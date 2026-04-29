@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { rubrosApi, subrubrosApi, localesApi, authApi } from './api';
 import RubroView from './components/RubroView';
 import Dashboard from './components/Dashboard';
+import Graficas from './components/Graficas';
 import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -160,7 +161,7 @@ export default function App() {
     }
   };
 
-  const isRubroActive = activeView !== 'inicio' && activeView?.id;
+  const isRubroActive = activeView !== 'inicio' && activeView !== 'graficas' && activeView?.id;
   const activeLocal = isRubroActive ? locales.find(l => l.id === activeView.local_id) : null;
 
   if (!loggedIn) return <Login onLogin={() => setLoggedIn(true)} />;
@@ -210,6 +211,16 @@ export default function App() {
           >
             <Home size={15} />
             Inicio
+          </button>
+
+          <button
+            onClick={() => { setActiveView('graficas'); setInitialSubrubro(null); closeSidebar(); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              activeView === 'graficas' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            }`}
+          >
+            <BarChart2 size={15} />
+            Gráficas
           </button>
 
           <div className="pt-4">
@@ -420,9 +431,14 @@ export default function App() {
                 <p className="font-semibold text-slate-800 leading-tight">{activeView.nombre}</p>
               </div>
             </div>
+          ) : activeView === 'graficas' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800">Gráficas</h1>
+              <p className="text-xs text-slate-400">Tendencias y resumen financiero</p>
+            </div>
           ) : (
             <div>
-              <h1 className="font-semibold text-slate-800">Panel de inicio</h1>
+              <h1 className="font-semibold text-slate-800">Inicio</h1>
               <p className="text-xs text-slate-400">Resumen general del sistema</p>
             </div>
           )}
@@ -437,13 +453,14 @@ export default function App() {
               initialSubrubro={initialSubrubro}
               onBack={() => { setActiveView('inicio'); setInitialSubrubro(null); cargar(); }}
             />
+          ) : activeView === 'graficas' ? (
+            <Graficas rubros={rubros} />
           ) : (
             <Dashboard
               locales={locales}
               rubros={rubros}
               rubroStats={rubroStats}
               onNavigate={handleNavigateFromVenc}
-              onSelectRubro={(r) => { setActiveView(r); setInitialSubrubro(null); }}
             />
           )}
         </main>
