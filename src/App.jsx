@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { rubrosApi, subrubrosApi, localesApi, authApi } from './api';
 import RubroView from './components/RubroView';
 import Dashboard from './components/Dashboard';
 import Graficas from './components/Graficas';
 import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -40,6 +40,14 @@ export default function App() {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   });
   const [sidebarRight, setSidebarRight] = useState(() => localStorage.getItem('sidebarSide') === 'right');
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const mainRef = useRef(null);
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Local CRUD
   const [showNewLocal, setShowNewLocal] = useState(false);
@@ -455,9 +463,11 @@ export default function App() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10">
-          <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
-            <Menu size={20} />
-          </button>
+          {!sidebarRight && (
+            <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
+              <Menu size={20} />
+            </button>
+          )}
           {isRubroActive ? (
             <div className="flex items-center gap-2.5">
               <button
@@ -486,9 +496,17 @@ export default function App() {
               <p className="text-xs text-slate-400">Resumen general del sistema</p>
             </div>
           )}
+          {sidebarRight && (
+            <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden ml-auto text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
+              <Menu size={20} />
+            </button>
+          )}
         </header>
 
-        <main className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto">
+        <main
+          ref={mainRef}
+          className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto"
+        >
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>
           ) : isRubroActive ? (
@@ -496,6 +514,7 @@ export default function App() {
               rubro={activeView}
               initialSubrubro={initialSubrubro}
               onBack={() => { setActiveView('inicio'); setInitialSubrubro(null); cargar(); }}
+              sidebarRight={sidebarRight}
             />
           ) : activeView === 'graficas' ? (
             <Graficas rubros={rubros} />
@@ -511,6 +530,16 @@ export default function App() {
       </div>
 
     </div>
+
+    {showScrollTop && (
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`fixed bottom-20 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-xl transition-all ${sidebarRight ? 'left-6' : 'right-6'}`}
+        title="Volver arriba"
+      >
+        <ChevronUp size={18} />
+      </button>
+    )}
     </>
   );
 }

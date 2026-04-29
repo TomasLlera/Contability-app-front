@@ -11,7 +11,7 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 
 const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
 
-export default function RubroView({ rubro, onBack, initialSubrubro }) {
+export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight }) {
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubro, setSelectedSubrubro] = useState(initialSubrubro ?? null);
   const [showCampos, setShowCampos] = useState(false);
@@ -76,6 +76,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
         rubro={rubro}
         subrubro={sub}
         onBack={() => { setSelectedSubrubro(null); cargar(); }}
+        sidebarRight={sidebarRight}
       />
     );
   }
@@ -116,7 +117,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
               toast.success('Movimientos eliminados');
             },
           })}
-          className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm hover:bg-red-100 flex items-center gap-1.5"
+          className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
         >
           🗑 Vaciar todo
         </button>
@@ -135,11 +136,11 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
                   <button
                     type="button"
                     onClick={() => setShowIconPicker(o => !o)}
-                    className="text-xl bg-slate-100 hover:bg-slate-200 rounded-lg px-2 py-1 shrink-0"
+                    className="text-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg px-2 py-1 shrink-0"
                     title="Cambiar ícono"
                   >{editIcon || '📁'}</button>
                   <input
-                    className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nombre"
                     value={editNombre}
                     onChange={e => setEditNombre(e.target.value)}
@@ -148,20 +149,20 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
                   />
                 </div>
                 {showIconPicker && (
-                  <div className="grid grid-cols-6 gap-0.5 border border-slate-200 rounded-lg p-1.5 bg-white">
+                  <div className="grid grid-cols-6 gap-0.5 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 bg-white dark:bg-slate-700">
                     {ICON_LIST.map(ic => (
                       <button
                         key={ic}
                         type="button"
                         onClick={() => { setEditIcon(ic); setShowIconPicker(false); }}
-                        className={`text-lg p-1 rounded hover:bg-slate-100 transition-colors ${editIcon === ic ? 'bg-blue-100' : ''}`}
+                        className={`text-lg p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors ${editIcon === ic ? 'bg-blue-100 dark:bg-blue-900/50' : ''}`}
                       >{ic}</button>
                     ))}
                   </div>
                 )}
                 <div className="flex gap-2">
                   <button onClick={() => handleSaveEdit(sub)} className="flex-1 bg-green-600 text-white rounded-lg py-1.5 text-sm hover:bg-green-700">Guardar</button>
-                  <button onClick={() => { setEditingId(null); setShowIconPicker(false); }} className="flex-1 bg-slate-100 rounded-lg py-1.5 text-sm hover:bg-slate-200">Cancelar</button>
+                  <button onClick={() => { setEditingId(null); setShowIconPicker(false); }} className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg py-1.5 text-sm hover:bg-slate-200 dark:hover:bg-slate-600">Cancelar</button>
                 </div>
               </div>
             ) : (

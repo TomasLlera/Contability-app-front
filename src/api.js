@@ -63,6 +63,8 @@ export const dashboardApi = {
   getResumen: () => api.get('/dashboard/resumen').then(r => r.data),
   getTendencia: (rubroId, meses = 6) =>
     api.get(`/dashboard/tendencia/${rubroId}`, { params: { meses } }).then(r => r.data),
+  getTendenciaSubrubro: (subrubroId, meses = 6) =>
+    api.get(`/dashboard/tendencia-subrubro/${subrubroId}`, { params: { meses } }).then(r => r.data),
 };
 
 export const movimientosApi = {

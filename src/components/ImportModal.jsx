@@ -184,19 +184,19 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <FileSpreadsheet size={16} className="text-emerald-600" />
+            <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg flex items-center justify-center">
+              <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="font-semibold text-slate-800 text-sm">Importar Excel</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Importar Excel</p>
               <p className="text-xs text-slate-400">{rubro.nombre}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <X size={18} />
           </button>
         </div>
@@ -206,19 +206,19 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
           {step === 'upload' && (
             <div>
               <div
-                className="border-2 border-dashed border-slate-300 rounded-xl p-10 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/40 transition-colors"
+                className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-10 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/40 dark:hover:border-emerald-600 dark:hover:bg-emerald-900/20 transition-colors"
                 onClick={() => inputRef.current?.click()}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }}
               >
                 <Upload size={32} className="mx-auto mb-3 text-slate-400" />
-                <p className="font-medium text-slate-600 text-sm">Arrastrá el archivo o hacé click</p>
+                <p className="font-medium text-slate-600 dark:text-slate-300 text-sm">Arrastrá el archivo o hacé click</p>
                 <p className="text-xs text-slate-400 mt-1">.xlsx / .xls</p>
               </div>
               <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={e => handleFile(e.target.files[0])} />
-              {error && <p className="mt-3 text-sm text-red-600 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
-              <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
+              {error && <p className="mt-3 text-sm text-red-500 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
+              <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-xs text-slate-500 dark:text-slate-400 space-y-1">
                 <p>• Cada <strong>hoja</strong> del Excel se crea como un subrubro bajo <strong>{rubro.nombre}</strong>.</p>
                 <p>• Si la hoja ya existe, se agregan o reemplazan movimientos según el modo.</p>
                 <p>• El mapeo de columnas se guarda automáticamente para importaciones futuras.</p>
@@ -229,9 +229,9 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
           {/* Step: map */}
           {step === 'map' && (
             <div className="space-y-5">
-              <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between gap-4">
+              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold text-slate-700">Filas a saltear al inicio</p>
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Filas a saltear al inicio</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {skipRows === 0
                       ? 'Los encabezados se leen desde la fila 1'
@@ -240,23 +240,23 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button type="button" onClick={() => setSkipRows(r => Math.max(0, r - 1))} disabled={skipRows === 0}
-                    className="w-7 h-7 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-30 font-bold text-sm flex items-center justify-center">−</button>
-                  <span className="w-5 text-center text-sm font-semibold text-slate-700">{skipRows}</span>
+                    className="w-7 h-7 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 disabled:opacity-30 font-bold text-sm flex items-center justify-center">−</button>
+                  <span className="w-5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">{skipRows}</span>
                   <button type="button" onClick={() => setSkipRows(r => Math.min(10, r + 1))}
-                    className="w-7 h-7 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold text-sm flex items-center justify-center">+</button>
+                    className="w-7 h-7 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 font-bold text-sm flex items-center justify-center">+</button>
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl">
+              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Hojas a importar ({selectedSheets.size}/{sheets.length})
                   </p>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setSelectedSheets(new Set(sheets.map(s => s.name)))}
-                      className="text-xs text-blue-600 hover:underline">Todas</button>
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Todas</button>
                     <button type="button" onClick={() => setSelectedSheets(new Set())}
-                      className="text-xs text-slate-400 hover:text-slate-600 hover:underline">Ninguna</button>
+                      className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:underline">Ninguna</button>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -265,8 +265,8 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                     return (
                       <label key={s.name} className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border cursor-pointer transition-colors select-none ${
                         sel
-                          ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
-                          : 'bg-white border-slate-200 text-slate-400 line-through'
+                          ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300'
+                          : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-400 line-through'
                       }`}>
                         <input type="checkbox" checked={sel} className="hidden"
                           onChange={() => setSelectedSheets(prev => {
@@ -283,7 +283,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
                   Asigná un rol a cada columna
                 </p>
                 <div className="space-y-2">
@@ -291,9 +291,9 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                     const samples = getSamples(col);
                     const numeric = isNumericCol(samples);
                     return (
-                      <div key={col} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
+                      <div key={col} className="flex items-start gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
                         <div className="w-40 shrink-0">
-                          <p className="text-xs font-semibold text-slate-700 truncate">{col}</p>
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{col}</p>
                           <p className="text-xs text-slate-400 mt-0.5 truncate">
                             {samples.filter(v => v !== null).slice(0, 3).map(fmtSample).join(' · ') || '—'}
                           </p>
@@ -301,10 +301,10 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                         <select
                           value={colMapping[col] || 'ignore'}
                           onChange={e => setColMapping(prev => ({ ...prev, [col]: e.target.value }))}
-                          className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white ${
+                          className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             colMapping[col] && colMapping[col] !== 'ignore'
-                              ? 'border-emerald-300 bg-emerald-50'
-                              : 'border-slate-300'
+                              ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 text-slate-800 dark:text-slate-100'
+                              : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100'
                           }`}
                         >
                           <option value="ignore">— Ignorar —</option>
@@ -336,7 +336,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
               </div>
 
               {canImport && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-300">
                   <p className="font-semibold mb-1">Se importará:</p>
                   <ul className="space-y-0.5">
                     {Object.entries(colMapping)
@@ -349,13 +349,13 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
               )}
 
               {!canImport && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 rounded-lg">
                   Necesitás asignar al menos: <strong>Fecha</strong> + <strong>Monto</strong> o <strong>Pago</strong>.
                 </p>
               )}
 
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Modo</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Modo</p>
                 <div className="space-y-2">
                   {[
                     { value: 'add',             label: 'Agregar todo',      desc: 'Importa todas las filas aunque existan.' },
@@ -364,13 +364,15 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                   ].map(opt => (
                     <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                       mode === opt.value
-                        ? opt.danger ? 'border-red-300 bg-red-50' : 'border-blue-300 bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? opt.danger
+                          ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30'
+                          : 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                     }`}>
                       <input type="radio" name="import-mode" value={opt.value} checked={mode === opt.value}
                         onChange={() => setMode(opt.value)} className="mt-0.5 shrink-0" />
                       <div>
-                        <p className={`text-xs font-semibold ${opt.danger ? 'text-red-700' : 'text-slate-700'}`}>{opt.label}</p>
+                        <p className={`text-xs font-semibold ${opt.danger ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>{opt.label}</p>
                         <p className="text-xs text-slate-400 mt-0.5">{opt.desc}</p>
                       </div>
                     </label>
@@ -378,7 +380,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-600 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
+              {error && <p className="text-sm text-red-500 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
             </div>
           )}
 
@@ -386,7 +388,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
           {step === 'importing' && (
             <div className="py-10 text-center">
               <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-600 text-sm">Importando datos...</p>
+              <p className="text-slate-600 dark:text-slate-300 text-sm">Importando datos...</p>
             </div>
           )}
 
@@ -394,11 +396,11 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
           {step === 'done' && result && (
             <div>
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <Check size={20} className="text-green-600" />
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
+                  <Check size={20} className="text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800">
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">
                     {result.totalCreated} movimiento{result.totalCreated !== 1 ? 's' : ''} importado{result.totalCreated !== 1 ? 's' : ''}
                   </p>
                   <p className="text-xs text-slate-400">
@@ -409,10 +411,10 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
               </div>
               <div className="space-y-1.5 mb-5 max-h-52 overflow-y-auto">
                 {result.sheets.map(s => (
-                  <div key={s.name} className="flex items-center justify-between py-1.5 px-3 bg-slate-50 rounded-lg">
-                    <span className="text-sm text-slate-700 truncate mr-3">{s.name}</span>
+                  <div key={s.name} className="flex items-center justify-between py-1.5 px-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <span className="text-sm text-slate-700 dark:text-slate-200 truncate mr-3">{s.name}</span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-green-600 font-medium">{s.created} importados</span>
+                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">{s.created} importados</span>
                       {s.duplicates > 0 && <span className="text-xs text-amber-500">{s.duplicates} dup.</span>}
                       {s.skipped > 0 && <span className="text-xs text-slate-400">{s.skipped} vacíos</span>}
                     </div>
@@ -430,10 +432,10 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
         </div>
 
         {step === 'map' && (
-          <div className="px-6 py-4 border-t border-slate-200 flex gap-2 shrink-0">
+          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex gap-2 shrink-0">
             <button
               onClick={() => { setStep('upload'); setFile(null); setSheets([]); }}
-              className="flex-1 border border-slate-300 text-slate-600 py-2 rounded-xl text-sm hover:bg-slate-50"
+              className="flex-1 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               ← Volver
             </button>

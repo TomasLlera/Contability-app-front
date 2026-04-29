@@ -14,10 +14,10 @@ function vencimientoLabel(fechaVenc) {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const venc = new Date(fechaVenc + 'T00:00:00');
   const dias = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
-  if (dias < 0) return { label: `Vencida ${Math.abs(dias)}d`, cls: 'bg-red-100 text-red-700 border-red-200' };
-  if (dias === 0) return { label: 'Vence hoy', cls: 'bg-red-100 text-red-700 border-red-200' };
-  if (dias <= 7) return { label: `Vence en ${dias}d`, cls: 'bg-amber-100 text-amber-700 border-amber-200' };
-  return { label: fechaVenc, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+  if (dias < 0) return { label: `Vencida ${Math.abs(dias)}d`, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' };
+  if (dias === 0) return { label: 'Vence hoy', cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' };
+  if (dias <= 7) return { label: `Vence en ${dias}d`, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' };
+  return { label: fechaVenc, cls: 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600' };
 }
 
 function parseMes(key) {
@@ -41,21 +41,21 @@ function mesActualKey() {
 
 function TipoBadge({ mov }) {
   if (mov.tipo === 'nota_credito')
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">📋 NC</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-full">📋 NC</span>;
   if (mov.tipo === 'ajuste')
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-700 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-full">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 border border-orange-200 dark:border-orange-800 px-2 py-0.5 rounded-full">
         ⚡ {mov.concepto || 'Ajuste'}
       </span>
     );
   if (mov.tipo === 'pago' || ((mov.pago || 0) > 0 && !(mov.monto > 0)))
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-full">↓ Pago</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full">↓ Pago</span>;
   if (mov.pagado)
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded-full">✓ Pagada</span>;
-  return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">● Pendiente</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full">✓ Pagada</span>;
+  return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">● Pendiente</span>;
 }
 
-export default function SubrubroView({ rubro, subrubro, onBack }) {
+export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) {
   const [data, setData] = useState({ movimientos: [], monto_base: 0, saldo_total: null });
   const [campos, setCampos] = useState([]);
   const [mesActual, setMesActual] = useState(mesActualKey);
@@ -251,7 +251,7 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
         <div className="flex gap-2">
           <button
             onClick={() => movimientosApi.exportExcel(subrubro.id, subrubro.nombre)}
-            className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100"
+            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
           >↓ Excel</button>
           <button
             onClick={() => setConfirmModal({
@@ -264,7 +264,7 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
                 toast.success('Movimientos eliminados');
               },
             })}
-            className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100"
+            className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50"
           >🗑 Limpiar</button>
           <button
             onClick={() => { setEditingMov(null); setShowForm(true); }}
@@ -401,7 +401,7 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
       {/* Botón flotante de volver */}
       <button
         onClick={onBack}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:shadow-xl"
+        className={`fixed bottom-6 z-40 flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:shadow-xl ${sidebarRight ? 'left-6' : 'right-6'}`}
       >
         <ArrowLeft size={15} />
         Volver

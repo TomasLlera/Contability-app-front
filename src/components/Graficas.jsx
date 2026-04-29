@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { dashboardApi } from '../api';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { dashboardApi, subrubrosApi } from '../api';
+import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -43,9 +43,9 @@ function Delta({ current, previous, positiveIsGood = false }) {
 }
 
 const METRICAS = [
-  { key: 'facturado', label: 'Facturas', color: 'bg-blue-500', colorLight: 'bg-blue-200' },
-  { key: 'pagado',    label: 'Pagos',    color: 'bg-emerald-500', colorLight: 'bg-emerald-200' },
-  { key: 'diferencia', label: 'Deuda',  color: 'bg-red-500', colorLight: 'bg-red-200' },
+  { key: 'facturado',  label: 'Facturas', color: 'bg-blue-500',    colorLight: 'bg-blue-200 dark:bg-blue-900/60' },
+  { key: 'pagado',     label: 'Pagos',    color: 'bg-emerald-500', colorLight: 'bg-emerald-200 dark:bg-emerald-900/60' },
+  { key: 'diferencia', label: 'Deuda',    color: 'bg-red-500',     colorLight: 'bg-red-200 dark:bg-red-900/60' },
 ];
 
 function GraficoTendencia({ tendencia, metrica }) {
@@ -56,7 +56,7 @@ function GraficoTendencia({ tendencia, metrica }) {
   if (tendencia.length === 0) {
     return (
       <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
-        Sin datos para este rubro
+        Sin datos para este período
       </div>
     );
   }
@@ -82,7 +82,7 @@ function GraficoTendencia({ tendencia, metrica }) {
                   style={{ height: `${Math.max(pct, 2)}%` }}
                 />
               </div>
-              <p className={`text-xs ${isLast ? 'font-bold text-slate-700' : 'text-slate-400'}`}>
+              <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>
                 {MESES[mes]}
               </p>
               {isLast && <p className="text-xs text-slate-400">{anio}</p>}
@@ -115,6 +115,8 @@ function GraficoTendencia({ tendencia, metrica }) {
 export default function Graficas({ rubros = [] }) {
   const [resumen, setResumen] = useState(null);
   const [selectedRubroId, setSelectedRubroId] = useState(null);
+  const [subrubros, setSubrubros] = useState([]);
+  const [selectedSubrubroId, setSelectedSubrubroId] = useState(null);
   const [metrica, setMetrica] = useState('facturado');
   const [tendencia, setTendencia] = useState([]);
   const [loadingTendencia, setLoadingTendencia] = useState(false);
@@ -127,15 +129,27 @@ export default function Graficas({ rubros = [] }) {
     if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id);
   }, [rubros]);
 
+  // Al cambiar de rubro: cargar sus subrubros y resetear selección de subrubro
+  useEffect(() => {
+    if (!selectedRubroId) return;
+    setSelectedSubrubroId(null);
+    subrubrosApi.getByRubro(selectedRubroId).then(setSubrubros);
+  }, [selectedRubroId]);
+
+  // Al cambiar rubro o subrubro: cargar tendencia
   useEffect(() => {
     if (!selectedRubroId) return;
     setLoadingTendencia(true);
-    dashboardApi.getTendencia(selectedRubroId, 6)
+    const request = selectedSubrubroId
+      ? dashboardApi.getTendenciaSubrubro(selectedSubrubroId, 6)
+      : dashboardApi.getTendencia(selectedRubroId, 6);
+    request
       .then(d => setTendencia(d.tendencia ?? []))
       .finally(() => setLoadingTendencia(false));
-  }, [selectedRubroId]);
+  }, [selectedRubroId, selectedSubrubroId]);
 
   const rubroSeleccionado = rubros.find(r => r.id === selectedRubroId);
+  const subrubroSeleccionado = subrubros.find(s => s.id === selectedSubrubroId);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -152,22 +166,12 @@ export default function Graficas({ rubros = [] }) {
         </div>
       )}
 
-      {/* Gráfico interactivo por rubro */}
+      {/* Gráfico interactivo */}
       {rubros.length > 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-          <div className="flex flex-wrap items-center gap-3 mb-5">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Tendencia mensual</h3>
-
-            <select
-              value={selectedRubroId ?? ''}
-              onChange={e => setSelectedRubroId(Number(e.target.value))}
-              className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              {rubros.map(r => (
-                <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>
-              ))}
-            </select>
-
+          {/* Fila 1: título + métricas */}
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tendencia mensual</h3>
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
               {METRICAS.map(m => (
                 <button
@@ -185,11 +189,38 @@ export default function Graficas({ rubros = [] }) {
             </div>
           </div>
 
-          {rubroSeleccionado && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
-              {getRubroIcon(rubroSeleccionado)} {rubroSeleccionado.nombre} — últimos 6 meses
-            </p>
-          )}
+          {/* Fila 2: selectores rubro / subrubro */}
+          <div className="flex items-center gap-2 mb-5">
+            <select
+              value={selectedRubroId ?? ''}
+              onChange={e => setSelectedRubroId(Number(e.target.value))}
+              className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {rubros.map(r => (
+                <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>
+              ))}
+            </select>
+
+            {subrubros.length > 0 && (
+              <>
+                <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 shrink-0" />
+                <select
+                  value={selectedSubrubroId ?? ''}
+                  onChange={e => setSelectedSubrubroId(e.target.value ? Number(e.target.value) : null)}
+                  className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="">Todos los subrubros</option>
+                  {subrubros.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.icon ? `${s.icon} ` : ''}{s.nombre}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">últimos 6 meses</span>
+          </div>
 
           {loadingTendencia ? (
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>

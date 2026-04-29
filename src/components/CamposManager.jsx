@@ -68,8 +68,8 @@ export default function CamposManager({ rubro, onClose }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-slate-500">
-        Definí las columnas que aparecerán en la tabla de <strong>{rubro.nombre}</strong>. Las columnas base no se pueden modificar.
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Definí las columnas que aparecerán en la tabla de <strong className="text-slate-700 dark:text-slate-200">{rubro.nombre}</strong>. Las columnas base no se pueden modificar.
       </p>
 
       {/* Columnas base (siempre presentes) */}
@@ -77,10 +77,10 @@ export default function CamposManager({ rubro, onClose }) {
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Columnas base (fijas)</p>
         <div className="grid grid-cols-2 gap-2">
           {BASE_COLS.map(c => (
-            <div key={c.nombre} className="flex items-center gap-2 p-2.5 bg-slate-100 rounded-lg border border-slate-200">
-              <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-300 text-slate-600 text-xs font-bold shrink-0">{c.icon}</span>
+            <div key={c.nombre} className="flex items-center gap-2 p-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg border border-slate-200 dark:border-slate-600">
+              <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold shrink-0">{c.icon}</span>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-700">{c.nombre}</p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{c.nombre}</p>
                 <p className="text-xs text-slate-400 leading-tight">{c.desc}</p>
               </div>
             </div>
@@ -100,9 +100,9 @@ export default function CamposManager({ rubro, onClose }) {
             return (
               <div key={c.id}>
                 {editingId === c.id ? (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
                     <input
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={editNombre}
                       onChange={e => setEditNombre(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSaveEdit(c)}
@@ -114,27 +114,27 @@ export default function CamposManager({ rubro, onClose }) {
                           key={t.value}
                           type="button"
                           onClick={() => setEditTipo(t.value)}
-                          className={`p-2 rounded-lg border-2 text-left transition-all ${editTipo === t.value ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                          className={`p-2 rounded-lg border-2 text-left transition-all ${editTipo === t.value ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500'}`}
                         >
-                          <p className="text-xs font-semibold text-slate-700">{t.label}</p>
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{t.label}</p>
                         </button>
                       ))}
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleSaveEdit(c)} className="flex-1 bg-blue-600 text-white rounded-lg py-1.5 text-sm hover:bg-blue-700">Guardar</button>
-                      <button onClick={() => setEditingId(null)} className="flex-1 bg-white border border-slate-300 text-slate-600 rounded-lg py-1.5 text-sm hover:bg-slate-50">Cancelar</button>
+                      <button onClick={() => setEditingId(null)} className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-600">Cancelar</button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 p-2.5 bg-white rounded-lg border border-slate-200 hover:border-slate-300">
+                  <div className="flex items-center gap-2 p-2.5 bg-white dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500">
                     <span className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold shrink-0 border ${info?.color}`}>
                       {info?.icon}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700">{c.nombre}</p>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{c.nombre}</p>
                       <p className="text-xs text-slate-400">{info?.label}</p>
                     </div>
-                    <button onClick={() => { setEditingId(c.id); setEditNombre(c.nombre); setEditTipo(c.tipo); }} className="text-xs text-slate-400 hover:text-blue-600 transition-colors shrink-0">Editar</button>
+                    <button onClick={() => { setEditingId(c.id); setEditNombre(c.nombre); setEditTipo(c.tipo); }} className="text-xs text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0">Editar</button>
                     <button onClick={() => handleDelete(c.id)} className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0">Borrar</button>
                   </div>
                 )}
@@ -142,17 +142,17 @@ export default function CamposManager({ rubro, onClose }) {
             );
           })}
           {campos.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-3 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <p className="text-sm text-slate-400 text-center py-3 bg-slate-50 dark:bg-slate-700/40 rounded-lg border border-dashed border-slate-200 dark:border-slate-600">
               Sin columnas adicionales. Agregá las que necesites.
             </p>
           )}
         </div>
 
         {/* Formulario para agregar */}
-        <div className="border-t border-slate-200 pt-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-500">Agregar columna</p>
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-3">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Agregar columna</p>
           <input
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Nombre (ej: N° Factura, Retención, Nota...)"
             value={nombre}
             onChange={e => setNombre(e.target.value)}
@@ -164,11 +164,11 @@ export default function CamposManager({ rubro, onClose }) {
                 key={t.value}
                 type="button"
                 onClick={() => setTipo(t.value)}
-                className={`p-2.5 rounded-lg border-2 text-left transition-all ${tipo === t.value ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}
+                className={`p-2.5 rounded-lg border-2 text-left transition-all ${tipo === t.value ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'}`}
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className={`text-xs font-bold px-1 rounded ${t.color}`}>{t.icon}</span>
-                  <p className="text-xs font-semibold text-slate-700">{t.label}</p>
+                  <span className={`text-xs font-bold px-1 rounded border ${t.color}`}>{t.icon}</span>
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{t.label}</p>
                 </div>
                 <p className="text-xs text-slate-400 leading-tight">{t.desc}</p>
               </button>
@@ -184,8 +184,8 @@ export default function CamposManager({ rubro, onClose }) {
         </div>
       </div>
 
-      <div className="flex justify-end pt-2 border-t border-slate-200">
-        <button onClick={onClose} className="bg-slate-100 text-slate-700 px-5 py-2 rounded-lg text-sm hover:bg-slate-200 font-medium">
+      <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-700">
+        <button onClick={onClose} className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-5 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 font-medium">
           Listo
         </button>
       </div>
