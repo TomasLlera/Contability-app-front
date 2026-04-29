@@ -43,13 +43,17 @@ function FinancialCard({ label, value, negative, sub }) {
   );
 }
 
-function Delta({ current, previous }) {
+function Delta({ current, previous, positiveIsGood = false }) {
   if (!previous || previous === 0) return null;
   const pct = ((current - previous) / previous) * 100;
   const abs = Math.abs(pct).toFixed(1);
   if (Math.abs(pct) < 1) return <span className="inline-flex items-center gap-0.5 text-xs text-slate-400"><Minus size={11} /> Sin cambio</span>;
-  if (pct > 0) return <span className="inline-flex items-center gap-0.5 text-xs text-red-500 font-medium"><TrendingUp size={11} /> +{abs}% vs mes ant.</span>;
-  return <span className="inline-flex items-center gap-0.5 text-xs text-green-600 font-medium"><TrendingDown size={11} /> -{abs}% vs mes ant.</span>;
+  if (pct > 0) {
+    const color = positiveIsGood ? 'text-green-600' : 'text-red-500';
+    return <span className={`inline-flex items-center gap-0.5 text-xs ${color} font-medium`}><TrendingUp size={11} /> +{abs}% vs mes ant.</span>;
+  }
+  const color = positiveIsGood ? 'text-red-500' : 'text-green-600';
+  return <span className={`inline-flex items-center gap-0.5 text-xs ${color} font-medium`}><TrendingDown size={11} /> -{abs}% vs mes ant.</span>;
 }
 
 const METRICAS = [
@@ -85,7 +89,7 @@ function GraficoTendencia({ tendencia, metrica }) {
               {/* Tooltip */}
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                 <p className="font-semibold">{fmt(val)}</p>
-                {prev && <Delta current={val} previous={prev[metrica] ?? 0} />}
+                {prev && <Delta current={val} previous={prev[metrica] ?? 0} positiveIsGood={metrica === 'pagado'} />}
               </div>
 
               {/* Barra */}
@@ -119,7 +123,7 @@ function GraficoTendencia({ tendencia, metrica }) {
               <p className="text-lg font-bold text-slate-800">{fmt(val)}</p>
             </div>
             <div className="ml-2">
-              <Delta current={val} previous={prevVal} />
+              <Delta current={val} previous={prevVal} positiveIsGood={metrica === 'pagado'} />
             </div>
           </div>
         );
