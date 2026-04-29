@@ -59,6 +59,12 @@ export const subrubrosApi = {
   clearMovimientos: (id) => api.delete(`/movimientos/${id}/movimientos`).then(r => r.data),
 };
 
+export const dashboardApi = {
+  getResumen: () => api.get('/dashboard/resumen').then(r => r.data),
+  getTendencia: (rubroId, meses = 6) =>
+    api.get(`/dashboard/tendencia/${rubroId}`, { params: { meses } }).then(r => r.data),
+};
+
 export const movimientosApi = {
   getBySubrubro: (subrubroId, anio, mes) =>
     api.get(`/movimientos/${subrubroId}`, { params: { anio, mes } }).then(r => r.data),
