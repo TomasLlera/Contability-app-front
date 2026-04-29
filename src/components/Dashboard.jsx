@@ -57,9 +57,9 @@ function Delta({ current, previous, positiveIsGood = false }) {
 }
 
 const METRICAS = [
-  { key: 'facturado', label: 'Facturas', color: 'bg-blue-400', colorLight: 'bg-blue-100' },
-  { key: 'pagado',    label: 'Pagos',    color: 'bg-emerald-400', colorLight: 'bg-emerald-100' },
-  { key: 'diferencia', label: 'Deuda',  color: 'bg-red-400', colorLight: 'bg-red-100' },
+  { key: 'facturado', label: 'Facturas', color: 'bg-blue-500', colorLight: 'bg-blue-200' },
+  { key: 'pagado',    label: 'Pagos',    color: 'bg-emerald-500', colorLight: 'bg-emerald-200' },
+  { key: 'diferencia', label: 'Deuda',  color: 'bg-red-500', colorLight: 'bg-red-200' },
 ];
 
 function GraficoTendencia({ tendencia, metrica }) {
@@ -85,7 +85,7 @@ function GraficoTendencia({ tendencia, metrica }) {
           const prev = tendencia[i - 1];
           const [anio, mes] = t.mes.split('-');
           return (
-            <div key={t.mes} className="flex-1 flex flex-col items-center gap-1 group relative">
+            <div key={t.mes} className="flex-1 h-full flex flex-col items-center gap-1 group relative">
               {/* Tooltip */}
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                 <p className="font-semibold">{fmt(val)}</p>
