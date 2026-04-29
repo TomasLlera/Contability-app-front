@@ -170,14 +170,14 @@ export default function Graficas({ rubros = [] }) {
       {rubros.length > 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           {/* Fila 1: título + métricas */}
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tendencia mensual</h3>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Tendencia mensual</h3>
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
               {METRICAS.map(m => (
                 <button
                   key={m.key}
                   onClick={() => setMetrica(m.key)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     metrica === m.key
                       ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -190,11 +190,11 @@ export default function Graficas({ rubros = [] }) {
           </div>
 
           {/* Fila 2: selectores rubro / subrubro */}
-          <div className="flex items-center gap-2 mb-5">
+          <div className="flex flex-wrap items-center gap-2 mb-5">
             <select
               value={selectedRubroId ?? ''}
               onChange={e => setSelectedRubroId(Number(e.target.value))}
-              className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {rubros.map(r => (
                 <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>
@@ -207,7 +207,7 @@ export default function Graficas({ rubros = [] }) {
                 <select
                   value={selectedSubrubroId ?? ''}
                   onChange={e => setSelectedSubrubroId(e.target.value ? Number(e.target.value) : null)}
-                  className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
                   <option value="">Todos los subrubros</option>
                   {subrubros.map(s => (
@@ -219,7 +219,7 @@ export default function Graficas({ rubros = [] }) {
               </>
             )}
 
-            <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">últimos 6 meses</span>
+            <span className="hidden sm:block text-xs text-slate-400 dark:text-slate-500 shrink-0">últimos 6 meses</span>
           </div>
 
           {loadingTendencia ? (

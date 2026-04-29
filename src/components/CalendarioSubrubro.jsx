@@ -165,7 +165,8 @@ function VistaSemana({ fecha, movimientos }) {
   });
 
   return (
-    <div className="grid grid-cols-7 gap-2">
+    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="grid grid-cols-7 gap-2 min-w-[560px]">
       {dias.map((dia, idx) => {
         const dateStr = toDateStr(dia);
         const info    = getDayInfo(movimientos, dateStr);
@@ -213,6 +214,7 @@ function VistaSemana({ fecha, movimientos }) {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
