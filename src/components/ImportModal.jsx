@@ -28,6 +28,34 @@ function autoDetectRole(headerName, camposRubro) {
   return 'ignore';
 }
 
+function expandMergedCells(sheet) {
+  const merges = sheet['!merges'] || [];
+  for (const merge of merges) {
+    const origin = XLSX.utils.encode_cell(merge.s);
+    const originVal = sheet[origin];
+    if (!originVal) continue;
+    for (let r = merge.s.r; r <= merge.e.r; r++) {
+      for (let c = merge.s.c; c <= merge.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!sheet[addr]) sheet[addr] = { ...originVal };
+      }
+    }
+  }
+  return sheet;
+}
+
+function parseWorkbook(wb, skip) {
+  return wb.SheetNames.map(name => {
+    expandMergedCells(wb.Sheets[name]);
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: true });
+    const headerRow = raw[skip] || [];
+    const headers = headerRow.map(v => (v == null ? '' : String(v).trim()));
+    const dataRows = raw.slice(skip + 1, skip + 4);
+    const samples = headers.map((_, ci) => dataRows.map(r => r[ci] ?? null));
+    return { name, headers, samples };
+  }).filter(s => s.headers.some(h => h.length > 0));
+}
+
 function isNumericCol(samples) {
   const vals = samples.filter(v => v !== null && v !== undefined && v !== '');
   if (vals.length === 0) return false;
@@ -51,7 +79,10 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('skip_duplicates');
+  const [skipRows, setSkipRows] = useState(0);
   const inputRef = useRef();
+  const wbRef = useRef(null);
+  const savedConfigRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -63,28 +94,38 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
     });
   }, [rubro.id]);
 
+  useEffect(() => {
+    if (step !== 'map' || !wbRef.current) return;
+    const sheetData = parseWorkbook(wbRef.current, skipRows);
+    if (sheetData.length === 0) return;
+    const allHeaders = [...new Set(sheetData.flatMap(s => s.headers))];
+    const saved = savedConfigRef.current?.mapping || {};
+    const mapping = {};
+    for (const h of allHeaders) {
+      mapping[h] = saved[h] || autoDetectRole(h, campos);
+    }
+    setColMapping(mapping);
+    setSheets(sheetData);
+  }, [skipRows, step]);
+
   const handleFile = async (f) => {
     if (!f) return;
     setError(null);
+    setSkipRows(0);
 
-    // Cargar config guardada del backend
     let savedConfig = null;
     try {
       savedConfig = await rubrosApi.getImportConfig(rubro.id);
     } catch { /* sin config guardada */ }
+    savedConfigRef.current = savedConfig;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-        const sheetData = wb.SheetNames.map(name => {
-          const raw = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: true });
-          const headers = (raw[0] || []).map(v => (v == null ? '' : String(v).trim()));
-          const dataRows = raw.slice(1, 4);
-          const samples = headers.map((_, ci) => dataRows.map(r => r[ci] ?? null));
-          return { name, headers, samples };
-        }).filter(s => s.headers.some(h => h.length > 0));
+        wbRef.current = wb;
 
+        const sheetData = parseWorkbook(wb, 0);
         if (sheetData.length === 0) { setError('El archivo no tiene hojas con datos.'); return; }
 
         const allHeaders = [...new Set(sheetData.flatMap(s => s.headers))];
@@ -111,7 +152,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
     setError(null);
     try {
       await rubrosApi.saveImportConfig(rubro.id, colMapping, mode);
-      const res = await movimientosApi.importExcel(rubro.id, file, colMapping, mode, [...selectedSheets]);
+      const res = await movimientosApi.importExcel(rubro.id, file, colMapping, mode, [...selectedSheets], skipRows);
       setResult(res);
       setStep('done');
     } catch (err) {
@@ -188,6 +229,24 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
           {/* Step: map */}
           {step === 'map' && (
             <div className="space-y-5">
+              <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Filas a saltear al inicio</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {skipRows === 0
+                      ? 'Los encabezados se leen desde la fila 1'
+                      : `Salteando ${skipRows} fila${skipRows > 1 ? 's' : ''} de título — encabezados desde la fila ${skipRows + 1}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => setSkipRows(r => Math.max(0, r - 1))} disabled={skipRows === 0}
+                    className="w-7 h-7 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-30 font-bold text-sm flex items-center justify-center">−</button>
+                  <span className="w-5 text-center text-sm font-semibold text-slate-700">{skipRows}</span>
+                  <button type="button" onClick={() => setSkipRows(r => Math.min(10, r + 1))}
+                    className="w-7 h-7 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold text-sm flex items-center justify-center">+</button>
+                </div>
+              </div>
+
               <div className="p-3 bg-slate-50 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">

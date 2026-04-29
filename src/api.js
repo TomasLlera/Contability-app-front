@@ -1,6 +1,31 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: '/api' });
+const BASE = import.meta.env.VITE_API_URL || '/api';
+const api = axios.create({ baseURL: BASE });
+
+api.interceptors.request.use(cfg => {
+  const token = localStorage.getItem('token');
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
+});
+
+api.interceptors.response.use(r => r, err => {
+  if (err.response?.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/';
+  }
+  return Promise.reject(err);
+});
+
+export const authApi = {
+  login: (usuario, password) =>
+    axios.post(`${BASE}/auth/login`, { usuario, password }).then(r => {
+      localStorage.setItem('token', r.data.token);
+      return r.data;
+    }),
+  logout: () => localStorage.removeItem('token'),
+  isLoggedIn: () => !!localStorage.getItem('token'),
+};
 
 export const localesApi = {
   getAll: () => api.get('/locales').then(r => r.data),
@@ -48,15 +73,16 @@ export const movimientosApi = {
   getVencimientos: (dias = 30) => api.get('/movimientos/vencimientos/proximos', { params: { dias } }).then(r => r.data),
   exportExcel: (subrubroId, nombre) => {
     const a = document.createElement('a');
-    a.href = `/api/movimientos/export/${subrubroId}`;
+    a.href = `${BASE}/movimientos/export/${subrubroId}`;
     a.download = `${nombre}.xlsx`;
     a.click();
   },
-  importExcel: (rubroId, file, mapping, mode = 'skip_duplicates', sheets = null) => {
+  importExcel: (rubroId, file, mapping, mode = 'skip_duplicates', sheets = null, skipRows = 0) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mapping', JSON.stringify(mapping));
     formData.append('mode', mode);
+    formData.append('skipRows', String(skipRows));
     if (sheets) formData.append('sheets', JSON.stringify(sheets));
     return api.post(`/movimientos/import/${rubroId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

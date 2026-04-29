@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { rubrosApi, subrubrosApi, localesApi } from './api';
+import { rubrosApi, subrubrosApi, localesApi, authApi } from './api';
 import RubroView from './components/RubroView';
 import Dashboard from './components/Dashboard';
-import { Home, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check } from 'lucide-react';
+import Login from './components/Login';
+import { Home, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu } from 'lucide-react';
 import './index.css';
 
 const RUBRO_ICONS = ['📁', '👥', '🏭', '🏪', '🚚', '💼', '🏗️', '📦'];
@@ -20,6 +21,7 @@ function getRubroIcon(rubro) {
 }
 
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(authApi.isLoggedIn());
   const [locales, setLocales] = useState([]);
   const [rubros, setRubros] = useState([]);
   const [rubroStats, setRubroStats] = useState({});
@@ -28,6 +30,7 @@ export default function App() {
   const [expandedLocales, setExpandedLocales] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Local CRUD
   const [showNewLocal, setShowNewLocal] = useState(false);
@@ -45,7 +48,7 @@ export default function App() {
   const [editIcon, setEditIcon] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { if (loggedIn) cargar(); else setLoading(false); }, [loggedIn]);
 
   const cargar = async () => {
     const [ls, rs] = await Promise.all([localesApi.getAll(), rubrosApi.getAll()]);
@@ -153,23 +156,38 @@ export default function App() {
   const isRubroActive = activeView !== 'inicio' && activeView?.id;
   const activeLocal = isRubroActive ? locales.find(l => l.id === activeView.local_id) : null;
 
+  if (!loggedIn) return <Login onLogin={() => setLoggedIn(true)} />;
+
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={closeSidebar} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-60 bg-slate-900 flex flex-col shrink-0 h-screen sticky top-0">
+      <aside className={`fixed md:sticky top-0 z-30 w-64 bg-slate-900 flex flex-col shrink-0 h-screen transition-transform duration-200
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div className="px-4 py-4 border-b border-slate-700/50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">C</div>
-            <div>
-              <p className="text-white font-bold text-sm leading-tight">Contabilidad</p>
-              <p className="text-slate-400 text-xs">Gestión de cuentas</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">C</div>
+              <div>
+                <p className="text-white font-bold text-sm leading-tight">Contabilidad</p>
+                <p className="text-slate-400 text-xs">Gestión de cuentas</p>
+              </div>
             </div>
+            <button onClick={() => { authApi.logout(); setLoggedIn(false); }} title="Cerrar sesión" className="text-slate-400 hover:text-white transition">
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
 
         <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
           <button
-            onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); }}
+            onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); }}
             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               activeView === 'inicio' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
@@ -275,7 +293,7 @@ export default function App() {
                             </div>
                           ) : (
                             <button
-                              onClick={() => { setActiveView(rubro); setInitialSubrubro(null); }}
+                              onClick={() => { setActiveView(rubro); setInitialSubrubro(null); closeSidebar(); }}
                               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors ${
                                 isRubroActive && activeView.id === rubro.id
                                   ? 'bg-slate-700 text-white'
@@ -372,7 +390,10 @@ export default function App() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10">
+        <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10">
+          <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 transition">
+            <Menu size={20} />
+          </button>
           {isRubroActive ? (
             <div className="flex items-center gap-2.5">
               <span className="text-xl">{getRubroIcon(activeView)}</span>
@@ -391,7 +412,7 @@ export default function App() {
           )}
         </header>
 
-        <main className="flex-1 px-6 py-6 overflow-auto">
+        <main className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>
           ) : isRubroActive ? (
