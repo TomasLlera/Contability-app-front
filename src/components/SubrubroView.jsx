@@ -3,6 +3,8 @@ import { movimientosApi, camposApi, subrubrosApi } from '../api';
 import Modal from './Modal';
 import MovimientoForm from './MovimientoForm';
 import CalendarioSubrubro from './CalendarioSubrubro';
+import ConfirmModal from './ConfirmModal';
+import toast from 'react-hot-toast';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -62,6 +64,7 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
   const [viewMode, setViewMode] = useState('tabla');
   const [todosMovs, setTodosMovs] = useState([]);
   const [todasFacturasPendientes, setTodasFacturasPendientes] = useState([]);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   const cargar = async (mes) => {
     const [y, m] = mes.split('-');
@@ -92,42 +95,53 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
     const tieneVinculacion = facturas_vinculadas_ids?.length > 0;
     const esPagoONC = tipo === 'pago' || tipo === 'nota_credito';
 
-    if (esPagoONC && tieneVinculacion) {
-      const payload = {
-        tipo,
-        fecha: rest.fecha,
-        monto_pago: rest.pago,
-        facturas_vinculadas_ids,
-        concepto_diferencia,
-        campos_extra: rest.campos_extra,
-      };
-      if (editingMov) {
-        await movimientosApi.actualizarPagoVinculado(editingMov.id, payload);
+    try {
+      if (esPagoONC && tieneVinculacion) {
+        const payload = {
+          tipo,
+          fecha: rest.fecha,
+          monto_pago: rest.pago,
+          facturas_vinculadas_ids,
+          concepto_diferencia,
+          campos_extra: rest.campos_extra,
+        };
+        if (editingMov) {
+          await movimientosApi.actualizarPagoVinculado(editingMov.id, payload);
+        } else {
+          await movimientosApi.pagoVinculado(subrubro.id, payload);
+        }
       } else {
-        await movimientosApi.pagoVinculado(subrubro.id, payload);
+        const payload = { ...rest, tipo };
+        if (editingMov) await movimientosApi.update(editingMov.id, payload);
+        else await movimientosApi.create(subrubro.id, payload);
       }
-    } else {
-      const payload = { ...rest, tipo };
-      if (editingMov) await movimientosApi.update(editingMov.id, payload);
-      else await movimientosApi.create(subrubro.id, payload);
-    }
 
-    setShowForm(false);
-    setEditingMov(null);
-    cargar(mesActual);
-    cargarTodos();
+      setShowForm(false);
+      setEditingMov(null);
+      cargar(mesActual);
+      cargarTodos();
+      toast.success(editingMov ? 'Movimiento actualizado' : 'Movimiento guardado');
+    } catch {
+      toast.error('No se pudo guardar el movimiento');
+    }
   };
 
-  const handleDelete = async (mov) => {
-    const msg = mov._ajuste_pago_id
+  const handleDelete = (mov) => {
+    const message = mov._ajuste_pago_id
       ? '¿Borrar este ajuste automático?'
       : mov.tipo === 'pago' || mov.tipo === 'nota_credito'
         ? '¿Borrar este pago? También se borrará su ajuste automático si tiene uno.'
         : '¿Borrar este movimiento?';
-    if (!confirm(msg)) return;
-    await movimientosApi.delete(mov.id);
-    cargar(mesActual);
-    cargarTodos();
+    setConfirmModal({
+      message,
+      onConfirm: async () => {
+        await movimientosApi.delete(mov.id);
+        setConfirmModal(null);
+        cargar(mesActual);
+        cargarTodos();
+        toast.success('Movimiento eliminado');
+      },
+    });
   };
 
   const handleEdit = (m) => {
@@ -239,12 +253,16 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
             className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100"
           >↓ Excel</button>
           <button
-            onClick={async () => {
-              if (!confirm(`¿Borrar TODOS los movimientos de "${subrubro.nombre}"?`)) return;
-              await subrubrosApi.clearMovimientos(subrubro.id);
-              cargar(mesActual);
-              cargarTodos();
-            }}
+            onClick={() => setConfirmModal({
+              message: `¿Borrar TODOS los movimientos de "${subrubro.nombre}"? Esta acción no se puede deshacer.`,
+              onConfirm: async () => {
+                await subrubrosApi.clearMovimientos(subrubro.id);
+                setConfirmModal(null);
+                cargar(mesActual);
+                cargarTodos();
+                toast.success('Movimientos eliminados');
+              },
+            })}
             className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100"
           >🗑 Limpiar</button>
           <button
@@ -378,6 +396,14 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
           </table>
         </div>
       ))}
+
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
 
       {showForm && (
         <Modal

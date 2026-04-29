@@ -4,6 +4,8 @@ import Modal from './Modal';
 import CamposManager from './CamposManager';
 import SubrubroView from './SubrubroView';
 import ImportModal from './ImportModal';
+import ConfirmModal from './ConfirmModal';
+import toast from 'react-hot-toast';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -20,6 +22,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   const cargar = () => subrubrosApi.getByRubro(rubro.id).then(setSubrubros);
   useEffect(() => {
@@ -29,25 +32,41 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
 
   const handleAdd = async () => {
     if (!nuevoNombre.trim()) return;
-    const sub = await subrubrosApi.create(rubro.id, nuevoNombre.trim());
-    setSubrubros(prev => [...prev, sub].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-    setNuevoNombre('');
+    try {
+      const sub = await subrubrosApi.create(rubro.id, nuevoNombre.trim());
+      setSubrubros(prev => [...prev, sub].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setNuevoNombre('');
+      toast.success(`${sub.nombre} creado`);
+    } catch {
+      toast.error('No se pudo crear');
+    }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Borrar este elemento y todos sus movimientos?')) return;
-    await subrubrosApi.delete(id);
-    setSubrubros(prev => prev.filter(s => s.id !== id));
+  const handleDelete = (id) => {
+    setConfirmModal({
+      message: '¿Borrar este elemento y todos sus movimientos? Esta acción no se puede deshacer.',
+      onConfirm: async () => {
+        await subrubrosApi.delete(id);
+        setSubrubros(prev => prev.filter(s => s.id !== id));
+        setConfirmModal(null);
+        toast.success('Eliminado');
+      },
+    });
   };
 
   const handleSaveEdit = async (sub) => {
-    await subrubrosApi.update(sub.id, editNombre, editIcon);
-    setSubrubros(prev =>
-      prev.map(s => s.id === sub.id ? { ...s, nombre: editNombre, icon: editIcon } : s)
-        .sort((a, b) => a.nombre.localeCompare(b.nombre))
-    );
-    setEditingId(null);
-    setShowIconPicker(false);
+    try {
+      await subrubrosApi.update(sub.id, editNombre, editIcon);
+      setSubrubros(prev =>
+        prev.map(s => s.id === sub.id ? { ...s, nombre: editNombre, icon: editIcon } : s)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      );
+      setEditingId(null);
+      setShowIconPicker(false);
+      toast.success('Actualizado');
+    } catch {
+      toast.error('No se pudo actualizar');
+    }
   };
 
   if (selectedSubrubro) {
@@ -88,11 +107,15 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
           ⚙️ Columnas
         </button>
         <button
-          onClick={async () => {
-            if (!confirm(`¿Vaciar TODOS los movimientos de todos los proveedores en "${rubro.nombre}"?\nEsta acción no se puede deshacer.`)) return;
-            await rubrosApi.clearAllMovimientos(rubro.id);
-            cargar();
-          }}
+          onClick={() => setConfirmModal({
+            message: `¿Vaciar TODOS los movimientos de todos los proveedores en "${rubro.nombre}"? Esta acción no se puede deshacer.`,
+            onConfirm: async () => {
+              await rubrosApi.clearAllMovimientos(rubro.id);
+              setConfirmModal(null);
+              cargar();
+              toast.success('Movimientos eliminados');
+            },
+          })}
           className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm hover:bg-red-100 flex items-center gap-1.5"
         >
           🗑 Vaciar todo
@@ -163,10 +186,16 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
                     className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
                   >Editar</button>
                   <button
-                    onClick={async (e) => {
+                    onClick={e => {
                       e.stopPropagation();
-                      if (!confirm(`¿Vaciar todos los movimientos de "${sub.nombre}"?`)) return;
-                      await subrubrosApi.clearMovimientos(sub.id);
+                      setConfirmModal({
+                        message: `¿Vaciar todos los movimientos de "${sub.nombre}"? Esta acción no se puede deshacer.`,
+                        onConfirm: async () => {
+                          await subrubrosApi.clearMovimientos(sub.id);
+                          setConfirmModal(null);
+                          toast.success('Movimientos eliminados');
+                        },
+                      });
                     }}
                     className="text-xs text-slate-400 hover:text-orange-500 transition-colors"
                   >Vaciar</button>
@@ -219,6 +248,14 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
         <Modal title={`Columnas de ${rubro.nombre}`} onClose={() => setShowCampos(false)}>
           <CamposManager rubro={rubro} onClose={() => setShowCampos(false)} />
         </Modal>
+      )}
+
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
       )}
     </div>
   );

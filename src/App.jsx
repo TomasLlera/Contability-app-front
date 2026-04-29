@@ -3,7 +3,9 @@ import { rubrosApi, subrubrosApi, localesApi, authApi } from './api';
 import RubroView from './components/RubroView';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
+import ConfirmModal from './components/ConfirmModal';
 import { Home, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
 const RUBRO_ICONS = ['📁', '👥', '🏭', '🏪', '🚚', '💼', '🏗️', '📦'];
@@ -29,7 +31,7 @@ export default function App() {
   const [initialSubrubro, setInitialSubrubro] = useState(null);
   const [expandedLocales, setExpandedLocales] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Local CRUD
@@ -63,11 +65,6 @@ export default function App() {
     setRubroStats(stats);
   };
 
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const toggleLocal = (id) => {
     setExpandedLocales(prev => {
       const next = new Set(prev);
@@ -84,7 +81,7 @@ export default function App() {
     setNuevoLocal('');
     setShowNewLocal(false);
     setExpandedLocales(prev => new Set([...prev, local.id]));
-    showToast('Local creado');
+    toast.success('Local creado');
   };
 
   const handleSaveLocalEdit = async (local, e) => {
@@ -96,17 +93,22 @@ export default function App() {
     );
     setEditingLocal(null);
     setShowLocalIconPicker(false);
-    showToast('Local actualizado');
+    toast.success('Local actualizado');
   };
 
-  const handleDeleteLocal = async (id, e) => {
+  const handleDeleteLocal = (id, e) => {
     e.stopPropagation();
-    if (!confirm('¿Borrar este local y todo su contenido?')) return;
-    await localesApi.delete(id);
-    setLocales(prev => prev.filter(l => l.id !== id));
-    setRubros(prev => prev.filter(r => r.local_id !== id));
-    if (activeView?.local_id === id) setActiveView('inicio');
-    showToast('Local eliminado');
+    setConfirmModal({
+      message: '¿Borrar este local y todo su contenido? Esta acción no se puede deshacer.',
+      onConfirm: async () => {
+        await localesApi.delete(id);
+        setLocales(prev => prev.filter(l => l.id !== id));
+        setRubros(prev => prev.filter(r => r.local_id !== id));
+        if (activeView?.local_id === id) setActiveView('inicio');
+        setConfirmModal(null);
+        toast.success('Local eliminado');
+      },
+    });
   };
 
   // --- Rubro handlers ---
@@ -118,9 +120,9 @@ export default function App() {
       setRubroStats(prev => ({ ...prev, [rubro.id]: 0 }));
       setNuevoRubro('');
       setShowNewRubro(null);
-      showToast('Rubro creado');
+      toast.success('Rubro creado');
     } catch {
-      showToast('El rubro ya existe', 'error');
+      toast.error('El rubro ya existe');
     }
   };
 
@@ -134,16 +136,21 @@ export default function App() {
     if (activeView?.id === rubro.id) setActiveView({ ...rubro, nombre: editNombre, icon: editIcon });
     setEditingRubro(null);
     setShowIconPicker(false);
-    showToast('Rubro actualizado');
+    toast.success('Rubro actualizado');
   };
 
-  const handleDeleteRubro = async (id, e) => {
+  const handleDeleteRubro = (id, e) => {
     e.stopPropagation();
-    if (!confirm('¿Borrar este rubro y todo su contenido?')) return;
-    await rubrosApi.delete(id);
-    setRubros(prev => prev.filter(r => r.id !== id));
-    if (activeView?.id === id) setActiveView('inicio');
-    showToast('Rubro eliminado');
+    setConfirmModal({
+      message: '¿Borrar este rubro y todo su contenido? Esta acción no se puede deshacer.',
+      onConfirm: async () => {
+        await rubrosApi.delete(id);
+        setRubros(prev => prev.filter(r => r.id !== id));
+        if (activeView?.id === id) setActiveView('inicio');
+        setConfirmModal(null);
+        toast.success('Rubro eliminado');
+      },
+    });
   };
 
   const handleNavigateFromVenc = (rubro, subrubro) => {
@@ -161,6 +168,15 @@ export default function App() {
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
+    <>
+    <Toaster position="bottom-right" toastOptions={{ duration: 3000 }} />
+    {confirmModal && (
+      <ConfirmModal
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(null)}
+      />
+    )}
     <div className="min-h-screen bg-slate-50 flex">
       {/* Overlay mobile */}
       {sidebarOpen && (
@@ -433,11 +449,7 @@ export default function App() {
         </main>
       </div>
 
-      {toast && (
-        <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium z-50 ${toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
-          {toast.msg}
-        </div>
-      )}
     </div>
+    </>
   );
 }
