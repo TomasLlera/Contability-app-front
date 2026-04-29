@@ -19,12 +19,12 @@ function getRubroIcon(rubro) {
 
 function FinancialCard({ label, value, negative, sub }) {
   return (
-    <div className={`rounded-2xl p-5 border ${negative && value > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{label}</p>
-      <p className={`text-2xl font-bold ${negative && value > 0 ? 'text-red-600' : 'text-slate-800'}`}>
+    <div className={`rounded-2xl p-5 border ${negative && value > 0 ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{label}</p>
+      <p className={`text-2xl font-bold ${negative && value > 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-100'}`}>
         {fmt(value)}
       </p>
-      {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
     </div>
   );
 }
@@ -97,10 +97,10 @@ function GraficoTendencia({ tendencia, metrica }) {
         const val = last[metrica] ?? 0;
         const prevVal = prev[metrica] ?? 0;
         return (
-          <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-700">
             <div>
-              <p className="text-xs text-slate-400">Mes actual</p>
-              <p className="text-lg font-bold text-slate-800">{fmt(val)}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Mes actual</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{fmt(val)}</p>
             </div>
             <div className="ml-2">
               <Delta current={val} previous={prevVal} positiveIsGood={metrica === 'pagado'} />
@@ -154,29 +154,29 @@ export default function Graficas({ rubros = [] }) {
 
       {/* Gráfico interactivo por rubro */}
       {rubros.length > 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex flex-wrap items-center gap-3 mb-5">
-            <h3 className="text-sm font-semibold text-slate-700 mr-auto">Tendencia mensual</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Tendencia mensual</h3>
 
             <select
               value={selectedRubroId ?? ''}
               onChange={e => setSelectedRubroId(Number(e.target.value))}
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {rubros.map(r => (
                 <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>
               ))}
             </select>
 
-            <div className="flex bg-slate-100 rounded-lg p-0.5">
+            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
               {METRICAS.map(m => (
                 <button
                   key={m.key}
                   onClick={() => setMetrica(m.key)}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                     metrica === m.key
-                      ? 'bg-white text-slate-800 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                      ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                   }`}
                 >
                   {m.label}
@@ -186,7 +186,7 @@ export default function Graficas({ rubros = [] }) {
           </div>
 
           {rubroSeleccionado && (
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
               {getRubroIcon(rubroSeleccionado)} {rubroSeleccionado.nombre} — últimos 6 meses
             </p>
           )}
@@ -198,9 +198,9 @@ export default function Graficas({ rubros = [] }) {
           )}
         </div>
       ) : (
-        <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
           <p className="text-5xl mb-4">📊</p>
-          <p className="font-semibold text-slate-600">Sin rubros para graficar</p>
+          <p className="font-semibold text-slate-600 dark:text-slate-300">Sin rubros para graficar</p>
           <p className="text-sm text-slate-400 mt-1">Creá rubros y cargá movimientos para ver las tendencias</p>
         </div>
       )}

@@ -5,6 +5,7 @@ import MovimientoForm from './MovimientoForm';
 import CalendarioSubrubro from './CalendarioSubrubro';
 import ConfirmModal from './ConfirmModal';
 import toast from 'react-hot-toast';
+import { ArrowLeft } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -189,36 +190,36 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
     <div>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={onBack} className="text-slate-400 hover:text-slate-600 text-sm flex items-center gap-1">
+        <button onClick={onBack} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm flex items-center gap-1">
           ← Volver
         </button>
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wide font-medium">{rubro.nombre}</p>
-          <h1 className="text-2xl font-bold text-slate-800">{subrubro.nombre}</h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{subrubro.nombre}</h1>
         </div>
       </div>
 
       {/* Resumen */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div className={`rounded-xl p-4 border ${saldoPositivo ? 'bg-white border-slate-200' : 'bg-red-50 border-red-200'}`}>
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Saldo total</p>
-          <p className={`text-xl font-bold mt-1 ${saldoPositivo ? 'text-slate-800' : 'text-red-600'}`}>{fmt(saldoFinal)}</p>
+        <div className={`rounded-xl p-4 border ${saldoPositivo ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'}`}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo total</p>
+          <p className={`text-xl font-bold mt-1 ${saldoPositivo ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(saldoFinal)}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Pendiente</p>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pendiente</p>
           <p className="text-xl font-bold text-amber-600 mt-1">
             {fmt(todasFacturasPendientes.reduce((s, m) => s + m.monto, 0))}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Total facturado</p>
-          <p className="text-xl font-bold text-slate-800 mt-1">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total facturado</p>
+          <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">
             {fmt(data.movimientos.reduce((s, m) => s + (m.monto || 0), 0))}
           </p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Total pagado</p>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total pagado</p>
           <p className="text-xl font-bold text-green-700 mt-1">
             {fmt(data.movimientos.reduce((s, m) => s + (m.pago || 0), 0))}
           </p>
@@ -226,25 +227,25 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
       </div>
 
       {/* Toggle vista */}
-      <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs font-medium mb-4 w-fit">
+      <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 text-xs font-medium mb-4 w-fit">
         {[['tabla', 'Tabla'], ['calendario', 'Calendario']].map(([v, l]) => (
           <button
             key={v}
             onClick={() => { setViewMode(v); if (v === 'calendario') cargarTodos(); }}
-            className={`px-4 py-1.5 rounded-md transition-colors ${viewMode === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-4 py-1.5 rounded-md transition-colors ${viewMode === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
           >{l}</button>
         ))}
       </div>
 
       {/* Selector mes + acciones */}
       <div className={`flex flex-wrap gap-2 items-center justify-between mb-4 ${viewMode === 'calendario' ? 'hidden' : ''}`}>
-        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
-          <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-2 py-1 rounded text-slate-500 hover:bg-slate-100 text-sm font-medium">‹</button>
-          <span className="px-3 py-1 text-sm font-semibold text-slate-700 min-w-20 text-center">{parseMes(mesActual)}</span>
+        <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
+          <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium">‹</button>
+          <span className="px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-20 text-center">{parseMes(mesActual)}</span>
           <button
             onClick={() => setMesActual(mesSiguiente(mesActual))}
             disabled={mesActual >= mesActualKey()}
-            className="px-2 py-1 rounded text-slate-500 hover:bg-slate-100 text-sm font-medium disabled:opacity-30"
+            className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium disabled:opacity-30"
           >›</button>
         </div>
         <div className="flex gap-2">
@@ -276,7 +277,7 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
 
       {/* Tabla */}
       {viewMode === 'tabla' && (data.movimientos.length === 0 ? (
-        <div className="text-center py-16 text-slate-400 bg-white border border-slate-200 rounded-xl">
+        <div className="text-center py-16 text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
           <p className="text-4xl mb-3">💸</p>
           <p className="font-medium">Sin movimientos en {parseMes(mesActual)}</p>
           <button onClick={() => setShowForm(true)} className="mt-3 text-blue-600 hover:underline text-sm">
@@ -284,28 +285,28 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
           </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Fecha</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Monto</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Pago</th>
+              <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fecha</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monto</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pago</th>
                 {camposNumericos.map(c => (
-                  <th key={c.id} className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">{c.nombre}</th>
+                  <th key={c.id} className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{c.nombre}</th>
                 ))}
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Estado</th>
                 {camposTexto.map(c => (
-                  <th key={c.id} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{c.nombre}</th>
+                  <th key={c.id} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{c.nombre}</th>
                 ))}
                 {hayVencimientos && (
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Vencimiento</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vencimiento</th>
                 )}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {movsDetallados.map(m => {
                 const esFactura = m.tipo === 'factura';
                 const esPago = m.tipo === 'pago';
@@ -315,24 +316,24 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
                 const venc = vencimientoLabel(m.fecha_vencimiento);
 
                 const rowCls = esFactura && m.pagado
-                  ? 'bg-green-50/50'
-                  : (esPago || esNC) ? 'bg-blue-50/30'
-                  : esAjuste ? 'bg-orange-50/30'
+                  ? 'bg-green-50/50 dark:bg-green-900/10'
+                  : (esPago || esNC) ? 'bg-blue-50/30 dark:bg-blue-900/10'
+                  : esAjuste ? 'bg-orange-50/30 dark:bg-orange-900/10'
                   : '';
 
                 return (
-                  <tr key={m.id} className={`hover:bg-slate-50 transition-colors ${rowCls}`}>
+                  <tr key={m.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${rowCls}`}>
                     <td className="px-4 py-3 whitespace-nowrap font-medium">
                       {m.fecha
-                        ? <span className="text-slate-600">{m.fecha}</span>
+                        ? <span className="text-slate-600 dark:text-slate-300">{m.fecha}</span>
                         : <span className="text-amber-500 text-xs italic">Sin fecha</span>
                       }
                     </td>
 
                     <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {(m.monto || 0) > 0
-                        ? <span className="text-slate-800">+{fmt(m.monto)}</span>
-                        : <span className="text-slate-300">—</span>
+                        ? <span className="text-slate-800 dark:text-slate-100">+{fmt(m.monto)}</span>
+                        : <span className="text-slate-300 dark:text-slate-600">—</span>
                       }
                     </td>
 
@@ -360,7 +361,7 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
                       );
                     })}
 
-                    <td className={`px-4 py-3 text-right font-bold whitespace-nowrap ${m._total >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
+                    <td className={`px-4 py-3 text-right font-bold whitespace-nowrap ${m._total >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>
                       {fmt(m._total)}
                     </td>
 
@@ -396,6 +397,15 @@ export default function SubrubroView({ rubro, subrubro, onBack }) {
           </table>
         </div>
       ))}
+
+      {/* Botón flotante de volver */}
+      <button
+        onClick={onBack}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:shadow-xl"
+      >
+        <ArrowLeft size={15} />
+        Volver
+      </button>
 
       {confirmModal && (
         <ConfirmModal

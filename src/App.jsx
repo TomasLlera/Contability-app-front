@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard';
 import Graficas from './components/Graficas';
 import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -34,6 +34,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  });
+  const [sidebarRight, setSidebarRight] = useState(() => localStorage.getItem('sidebarSide') === 'right');
 
   // Local CRUD
   const [showNewLocal, setShowNewLocal] = useState(false);
@@ -52,6 +58,17 @@ export default function App() {
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   useEffect(() => { if (loggedIn) cargar(); else setLoading(false); }, [loggedIn]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
+  const toggleSidebarSide = () => setSidebarRight(v => {
+    const next = !v;
+    localStorage.setItem('sidebarSide', next ? 'right' : 'left');
+    return next;
+  });
 
   const cargar = async () => {
     const [ls, rs] = await Promise.all([localesApi.getAll(), rubrosApi.getAll()]);
@@ -178,7 +195,7 @@ export default function App() {
         onCancel={() => setConfirmModal(null)}
       />
     )}
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className={`min-h-screen bg-slate-50 dark:bg-slate-900 flex ${sidebarRight ? 'flex-row-reverse' : ''}`}>
       {/* Overlay mobile */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={closeSidebar} />
@@ -186,7 +203,8 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`fixed md:sticky top-0 z-30 w-64 bg-slate-900 flex flex-col shrink-0 h-screen transition-transform duration-200
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        ${sidebarRight ? 'right-0 left-auto' : 'left-0'}
+        ${sidebarOpen ? 'translate-x-0' : sidebarRight ? 'translate-x-full' : '-translate-x-full'} md:translate-x-0`}>
         <div className="px-4 py-4 border-b border-slate-700/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -408,37 +426,63 @@ export default function App() {
           </div>
         </nav>
 
-        <div className="px-4 py-3 border-t border-slate-700/50">
+        <div className="px-4 py-3 border-t border-slate-700/50 space-y-2">
           <p className="text-xs text-slate-500">
             {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDarkMode(v => !v)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+            >
+              {darkMode ? <Sun size={13} /> : <Moon size={13} />}
+              {darkMode ? 'Claro' : 'Oscuro'}
+            </button>
+            <span className="text-slate-700">·</span>
+            <button
+              onClick={toggleSidebarSide}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              title={sidebarRight ? 'Mover a la izquierda' : 'Mover a la derecha'}
+            >
+              {sidebarRight ? <PanelLeft size={13} /> : <PanelRight size={13} />}
+              {sidebarRight ? 'Izquierda' : 'Derecha'}
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10">
-          <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 transition">
+        <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10">
+          <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
             <Menu size={20} />
           </button>
           {isRubroActive ? (
             <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); cargar(); }}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0"
+                title="Volver al inicio"
+              >
+                <ArrowLeft size={18} />
+              </button>
               <span className="text-xl">{getRubroIcon(activeView)}</span>
               <div>
                 {activeLocal && (
                   <p className="text-xs text-slate-400 leading-none mb-0.5">{activeLocal.icon || '🏠'} {activeLocal.nombre}</p>
                 )}
-                <p className="font-semibold text-slate-800 leading-tight">{activeView.nombre}</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-100 leading-tight">{activeView.nombre}</p>
               </div>
             </div>
           ) : activeView === 'graficas' ? (
             <div>
-              <h1 className="font-semibold text-slate-800">Gráficas</h1>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Gráficas</h1>
               <p className="text-xs text-slate-400">Tendencias y resumen financiero</p>
             </div>
           ) : (
             <div>
-              <h1 className="font-semibold text-slate-800">Inicio</h1>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Inicio</h1>
               <p className="text-xs text-slate-400">Resumen general del sistema</p>
             </div>
           )}

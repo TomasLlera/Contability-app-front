@@ -89,20 +89,20 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
       {/* Barra de herramientas */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <input
-          className="flex-1 min-w-40 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          className="flex-1 min-w-40 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400"
           placeholder={`Buscar en ${rubro.nombre}...`}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
         <button
           onClick={() => setShowImport(true)}
-          className="bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 flex items-center gap-1.5"
+          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
           ↑ Importar Excel
         </button>
         <button
           onClick={() => setShowCampos(true)}
-          className="bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 flex items-center gap-1.5"
+          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
           ⚙️ Columnas
         </button>
@@ -127,7 +127,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
         {filtrados.map(sub => (
           <div
             key={sub.id}
-            className="bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-slate-300 transition-all group overflow-hidden"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all group overflow-hidden"
           >
             {editingId === sub.id ? (
               <div className="p-4 space-y-2" onClick={e => e.stopPropagation()}>
@@ -173,14 +173,14 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       {sub.icon && <span className="text-2xl block mb-1">{sub.icon}</span>}
-                      <p className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 transition-colors truncate">
                         {sub.nombre}
                       </p>
                     </div>
                     <span className="text-slate-300 group-hover:text-blue-400 transition-colors text-lg ml-2 mt-0.5">→</span>
                   </div>
                 </button>
-                <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={e => { e.stopPropagation(); setEditingId(sub.id); setEditNombre(sub.nombre); setEditIcon(sub.icon || ''); setShowIconPicker(false); }}
                     className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
@@ -210,12 +210,12 @@ export default function RubroView({ rubro, onBack, initialSubrubro }) {
         ))}
 
         {/* Nueva tarjeta */}
-        <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+        <div className="border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-500 transition-colors">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
             Nuevo {rubro.nombre.toLowerCase()}
           </p>
           <input
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Nombre (ej: Juan Pérez)"
             value={nuevoNombre}
             onChange={e => setNuevoNombre(e.target.value)}
