@@ -195,7 +195,15 @@ export default function App() {
 
   return (
     <>
-    <Toaster position="bottom-right" toastOptions={{ duration: 3000 }} />
+    <Toaster
+      position="bottom-right"
+      toastOptions={{
+        duration: 3000,
+        style: darkMode
+          ? { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' }
+          : { background: '#fff', color: '#1e293b', border: '1px solid #e2e8f0' },
+      }}
+    />
     {confirmModal && (
       <ConfirmModal
         message={confirmModal.message}
