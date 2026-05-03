@@ -65,6 +65,8 @@ export const dashboardApi = {
     api.get(`/dashboard/tendencia/${rubroId}`, { params: { meses } }).then(r => r.data),
   getTendenciaSubrubro: (subrubroId, meses = 6) =>
     api.get(`/dashboard/tendencia-subrubro/${subrubroId}`, { params: { meses } }).then(r => r.data),
+  getComparacion: (rubroId) =>
+    api.get(`/dashboard/comparacion/${rubroId}`).then(r => r.data),
 };
 
 export const movimientosApi = {
@@ -79,6 +81,7 @@ export const movimientosApi = {
     api.put(`/movimientos/${id}/pago-vinculado`, data).then(r => r.data),
   delete: (id) => api.delete(`/movimientos/${id}`),
   getVencimientos: (dias = 30) => api.get('/movimientos/vencimientos/proximos', { params: { dias } }).then(r => r.data),
+  search: (q, limit = 25) => api.get('/movimientos/search', { params: { q, limit } }).then(r => r.data),
   exportExcel: (subrubroId, nombre) => {
     const a = document.createElement('a');
     a.href = `${BASE}/movimientos/export/${subrubroId}`;

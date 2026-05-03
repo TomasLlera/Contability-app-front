@@ -3,9 +3,10 @@ import { rubrosApi, subrubrosApi, localesApi, authApi } from './api';
 import RubroView from './components/RubroView';
 import Dashboard from './components/Dashboard';
 import Graficas from './components/Graficas';
+import BuscadorGlobal from './components/BuscadorGlobal';
 import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -41,12 +42,21 @@ export default function App() {
   });
   const [sidebarRight, setSidebarRight] = useState(() => localStorage.getItem('sidebarSide') === 'right');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const mainRef = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setShowScrollTop(window.scrollY > 300);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setShowSearch(true); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   // Local CRUD
@@ -504,8 +514,17 @@ export default function App() {
               <p className="text-xs text-slate-400">Resumen general del sistema</p>
             </div>
           )}
+          <button
+            onClick={() => setShowSearch(true)}
+            className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+            title="Buscar (Ctrl+K)"
+          >
+            <Search size={13} />
+            <span className="hidden sm:block">Buscar</span>
+            <kbd className="hidden sm:block font-sans opacity-60">Ctrl K</kbd>
+          </button>
           {sidebarRight && (
-            <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden ml-auto text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
+            <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
               <Menu size={20} />
             </button>
           )}
@@ -547,6 +566,13 @@ export default function App() {
       >
         <ChevronUp size={18} />
       </button>
+    )}
+
+    {showSearch && (
+      <BuscadorGlobal
+        onNavigate={handleNavigateFromVenc}
+        onClose={() => setShowSearch(false)}
+      />
     )}
     </>
   );

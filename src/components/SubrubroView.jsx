@@ -201,17 +201,6 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
 
       {/* Resumen */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div className={`rounded-xl p-4 border ${saldoPositivo ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'}`}>
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo total</p>
-          <p className={`text-xl font-bold mt-1 ${saldoPositivo ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(saldoFinal)}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pendiente</p>
-          <p className="text-xl font-bold text-amber-600 mt-1">
-            {fmt(todasFacturasPendientes.reduce((s, m) => s + m.monto, 0))}
-          </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
-        </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total facturado</p>
           <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">
@@ -223,6 +212,17 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
           <p className="text-xl font-bold text-green-700 mt-1">
             {fmt(data.movimientos.reduce((s, m) => s + (m.pago || 0), 0))}
           </p>
+        </div>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pendiente</p>
+          <p className="text-xl font-bold text-amber-600 mt-1">
+            {fmt(todasFacturasPendientes.reduce((s, m) => s + m.monto, 0))}
+          </p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className={`rounded-xl p-4 border ${saldoPositivo ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'}`}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo total</p>
+          <p className={`text-xl font-bold mt-1 ${saldoPositivo ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(saldoFinal)}</p>
         </div>
       </div>
 

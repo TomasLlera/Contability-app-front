@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { subrubrosApi, rubrosApi } from '../api';
+import { subrubrosApi, rubrosApi, dashboardApi } from '../api';
 import Modal from './Modal';
 import CamposManager from './CamposManager';
 import SubrubroView from './SubrubroView';
@@ -23,12 +23,30 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [stats, setStats] = useState({});
 
-  const cargar = () => subrubrosApi.getByRubro(rubro.id).then(setSubrubros);
+  const cargarStats = () => {
+    dashboardApi.getComparacion(rubro.id)
+      .then(d => {
+        const map = {};
+        (d.comparacion || []).forEach(s => { map[s.id] = s; });
+        setStats(map);
+      })
+      .catch(() => {});
+  };
+
+  const cargar = () => {
+    subrubrosApi.getByRubro(rubro.id).then(setSubrubros);
+    cargarStats();
+  };
+
   useEffect(() => {
     cargar();
-    setSelectedSubrubro(initialSubrubro ?? null);
   }, [rubro.id]);
+
+  useEffect(() => {
+    setSelectedSubrubro(initialSubrubro ?? null);
+  }, [rubro.id, initialSubrubro?.id]);
 
   const handleAdd = async () => {
     if (!nuevoNombre.trim()) return;
@@ -81,9 +99,9 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
     );
   }
 
-  const filtrados = subrubros.filter(s =>
-    s.nombre.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtrados = subrubros
+    .filter(s => s.nombre.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (stats[b.id]?.saldo ?? 0) - (stats[a.id]?.saldo ?? 0));
 
   return (
     <div>
@@ -171,15 +189,38 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                   onClick={() => setSelectedSubrubro(sub)}
                   className="w-full text-left p-4"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      {sub.icon && <span className="text-2xl block mb-1">{sub.icon}</span>}
+                  {/* Nombre + flecha */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {sub.icon && <span className="text-xl shrink-0">{sub.icon}</span>}
                       <p className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 transition-colors truncate">
                         {sub.nombre}
                       </p>
                     </div>
-                    <span className="text-slate-300 group-hover:text-blue-400 transition-colors text-lg ml-2 mt-0.5">→</span>
+                    <span className="text-slate-300 group-hover:text-blue-400 transition-colors ml-2 shrink-0">→</span>
                   </div>
+
+                  {/* Datos financieros */}
+                  {stats[sub.id] !== undefined && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-4 gap-1 text-center">
+                      <div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Monto</p>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{fmt(stats[sub.id].facturado)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Pago</p>
+                        <p className="text-xs font-semibold text-emerald-600 truncate">{fmt(stats[sub.id].pagado)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Pendiente</p>
+                        <p className={`text-xs font-semibold truncate ${stats[sub.id].pendiente > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{fmt(stats[sub.id].pendiente)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Saldo</p>
+                        <p className={`text-xs font-bold truncate ${stats[sub.id].saldo > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(stats[sub.id].saldo)}</p>
+                      </div>
+                    </div>
+                  )}
                 </button>
                 <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button

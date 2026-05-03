@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { dashboardApi, subrubrosApi } from '../api';
-import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, RotateCcw } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -47,6 +47,65 @@ const METRICAS = [
   { key: 'pagado',     label: 'Pagos',    color: 'bg-emerald-500', colorLight: 'bg-emerald-200 dark:bg-emerald-900/60' },
   { key: 'diferencia', label: 'Deuda',    color: 'bg-red-500',     colorLight: 'bg-red-200 dark:bg-red-900/60' },
 ];
+
+function GraficoRanking({ comparacion, metrica, selectedId, onSelect }) {
+  if (comparacion.length === 0) return null;
+  const m = METRICAS.find(x => x.key === metrica);
+  const vals = comparacion.map(s => Math.max(s[metrica] ?? 0, 0));
+  const maxVal = Math.max(...vals, 1);
+
+  return (
+    <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          Ranking de subrubros
+        </h4>
+        {selectedId && (
+          <button
+            onClick={() => onSelect(null)}
+            className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors"
+          >
+            <RotateCcw size={11} /> Ver todos
+          </button>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        {comparacion.map(s => {
+          const val = Math.max(s[metrica] ?? 0, 0);
+          const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+          const isSelected = selectedId === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => onSelect(isSelected ? null : s.id)}
+              className={`w-full text-left flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${
+                isSelected
+                  ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800'
+                  : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              <span className="text-base shrink-0 w-6 text-center">{s.icon || '📁'}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-medium truncate ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                    {s.nombre}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 shrink-0">{fmt(val)}</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${isSelected ? m.color : m.colorLight}`}
+                    style={{ width: `${Math.max(pct, 1)}%` }}
+                  />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function GraficoTendencia({ tendencia, metrica }) {
   const m = METRICAS.find(x => x.key === metrica);
@@ -120,6 +179,7 @@ export default function Graficas({ rubros = [] }) {
   const [metrica, setMetrica] = useState('facturado');
   const [tendencia, setTendencia] = useState([]);
   const [loadingTendencia, setLoadingTendencia] = useState(false);
+  const [comparacion, setComparacion] = useState([]);
 
   useEffect(() => {
     dashboardApi.getResumen().then(setResumen);
@@ -129,11 +189,15 @@ export default function Graficas({ rubros = [] }) {
     if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id);
   }, [rubros]);
 
-  // Al cambiar de rubro: cargar sus subrubros y resetear selección de subrubro
+  // Al cambiar de rubro: cargar subrubros, comparación y resetear selección
   useEffect(() => {
     if (!selectedRubroId) return;
     setSelectedSubrubroId(null);
+    setComparacion([]);
     subrubrosApi.getByRubro(selectedRubroId).then(setSubrubros);
+    dashboardApi.getComparacion(selectedRubroId)
+      .then(d => setComparacion(d.comparacion ?? []))
+      .catch(() => {});
   }, [selectedRubroId]);
 
   // Al cambiar rubro o subrubro: cargar tendencia
@@ -227,6 +291,13 @@ export default function Graficas({ rubros = [] }) {
           ) : (
             <GraficoTendencia tendencia={tendencia} metrica={metrica} />
           )}
+
+          <GraficoRanking
+            comparacion={comparacion}
+            metrica={metrica}
+            selectedId={selectedSubrubroId}
+            onSelect={setSelectedSubrubroId}
+          />
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
