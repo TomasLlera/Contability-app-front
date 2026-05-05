@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { movimientosApi, camposApi, subrubrosApi } from '../api';
+import { movimientosApi, camposApi, subrubrosApi, getErrorMsg } from '../api';
 import Modal from './Modal';
 import MovimientoForm from './MovimientoForm';
 import CalendarioSubrubro from './CalendarioSubrubro';
 import ConfirmModal from './ConfirmModal';
 import toast from 'react-hot-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet } from 'lucide-react';
+import ExportModal from './ExportModal';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -41,36 +42,39 @@ function mesActualKey() {
 
 function TipoBadge({ mov }) {
   if (mov.tipo === 'nota_credito')
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-full">📋 NC</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-full"><FileText size={11} /> NC</span>;
   if (mov.tipo === 'ajuste')
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 border border-orange-200 dark:border-orange-800 px-2 py-0.5 rounded-full">
-        ⚡ {mov.concepto || 'Ajuste'}
+        <Zap size={11} /> {mov.concepto || 'Ajuste'}
       </span>
     );
   if (mov.tipo === 'pago' || ((mov.pago || 0) > 0 && !(mov.monto > 0)))
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full">↓ Pago</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full"><ArrowDownCircle size={11} /> Pago</span>;
   if (mov.pagado)
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full">✓ Pagada</span>;
-  return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">● Pendiente</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full"><CheckCircle2 size={11} /> Pagada</span>;
+  return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendiente</span>;
 }
 
 export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) {
-  const [data, setData] = useState({ movimientos: [], monto_base: 0, saldo_total: null });
+  const [data, setData] = useState({ movimientos: [], monto_base: 0, saldo_total: null, saldo_anterior: null });
   const [campos, setCampos] = useState([]);
   const [mesActual, setMesActual] = useState(mesActualKey);
   const [showForm, setShowForm] = useState(false);
   const [editingMov, setEditingMov] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('tabla');
+  const [mostrarTodo, setMostrarTodo] = useState(false);
   const [todosMovs, setTodosMovs] = useState([]);
   const [todasFacturasPendientes, setTodasFacturasPendientes] = useState([]);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
-  const cargar = async (mes) => {
-    const [y, m] = mes.split('-');
+  const cargar = async (mes, todo = false) => {
     const [d, cs] = await Promise.all([
-      movimientosApi.getBySubrubro(subrubro.id, y, m),
+      todo
+        ? movimientosApi.getBySubrubro(subrubro.id)
+        : (() => { const [y, m] = mes.split('-'); return movimientosApi.getBySubrubro(subrubro.id, y, m); })(),
       camposApi.getByRubro(rubro.id),
     ]);
     setData(d);
@@ -88,7 +92,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
     setTodasFacturasPendientes(pendientes);
   };
 
-  useEffect(() => { cargar(mesActual); }, [subrubro.id, mesActual]);
+  useEffect(() => { cargar(mesActual, mostrarTodo); }, [subrubro.id, mesActual, mostrarTodo]);
   useEffect(() => { cargarTodos(); }, [subrubro.id]);
 
   const handleSave = async (formData) => {
@@ -98,6 +102,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
 
     try {
       if (esPagoONC && tieneVinculacion) {
+
         const payload = {
           tipo,
           fecha: rest.fecha,
@@ -119,11 +124,11 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
 
       setShowForm(false);
       setEditingMov(null);
-      cargar(mesActual);
+      cargar(mesActual, mostrarTodo);
       cargarTodos();
       toast.success(editingMov ? 'Movimiento actualizado' : 'Movimiento guardado');
-    } catch {
-      toast.error('No se pudo guardar el movimiento');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
     }
   };
 
@@ -138,7 +143,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
       onConfirm: async () => {
         await movimientosApi.delete(mov.id);
         setConfirmModal(null);
-        cargar(mesActual);
+        cargar(mesActual, mostrarTodo);
         cargarTodos();
         toast.success('Movimiento eliminado');
       },
@@ -146,9 +151,8 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
   };
 
   const handleEdit = (m) => {
-    // No editar ajustes auto: deben editarse desde el pago padre
     if (m.tipo === 'ajuste' && m._ajuste_pago_id) {
-      alert('Este ajuste fue generado automáticamente. Para modificarlo, editá el pago vinculado correspondiente.');
+      toast.error('Este ajuste fue generado automáticamente. Editá el pago vinculado para modificarlo.');
       return;
     }
     setEditingMov(m);
@@ -159,7 +163,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
   const camposRestaSet = new Set(campos.filter(c => c.tipo === 'resta').map(c => c.nombre));
 
   const movsConTotal = () => {
-    let total = data.monto_base || 0;
+    let total = data.saldo_anterior ?? data.monto_base ?? 0;
     return data.movimientos.map(m => {
       const extra = m.campos_extra || {};
       let extraEfecto = 0;
@@ -191,7 +195,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={onBack} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm flex items-center gap-1">
-          ← Volver
+          <ArrowLeft size={15} /> Volver
         </button>
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wide font-medium">{rubro.nombre}</p>
@@ -239,33 +243,56 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
 
       {/* Selector mes + acciones */}
       <div className={`flex flex-wrap gap-2 items-center justify-between mb-4 ${viewMode === 'calendario' ? 'hidden' : ''}`}>
-        <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
-          <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium">‹</button>
-          <span className="px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-20 text-center">{parseMes(mesActual)}</span>
-          <button
-            onClick={() => setMesActual(mesSiguiente(mesActual))}
-            disabled={mesActual >= mesActualKey()}
-            className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium disabled:opacity-30"
-          >›</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtros rápidos */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+            {[
+              { label: 'Mes ant.', action: () => { setMostrarTodo(false); setMesActual(mesAnterior(mesActualKey())); } },
+              { label: 'Este mes', action: () => { setMostrarTodo(false); setMesActual(mesActualKey()); } },
+              { label: 'Todo', action: () => setMostrarTodo(true) },
+            ].map(f => {
+              const active = f.label === 'Todo' ? mostrarTodo
+                : !mostrarTodo && (f.label === 'Este mes' ? mesActual === mesActualKey() : mesActual === mesAnterior(mesActualKey()));
+              return (
+                <button
+                  key={f.label}
+                  onClick={f.action}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${active ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                >{f.label}</button>
+              );
+            })}
+          </div>
+          {/* Navegación por mes (oculta en modo "Todo") */}
+          {!mostrarTodo && (
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
+              <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium">‹</button>
+              <span className="px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-20 text-center">{parseMes(mesActual)}</span>
+              <button
+                onClick={() => setMesActual(mesSiguiente(mesActual))}
+                disabled={mesActual >= mesActualKey()}
+                className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium disabled:opacity-30"
+              >›</button>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => movimientosApi.exportExcel(subrubro.id, subrubro.nombre)}
-            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
-          >↓ Excel</button>
+            onClick={() => setShowExportModal(true)}
+            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"
+          ><Download size={14} /> Excel</button>
           <button
             onClick={() => setConfirmModal({
               message: `¿Borrar TODOS los movimientos de "${subrubro.nombre}"? Esta acción no se puede deshacer.`,
               onConfirm: async () => {
                 await subrubrosApi.clearMovimientos(subrubro.id);
                 setConfirmModal(null);
-                cargar(mesActual);
+                cargar(mesActual, mostrarTodo);
                 cargarTodos();
                 toast.success('Movimientos eliminados');
               },
             })}
-            className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50"
-          >🗑 Limpiar</button>
+            className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
+          ><Trash2 size={14} /> Limpiar</button>
           <button
             onClick={() => { setEditingMov(null); setShowForm(true); }}
             className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 shadow-sm"
@@ -278,7 +305,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
       {/* Tabla */}
       {viewMode === 'tabla' && (data.movimientos.length === 0 ? (
         <div className="text-center py-16 text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-          <p className="text-4xl mb-3">💸</p>
+          <Wallet size={40} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
           <p className="font-medium">Sin movimientos en {parseMes(mesActual)}</p>
           <button onClick={() => setShowForm(true)} className="mt-3 text-blue-600 hover:underline text-sm">
             Agregar el primero
@@ -413,6 +440,10 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(null)}
         />
+      )}
+
+      {showExportModal && (
+        <ExportModal subrubro={subrubro} onClose={() => setShowExportModal(false)} />
       )}
 
       {showForm && (

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { FileText, CreditCard, FileMinus, Check } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
 const TIPOS = [
-  { value: 'factura',      label: 'Factura',          icon: '📄', hint: 'Boleta o importe a cobrar/pagar' },
-  { value: 'pago',         label: 'Pago',             icon: '💳', hint: 'Abono o pago realizado' },
-  { value: 'nota_credito', label: 'Nota de Crédito',  icon: '📋', hint: 'Crédito emitido por el proveedor' },
+  { value: 'factura',      label: 'Factura',          Icon: FileText,   hint: 'Boleta o importe a cobrar/pagar' },
+  { value: 'pago',         label: 'Pago',             Icon: CreditCard, hint: 'Abono o pago realizado' },
+  { value: 'nota_credito', label: 'Nota de Crédito',  Icon: FileMinus,  hint: 'Crédito emitido por el proveedor' },
 ];
 
 export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel }) {
@@ -123,13 +124,13 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             key={t.value}
             type="button"
             onClick={() => handleChangeTipo(t.value)}
-            className={`flex-1 py-2 px-1 text-center transition-colors ${
+            className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
               tipo === t.value
                 ? 'bg-blue-600 text-white'
                 : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
             }`}
           >
-            <span className="mr-1">{t.icon}</span>
+            <t.Icon size={14} />
             {t.label}
           </button>
         ))}
@@ -138,7 +139,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
       {/* Fecha */}
       <div>
         <label className={labelCls}>Fecha</label>
-        <input type="date" className={inputCls} value={fecha} onChange={e => setFecha(e.target.value)} required />
+        <input type="date" className={inputCls} value={fecha} max={today} onChange={e => setFecha(e.target.value)} required />
       </div>
 
       {/* ── FACTURA ── */}
@@ -299,7 +300,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 <ul className="space-y-0.5 mb-1">
                   {preview.cubiertas.map(b => (
                     <li key={b.id} className="flex items-center gap-1.5 text-green-700 dark:text-green-400 text-xs">
-                      <span>✓</span>
+                      <Check size={11} />
                       <span>{b.fecha} — {fmt(b.monto)} → <strong>PAGADA</strong></span>
                     </li>
                   ))}
@@ -324,7 +325,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                   .filter(f => facturasSeleccionadas.has(f.id))
                   .map(f => (
                     <li key={f.id} className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-                      <span>✓</span>
+                      <Check size={11} />
                       <span>{f.fecha} — {fmt(f.monto)}</span>
                     </li>
                   ))}

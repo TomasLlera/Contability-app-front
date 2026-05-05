@@ -80,6 +80,8 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('skip_duplicates');
   const [skipRows, setSkipRows] = useState(0);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
   const inputRef = useRef();
   const wbRef = useRef(null);
   const savedConfigRef = useRef(null);
@@ -152,7 +154,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
     setError(null);
     try {
       await rubrosApi.saveImportConfig(rubro.id, colMapping, mode);
-      const res = await movimientosApi.importExcel(rubro.id, file, colMapping, mode, [...selectedSheets], skipRows);
+      const res = await movimientosApi.importExcel(rubro.id, file, colMapping, mode, [...selectedSheets], skipRows, fechaDesde || null, fechaHasta || null);
       setResult(res);
       setStep('done');
     } catch (err) {
@@ -380,6 +382,33 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                 </div>
               </div>
 
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Filtro de fechas <span className="normal-case font-normal text-slate-400">(opcional)</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Desde</label>
+                    <input
+                      type="date"
+                      value={fechaDesde}
+                      onChange={e => setFechaDesde(e.target.value)}
+                      className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Hasta</label>
+                    <input
+                      type="date"
+                      value={fechaHasta}
+                      onChange={e => setFechaHasta(e.target.value)}
+                      className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+                {(fechaDesde || fechaHasta) && (
+                  <p className="text-xs text-slate-400 mt-1.5">Las filas con fechas fuera de este rango serán ignoradas.</p>
+                )}
+              </div>
+
               {error && <p className="text-sm text-red-500 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
             </div>
           )}
@@ -405,7 +434,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                   </p>
                   <p className="text-xs text-slate-400">
                     {result.sheets.length} subrubro{result.sheets.length !== 1 ? 's' : ''}
-                    {result.totalSkipped > 0 && ` · ${result.totalSkipped} duplicados omitidos`}
+                    {result.totalSkipped > 0 && ` · ${result.totalSkipped} omitidos`}
                   </p>
                 </div>
               </div>
@@ -416,7 +445,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-green-600 dark:text-green-400 font-medium">{s.created} importados</span>
                       {s.duplicates > 0 && <span className="text-xs text-amber-500">{s.duplicates} dup.</span>}
-                      {s.skipped > 0 && <span className="text-xs text-slate-400">{s.skipped} vacíos</span>}
+                      {s.skipped > 0 && <span className="text-xs text-slate-400">{s.skipped} omitidos</span>}
                     </div>
                   </div>
                 ))}
