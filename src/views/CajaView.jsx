@@ -479,7 +479,7 @@ export default function CajaView({ rubros = [] }) {
           <ChevronRight size={18} />
         </button>
         <input type="date" value={fecha} max={todayStr()} onChange={e => setFecha(e.target.value)}
-          className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          className="hidden sm:block border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <button onClick={() => setShowConfig(true)}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Configurar empleados y proveedores">
           <Settings size={16} />

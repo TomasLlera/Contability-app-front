@@ -162,33 +162,38 @@ function CajaBarChart({ datos, chartCfg }) {
 
   if (datos.length === 0) return <div className="h-40 flex items-center justify-center text-slate-400 text-sm">Sin datos para este período</div>;
 
+  const minBarW = 22;
+  const needsScroll = datos.length > 14;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className={`text-2xl font-bold ${chartCfg.text}`}>{fmt(total)}</p>
         <p className="text-xs text-slate-400">Total del período</p>
       </div>
-      <div className="flex items-end gap-1.5 h-40 mb-2">
-        {datos.map((d, i) => {
-          const val = d[chartCfg.key] || 0;
-          const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
-          const isLast = i === datos.length - 1;
-          const prev = datos[i - 1];
-          return (
-            <div key={d.key} className="flex-1 h-full flex flex-col items-center gap-1 group relative">
-              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                <p className="font-semibold">{d.label}</p>
-                <p>{fmt(val)}</p>
-                {prev && val > 0 && <Delta current={val} previous={prev[chartCfg.key] || 0} positiveIsGood={chartCfg.key.startsWith('ingreso') || chartCfg.key === 'transDelta'} />}
+      <div className={needsScroll ? 'overflow-x-auto -mx-1 px-1' : ''}>
+        <div className="flex items-end gap-1.5 h-40 mb-2" style={needsScroll ? { minWidth: `${datos.length * (minBarW + 6)}px` } : {}}>
+          {datos.map((d, i) => {
+            const val = d[chartCfg.key] || 0;
+            const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+            const isLast = i === datos.length - 1;
+            const prev = datos[i - 1];
+            return (
+              <div key={d.key} className="flex-1 h-full flex flex-col items-center gap-1 group relative" style={needsScroll ? { minWidth: `${minBarW}px` } : {}}>
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  <p className="font-semibold">{d.label}</p>
+                  <p>{fmt(val)}</p>
+                  {prev && val > 0 && <Delta current={val} previous={prev[chartCfg.key] || 0} positiveIsGood={chartCfg.key.startsWith('ingreso') || chartCfg.key === 'transDelta'} />}
+                </div>
+                <div className="w-full flex-1 flex items-end">
+                  <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? chartCfg.color : chartCfg.colorLight}`}
+                    style={{ height: `${Math.max(pct, val > 0 ? 2 : 0)}%` }} />
+                </div>
+                <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{d.label}</p>
               </div>
-              <div className="w-full flex-1 flex items-end">
-                <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? chartCfg.color : chartCfg.colorLight}`}
-                  style={{ height: `${Math.max(pct, val > 0 ? 2 : 0)}%` }} />
-              </div>
-              <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{d.label}</p>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -47,12 +47,28 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showCargaRapida, setShowCargaRapida] = useState(false);
   const [vencCount, setVencCount] = useState(0);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const mainRef = useRef(null);
+  const lastScrollY = useRef(0);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
 
   useEffect(() => {
-    const onScroll = () => setShowScrollTop(window.scrollY > 300);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      setHeaderHidden(prev => {
+        if (y < 40) return false;
+        if (y > lastScrollY.current + 8) return true;
+        if (y < lastScrollY.current - 8) return false;
+        return prev;
+      });
+      setShowScrollTop(y > 300);
+      lastScrollY.current = y;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
@@ -516,7 +532,7 @@ export default function App() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10">
+        <header className={`bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10 transition-transform duration-300 ${headerHidden ? '-translate-y-full md:translate-y-0' : 'translate-y-0'}`}>
           {!sidebarRight && (
             <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
               <Menu size={20} />
@@ -544,21 +560,36 @@ export default function App() {
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Gráficas</h1>
               <p className="text-xs text-slate-400">Tendencias y resumen financiero</p>
             </div>
+          ) : activeView === 'caja' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Caja del día</h1>
+              <p className="text-xs text-slate-400">Registro diario de movimientos</p>
+            </div>
           ) : (
             <div>
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Inicio</h1>
               <p className="text-xs text-slate-400">Resumen general del sistema</p>
             </div>
           )}
-          <button
-            onClick={() => setShowSearch(true)}
-            className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
-            title="Buscar (Ctrl+K)"
-          >
-            <Search size={13} />
-            <span className="hidden sm:block">Buscar</span>
-            <kbd className="hidden sm:block font-sans opacity-60">Ctrl K</kbd>
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+              title="Buscar (Ctrl+K)"
+            >
+              <Search size={13} />
+              <span className="hidden sm:block">Buscar</span>
+              <kbd className="hidden sm:block font-sans opacity-60">Ctrl K</kbd>
+            </button>
+            <button
+              onClick={() => setShowCargaRapida(true)}
+              className="flex items-center gap-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-2.5 py-1.5 transition-colors font-medium shadow-sm"
+              title="Carga rápida"
+            >
+              <Zap size={13} />
+              <span className="hidden sm:block">Carga rápida</span>
+            </button>
+          </div>
           {sidebarRight && (
             <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
               <Menu size={20} />
@@ -569,6 +600,23 @@ export default function App() {
         <main
           ref={mainRef}
           className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto"
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+            touchStartY.current = e.touches[0].clientY;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current === null) return;
+            const dx = e.changedTouches[0].clientX - touchStartX.current;
+            const dy = e.changedTouches[0].clientY - touchStartY.current;
+            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+              if (!sidebarRight && dx > 0) setSidebarOpen(true);
+              if (!sidebarRight && dx < 0) setSidebarOpen(false);
+              if (sidebarRight && dx < 0) setSidebarOpen(true);
+              if (sidebarRight && dx > 0) setSidebarOpen(false);
+            }
+            touchStartX.current = null;
+            touchStartY.current = null;
+          }}
         >
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>
@@ -596,18 +644,9 @@ export default function App() {
 
     </div>
 
-    {/* Botón carga rápida */}
-    <button
-      onClick={() => setShowCargaRapida(true)}
-      className={`fixed bottom-6 z-50 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center hover:shadow-xl transition-all ${sidebarRight ? 'left-20' : 'right-20'}`}
-      title="Carga rápida"
-    >
-      <Zap size={20} />
-    </button>
-
     {showScrollTop && (
       <button
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
         className={`fixed bottom-6 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-xl transition-all ${sidebarRight ? 'left-6' : 'right-6'}`}
         title="Volver arriba"
       >
