@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { rubrosApi, subrubrosApi, localesApi, authApi } from './api';
+import { rubrosApi, subrubrosApi, localesApi, authApi, movimientosApi, getErrorMsg } from './api';
 import RubroView from './components/RubroView';
 import Dashboard from './components/Dashboard';
 import Graficas from './components/Graficas';
 import BuscadorGlobal from './components/BuscadorGlobal';
+import CargaRapidaModal from './components/CargaRapidaModal';
 import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -43,6 +44,8 @@ export default function App() {
   const [sidebarRight, setSidebarRight] = useState(() => localStorage.getItem('sidebarSide') === 'right');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showCargaRapida, setShowCargaRapida] = useState(false);
+  const [vencCount, setVencCount] = useState(0);
   const mainRef = useRef(null);
 
   useEffect(() => {
@@ -75,7 +78,17 @@ export default function App() {
   const [editIcon, setEditIcon] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
 
-  useEffect(() => { if (loggedIn) cargar(); else setLoading(false); }, [loggedIn]);
+  useEffect(() => {
+    if (loggedIn) {
+      authApi.refreshIfNeeded();
+      cargar();
+      cargarVencCount();
+      const interval = setInterval(cargarVencCount, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    } else {
+      setLoading(false);
+    }
+  }, [loggedIn]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -99,6 +112,13 @@ export default function App() {
       stats[r.id] = subs.length;
     }));
     setRubroStats(stats);
+  };
+
+  const cargarVencCount = async () => {
+    try {
+      const data = await movimientosApi.getVencimientos(7);
+      setVencCount((data.vencimientos || []).length);
+    } catch {}
   };
 
   const toggleLocal = (id) => {
@@ -157,8 +177,8 @@ export default function App() {
       setNuevoRubro('');
       setShowNewRubro(null);
       toast.success('Rubro creado');
-    } catch {
-      toast.error('El rubro ya existe');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
     }
   };
 
@@ -248,13 +268,18 @@ export default function App() {
 
         <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
           <button
-            onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); }}
+            onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); cargarVencCount(); }}
             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               activeView === 'inicio' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
             <Home size={15} />
-            Inicio
+            <span className="flex-1 text-left">Inicio</span>
+            {vencCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1 leading-none">
+                {vencCount > 99 ? '99+' : vencCount}
+              </span>
+            )}
           </button>
 
           <button
@@ -558,10 +583,19 @@ export default function App() {
 
     </div>
 
+    {/* Botón carga rápida */}
+    <button
+      onClick={() => setShowCargaRapida(true)}
+      className={`fixed bottom-6 z-50 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center hover:shadow-xl transition-all ${sidebarRight ? 'left-20' : 'right-20'}`}
+      title="Carga rápida"
+    >
+      <Zap size={20} />
+    </button>
+
     {showScrollTop && (
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className={`fixed bottom-20 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-xl transition-all ${sidebarRight ? 'left-6' : 'right-6'}`}
+        className={`fixed bottom-6 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-xl transition-all ${sidebarRight ? 'left-6' : 'right-6'}`}
         title="Volver arriba"
       >
         <ChevronUp size={18} />
@@ -572,6 +606,14 @@ export default function App() {
       <BuscadorGlobal
         onNavigate={handleNavigateFromVenc}
         onClose={() => setShowSearch(false)}
+      />
+    )}
+
+    {showCargaRapida && (
+      <CargaRapidaModal
+        rubros={rubros}
+        onClose={() => setShowCargaRapida(false)}
+        onSaved={() => { if (isRubroActive) cargar(activeView); }}
       />
     )}
     </>
