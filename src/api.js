@@ -115,6 +115,15 @@ export const rubrosApi = {
   clearAllMovimientos: (id) => api.delete(`/rubros/${id}/movimientos`).then(r => r.data),
 };
 
+export const categoriasApi = {
+  getByRubro: (rubroId) => api.get(`/categorias/${rubroId}`).then(r => r.data),
+  create: (rubroId, nombre, operacion, tipo_calculo, porcentaje_default) =>
+    api.post(`/categorias/${rubroId}`, { nombre, operacion, tipo_calculo, porcentaje_default }).then(r => r.data),
+  update: (id, nombre, operacion, tipo_calculo, porcentaje_default) =>
+    api.put(`/categorias/${id}`, { nombre, operacion, tipo_calculo, porcentaje_default }),
+  delete: (id) => api.delete(`/categorias/${id}`),
+};
+
 export const camposApi = {
   getByRubro: (rubroId) => api.get(`/campos/${rubroId}`).then(r => r.data),
   create: (rubroId, nombre, tipo, orden) => api.post(`/campos/${rubroId}`, { nombre, tipo, orden }).then(r => r.data),
