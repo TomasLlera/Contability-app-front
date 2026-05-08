@@ -164,14 +164,30 @@ export default function CajaView() {
   const [editingMov, setEditingMov] = useState(null);
   const [saldoInput, setSaldoInput] = useState('');
   const [editandoSaldo, setEditandoSaldo] = useState(false);
+  const [saldoAutoCalculado, setSaldoAutoCalculado] = useState(null);
   const [rangoIdx, setRangoIdx]   = useState(0);
   const [movsRango, setMovsRango] = useState([]);
   const [vencimientos, setVencimientos] = useState([]);
 
+  const calcularSaldoAyer = (movsAyer) => {
+    const saldoInicial = movsAyer.find(m => m.tipo === 'saldo_inicial')?.monto || 0;
+    const efvoDisp = saldoInicial
+      + movsAyer.filter(m => m.tipo === 'empleado'      && m.metodo === 'efectivo').reduce((s,m) => s+m.monto, 0)
+      + movsAyer.filter(m => m.tipo === 'ingreso_extra' && m.metodo === 'efectivo').reduce((s,m) => s+m.monto, 0);
+    const efvoGastos = movsAyer.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo').reduce((s,m) => s+m.monto, 0);
+    return efvoDisp - efvoGastos;
+  };
+
   const cargar = async () => {
     setLoading(true);
-    const data = await cajaApi.getByFecha(fecha);
+    const [data, dataAyer] = await Promise.all([
+      cajaApi.getByFecha(fecha),
+      cajaApi.getByFecha(addDays(fecha, -1)),
+    ]);
     setMovs(data);
+    // Si el día actual no tiene saldo_inicial guardado manualmente, auto-calculamos del día anterior
+    const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
+    setSaldoAutoCalculado(tieneSaldoManual ? null : calcularSaldoAyer(dataAyer));
     setLoading(false);
   };
 
@@ -239,7 +255,7 @@ export default function CajaView() {
 
   // Calcular totales
   const saldoMov      = movs.find(m => m.tipo === 'saldo_inicial');
-  const saldoInicial  = saldoMov?.monto || 0;
+  const saldoInicial  = saldoMov?.monto ?? saldoAutoCalculado ?? 0;
   const empleados     = movs.filter(m => m.tipo === 'empleado');
   const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra');
   const gastos        = movs.filter(m => m.tipo === 'gasto');
@@ -314,9 +330,17 @@ export default function CajaView() {
             <button onClick={() => setEditandoSaldo(false)} className="text-slate-400 hover:text-slate-600 px-2">✕</button>
           </div>
         ) : (
-          <p className={`text-2xl font-bold mt-1 ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
-            {saldoInicial ? fmt(saldoInicial) : '—'}
-          </p>
+          <div className="mt-1">
+            <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+              {saldoInicial ? fmt(saldoInicial) : '—'}
+            </p>
+            {saldoAutoCalculado !== null && !saldoMov && (
+              <p className="text-xs text-slate-400 mt-0.5">Calculado automáticamente del día anterior</p>
+            )}
+            {saldoMov && (
+              <p className="text-xs text-slate-400 mt-0.5">Ingresado manualmente</p>
+            )}
+          </div>
         )}
       </div>
 
