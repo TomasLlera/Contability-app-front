@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { camposApi } from '../api';
+import { Calendar, Plus, Minus, Equal } from 'lucide-react';
 
 const TIPOS = [
   {
@@ -26,10 +27,10 @@ const TIPOS = [
 ];
 
 const BASE_COLS = [
-  { nombre: 'Fecha', desc: 'Fecha del registro', icon: '📅' },
-  { nombre: 'Monto', desc: 'Importe de la boleta (suma al total)', icon: '+' },
-  { nombre: 'Pago', desc: 'Pago realizado (resta del total)', icon: '−' },
-  { nombre: 'Total', desc: 'Saldo acumulado calculado automáticamente', icon: '=' },
+  { nombre: 'Fecha', desc: 'Fecha del registro', Icon: Calendar },
+  { nombre: 'Monto', desc: 'Importe de la boleta (suma al total)', Icon: Plus },
+  { nombre: 'Pago', desc: 'Pago realizado (resta del total)', Icon: Minus },
+  { nombre: 'Total', desc: 'Saldo acumulado calculado automáticamente', Icon: Equal },
 ];
 
 export default function CamposManager({ rubro, onClose }) {
@@ -78,7 +79,7 @@ export default function CamposManager({ rubro, onClose }) {
         <div className="grid grid-cols-2 gap-2">
           {BASE_COLS.map(c => (
             <div key={c.nombre} className="flex items-center gap-2 p-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg border border-slate-200 dark:border-slate-600">
-              <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold shrink-0">{c.icon}</span>
+              <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-300 shrink-0"><c.Icon size={13} /></span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{c.nombre}</p>
                 <p className="text-xs text-slate-400 leading-tight">{c.desc}</p>
@@ -177,9 +178,9 @@ export default function CamposManager({ rubro, onClose }) {
           <button
             onClick={handleAdd}
             disabled={!nombre.trim()}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 font-medium"
+            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 font-medium flex items-center justify-center gap-1.5"
           >
-            + Agregar columna
+            <Plus size={14} /> Agregar columna
           </button>
         </div>
       </div>

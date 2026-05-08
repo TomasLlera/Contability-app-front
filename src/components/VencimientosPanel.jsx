@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { movimientosApi } from '../api';
+import { AlertTriangle } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
 
@@ -31,7 +32,7 @@ export default function VencimientosPanel({ onNavigate, items: itemsProp }) {
   return (
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-lg">⚠️</span>
+        <AlertTriangle size={18} className="text-amber-500 shrink-0" />
         <h2 className="text-base font-semibold text-slate-700">Vencimientos próximos</h2>
         <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
           {items.length} factura{items.length !== 1 ? 's' : ''}

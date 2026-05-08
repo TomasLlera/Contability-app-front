@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { subrubrosApi, rubrosApi, dashboardApi } from '../api';
-import Modal from './Modal';
-import CamposManager from './CamposManager';
+import { subrubrosApi, rubrosApi, dashboardApi, getErrorMsg } from '../api';
+import Modal from '../components/Modal';
+import CamposManager from '../components/CamposManager';
 import SubrubroView from './SubrubroView';
-import ImportModal from './ImportModal';
-import ConfirmModal from './ConfirmModal';
+import ImportModal from '../components/ImportModal';
+import ConfirmModal from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
+import { Upload, Settings2, Trash2, ChevronRight, Plus } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -55,8 +56,8 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
       setSubrubros(prev => [...prev, sub].sort((a, b) => a.nombre.localeCompare(b.nombre)));
       setNuevoNombre('');
       toast.success(`${sub.nombre} creado`);
-    } catch {
-      toast.error('No se pudo crear');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
     }
   };
 
@@ -82,8 +83,8 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
       setEditingId(null);
       setShowIconPicker(false);
       toast.success('Actualizado');
-    } catch {
-      toast.error('No se pudo actualizar');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
     }
   };
 
@@ -117,13 +118,13 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           onClick={() => setShowImport(true)}
           className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
-          ↑ Importar Excel
+          <Upload size={14} /> Importar Excel
         </button>
         <button
           onClick={() => setShowCampos(true)}
           className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
-          ⚙️ Columnas
+          <Settings2 size={14} /> Columnas
         </button>
         <button
           onClick={() => setConfirmModal({
@@ -137,7 +138,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           })}
           className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
         >
-          🗑 Vaciar todo
+          <Trash2 size={14} /> Vaciar todo
         </button>
       </div>
 
@@ -197,7 +198,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                         {sub.nombre}
                       </p>
                     </div>
-                    <span className="text-slate-300 group-hover:text-blue-400 transition-colors ml-2 shrink-0">→</span>
+                    <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors ml-2 shrink-0" />
                   </div>
 
                   {/* Datos financieros */}
@@ -265,9 +266,9 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           />
           <button
             onClick={handleAdd}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 font-medium"
+            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 font-medium flex items-center justify-center gap-1.5"
           >
-            + Agregar
+            <Plus size={14} /> Agregar
           </button>
         </div>
 

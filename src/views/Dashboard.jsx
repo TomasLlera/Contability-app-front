@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { movimientosApi } from '../api';
-import { Folder, Users, Clock, AlertCircle, TrendingUp } from 'lucide-react';
-import VencimientosPanel from './VencimientosPanel';
+import { Folder, Users, Clock, AlertCircle, TrendingUp, FolderOpen } from 'lucide-react';
+import VencimientosPanel from '../components/VencimientosPanel';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -72,7 +72,7 @@ export default function Dashboard({ locales = [], rubros, rubroStats, onNavigate
 
       {rubros.length === 0 && (
         <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
-          <p className="text-5xl mb-4">📂</p>
+          <FolderOpen size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
           <p className="font-semibold text-slate-600 dark:text-slate-300">No hay rubros todavía</p>
           <p className="text-sm text-slate-400 mt-1">Creá tu primer rubro desde el menú lateral para empezar</p>
         </div>

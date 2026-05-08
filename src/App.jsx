@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { rubrosApi, subrubrosApi, localesApi, authApi, movimientosApi, getErrorMsg } from './api';
-import RubroView from './components/RubroView';
-import Dashboard from './components/Dashboard';
-import Graficas from './components/Graficas';
+import RubroView from './views/RubroView';
+import Dashboard from './views/Dashboard';
+import Graficas from './views/Graficas';
+import CajaView from './views/CajaView';
+import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
-import CajaView from './components/CajaView';
-import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
 import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';

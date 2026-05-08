@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { movimientosApi, camposApi, subrubrosApi, getErrorMsg } from '../api';
-import Modal from './Modal';
-import MovimientoForm from './MovimientoForm';
-import CalendarioSubrubro from './CalendarioSubrubro';
-import ConfirmModal from './ConfirmModal';
+import Modal from '../components/Modal';
+import MovimientoForm from '../components/MovimientoForm';
+import CalendarioSubrubro from '../components/CalendarioSubrubro';
+import ConfirmModal from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet } from 'lucide-react';
-import ExportModal from './ExportModal';
+import ExportModal from '../components/ExportModal';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
