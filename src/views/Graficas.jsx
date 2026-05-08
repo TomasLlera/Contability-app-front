@@ -179,7 +179,7 @@ function GraficoTendencia({ tendencia, metrica }) {
 }
 
 function GraficoCajaDia({ datos }) {
-  const maxVal = Math.max(...datos.flatMap(d => [d.ingresos, d.gastos]), 1);
+  const maxVal = Math.max(...datos.flatMap(d => [d.ingresosEfvo, d.transDelta, d.gastos]), 1);
   const today = todayStr();
 
   return (
@@ -188,22 +188,19 @@ function GraficoCajaDia({ datos }) {
         {datos.map(d => {
           const [, mes, dd] = d.fecha.split('-');
           const isToday = d.fecha === today;
+          const h = (v) => `${Math.max((v / maxVal) * 100, v > 0 ? 2 : 0)}%`;
           return (
             <div key={d.fecha} className="flex-1 h-full flex flex-col items-center gap-0.5 group relative min-w-0">
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                 <p className="font-semibold mb-1">{dd}/{mes}</p>
-                <p className="text-green-400">↑ {fmt(d.ingresos)}</p>
-                <p className="text-red-400">↓ {fmt(d.gastos)}</p>
+                <p className="text-green-400">Efvo {fmt(d.ingresosEfvo)}</p>
+                <p className="text-blue-400">Trans {fmt(d.transDelta)}</p>
+                <p className="text-red-400">Gastos {fmt(d.gastos)}</p>
               </div>
-              <div className="w-full flex-1 flex items-end gap-0.5">
-                <div
-                  className="flex-1 rounded-t-sm bg-green-400 dark:bg-green-600 transition-all duration-500 min-h-0.5"
-                  style={{ height: `${Math.max((d.ingresos / maxVal) * 100, d.ingresos > 0 ? 2 : 0)}%` }}
-                />
-                <div
-                  className="flex-1 rounded-t-sm bg-red-400 dark:bg-red-600 transition-all duration-500 min-h-0.5"
-                  style={{ height: `${Math.max((d.gastos / maxVal) * 100, d.gastos > 0 ? 2 : 0)}%` }}
-                />
+              <div className="w-full flex-1 flex items-end gap-px">
+                <div className="flex-1 rounded-t-sm bg-green-400 dark:bg-green-500 transition-all duration-500" style={{ height: h(d.ingresosEfvo) }} />
+                <div className="flex-1 rounded-t-sm bg-blue-400 dark:bg-blue-500 transition-all duration-500" style={{ height: h(d.transDelta) }} />
+                <div className="flex-1 rounded-t-sm bg-red-400 dark:bg-red-500 transition-all duration-500" style={{ height: h(d.gastos) }} />
               </div>
               <p className={`text-xs truncate ${isToday ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>
                 {dd}
@@ -213,7 +210,8 @@ function GraficoCajaDia({ datos }) {
         })}
       </div>
       <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-green-400" />Ingresos</div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-green-400" />Efectivo</div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-blue-400" />Transferencia</div>
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-red-400" />Gastos</div>
       </div>
     </div>
@@ -288,13 +286,14 @@ export default function Graficas({ rubros = [] }) {
       const transDelta = (d.saldoCuenta !== null && prev?.saldoCuenta != null)
         ? Math.max(d.saldoCuenta - prev.saldoCuenta, 0)
         : 0;
-      return { ...d, ingresos: d.ingresosEfvo + transDelta };
+      return { ...d, transDelta };
     });
   }, [cajaMovs]);
 
-  const totalIngresos = cajaByDia.reduce((s, d) => s + d.ingresos, 0);
+  const totalEfvo     = cajaByDia.reduce((s, d) => s + d.ingresosEfvo, 0);
+  const totalTrans    = cajaByDia.reduce((s, d) => s + d.transDelta, 0);
   const totalGastos   = cajaByDia.reduce((s, d) => s + d.gastos, 0);
-  const balance       = totalIngresos - totalGastos;
+  const balance       = totalEfvo + totalTrans - totalGastos;
 
   const rubroSeleccionado = rubros.find(r => r.id === selectedRubroId);
   const subrubroSeleccionado = subrubros.find(s => s.id === selectedSubrubroId);
@@ -415,10 +414,14 @@ export default function Graficas({ rubros = [] }) {
           <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos de caja para este período</div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
               <div className="bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900/50 rounded-xl p-3">
-                <p className="text-xs text-green-700 dark:text-green-400 font-medium mb-1">Ingresos</p>
-                <p className="text-lg font-bold text-green-700 dark:text-green-400">{fmt(totalIngresos)}</p>
+                <p className="text-xs text-green-700 dark:text-green-400 font-medium mb-1">Efectivo</p>
+                <p className="text-lg font-bold text-green-700 dark:text-green-400">{fmt(totalEfvo)}</p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-xl p-3">
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">Transferencia</p>
+                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{fmt(totalTrans)}</p>
               </div>
               <div className="bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-xl p-3">
                 <p className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Gastos</p>
