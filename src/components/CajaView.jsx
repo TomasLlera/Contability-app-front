@@ -5,7 +5,6 @@ import {
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -153,7 +152,6 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, vencimien
   );
 }
 
-const RANGOS = [{ label: 'Semana', days: 7 }, { label: 'Mes', days: 30 }, { label: 'Año', days: 365 }];
 
 export default function CajaView() {
   const [fecha, setFecha]         = useState(todayStr());
@@ -165,8 +163,6 @@ export default function CajaView() {
   const [saldoInput, setSaldoInput] = useState('');
   const [editandoSaldo, setEditandoSaldo] = useState(false);
   const [saldoAutoCalculado, setSaldoAutoCalculado] = useState(null);
-  const [rangoIdx, setRangoIdx]   = useState(0);
-  const [movsRango, setMovsRango] = useState([]);
   const [vencimientos, setVencimientos] = useState([]);
 
   const calcularSaldoAyer = (movsAyer) => {
@@ -191,13 +187,6 @@ export default function CajaView() {
     setLoading(false);
   };
 
-  const cargarRango = async () => {
-    const dias = RANGOS[rangoIdx].days;
-    const desde = addDays(todayStr(), -dias + 1);
-    const data = await cajaApi.getRango(desde, todayStr());
-    setMovsRango(data);
-  };
-
   const cargarVencimientos = async () => {
     try {
       const data = await movimientosApi.getVencimientos(7);
@@ -206,7 +195,6 @@ export default function CajaView() {
   };
 
   useEffect(() => { cargar(); }, [fecha]);
-  useEffect(() => { cargarRango(); }, [rangoIdx]);
   useEffect(() => { cargarVencimientos(); }, []);
 
   const handleSave = async (data) => {
@@ -222,14 +210,12 @@ export default function CajaView() {
       setEditingMov(null);
       setTipoForm(null);
       cargar();
-      cargarRango();
     } catch { toast.error('Error al guardar'); }
   };
 
   const handleDelete = async (id) => {
     await cajaApi.delete(id);
     setMovs(prev => prev.filter(m => m.id !== id));
-    cargarRango();
     toast.success('Eliminado');
   };
 
@@ -267,23 +253,6 @@ export default function CajaView() {
 
   const vencEfvo  = vencimientos.filter(v => v.metodo !== 'transferencia');
   const vencTrans = vencimientos.filter(v => v.metodo === 'transferencia');
-
-  // Gráfica
-  const graficaData = (() => {
-    const byDate = {};
-    for (const m of movsRango) {
-      if (m.tipo === 'saldo_inicial') continue;
-      if (!byDate[m.fecha]) byDate[m.fecha] = { fecha: m.fecha, efectivo: 0, transferencia: 0, especial: 0 };
-      if (m.tipo === 'gasto') {
-        if (m.es_especial) byDate[m.fecha].especial += m.monto;
-        else byDate[m.fecha][m.metodo] += m.monto;
-      }
-    }
-    return Object.values(byDate).sort((a,b) => a.fecha.localeCompare(b.fecha)).map(d => ({
-      ...d,
-      label: new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }),
-    }));
-  })();
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
@@ -439,35 +408,6 @@ export default function CajaView() {
         />
       </div>
 
-      {/* Gráfica historial de gastos */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Historial de gastos</h3>
-          <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs">
-            {RANGOS.map((r, i) => (
-              <button key={r.label} onClick={() => setRangoIdx(i)}
-                className={`px-3 py-1 transition-colors ${rangoIdx === i ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {graficaData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={graficaData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip formatter={v => fmt(v)} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="efectivo"     name="Efectivo"    fill="#22c55e" radius={[3,3,0,0]} stackId="a" />
-              <Bar dataKey="transferencia" name="Transf."    fill="#3b82f6" radius={[3,3,0,0]} stackId="a" />
-              <Bar dataKey="especial"     name="Especial"    fill="#f59e0b" radius={[3,3,0,0]} stackId="a" />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <p className="text-center text-xs text-slate-400 py-8">Sin datos en este rango</p>
-        )}
-      </div>
     </div>
   );
 }
