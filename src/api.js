@@ -176,3 +176,11 @@ export const movimientosApi = {
     }).then(r => r.data);
   },
 };
+
+export const cajaApi = {
+  getByFecha: (fecha) => api.get('/caja', { params: { fecha } }).then(r => r.data),
+  getRango: (desde, hasta) => api.get('/caja/rango', { params: { desde, hasta } }).then(r => r.data),
+  create: (data) => api.post('/caja', data).then(r => r.data),
+  update: (id, data) => api.put(`/caja/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/caja/${id}`).then(r => r.data),
+};

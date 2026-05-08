@@ -5,9 +5,10 @@ import Dashboard from './components/Dashboard';
 import Graficas from './components/Graficas';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
+import CajaView from './components/CajaView';
 import Login from './components/Login';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -292,6 +293,16 @@ export default function App() {
             Gráficas
           </button>
 
+          <button
+            onClick={() => { setActiveView('caja'); setInitialSubrubro(null); closeSidebar(); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              activeView === 'caja' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            }`}
+          >
+            <ClipboardList size={15} />
+            Caja del día
+          </button>
+
           <div className="pt-4">
             <div className="flex items-center px-3 py-1 mb-1">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex-1">Locales</span>
@@ -570,6 +581,8 @@ export default function App() {
             />
           ) : activeView === 'graficas' ? (
             <Graficas rubros={rubros} />
+          ) : activeView === 'caja' ? (
+            <CajaView />
           ) : (
             <Dashboard
               locales={locales}
