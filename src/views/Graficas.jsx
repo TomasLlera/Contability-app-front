@@ -277,11 +277,19 @@ export default function Graficas({ rubros = [] }) {
   const cajaByDia = useMemo(() => {
     const map = {};
     cajaMovs.forEach(m => {
-      if (!map[m.fecha]) map[m.fecha] = { ingresos: 0, gastos: 0 };
-      if (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') map[m.fecha].ingresos += m.monto;
+      if (!map[m.fecha]) map[m.fecha] = { ingresosEfvo: 0, gastos: 0, saldoCuenta: null };
+      if (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') map[m.fecha].ingresosEfvo += m.monto;
       if (m.tipo === 'gasto') map[m.fecha].gastos += m.monto;
+      if (m.tipo === 'saldo_cuenta') map[m.fecha].saldoCuenta = m.monto;
     });
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, v]) => ({ fecha, ...v }));
+    const sorted = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, v]) => ({ fecha, ...v }));
+    return sorted.map((d, i) => {
+      const prev = sorted[i - 1];
+      const transDelta = (d.saldoCuenta !== null && prev?.saldoCuenta != null)
+        ? Math.max(d.saldoCuenta - prev.saldoCuenta, 0)
+        : 0;
+      return { ...d, ingresos: d.ingresosEfvo + transDelta };
+    });
   }, [cajaMovs]);
 
   const totalIngresos = cajaByDia.reduce((s, d) => s + d.ingresos, 0);

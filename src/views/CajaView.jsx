@@ -60,7 +60,6 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
 
-        {/* Empleados */}
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Users size={13} className="text-green-600" /> Empleados</h3>
           <div className="space-y-1.5 mb-2">
@@ -80,7 +79,6 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
           </div>
         </div>
 
-        {/* Proveedores */}
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><ShoppingCart size={13} className="text-red-500" /> Proveedores</h3>
           <div className="space-y-1.5 mb-2">
@@ -93,7 +91,6 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
               </div>
             ))}
           </div>
-          {/* Desde subrubro */}
           <div className="mb-2">
             <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Vincular a un subrubro existente</label>
             <div className="flex gap-2">
@@ -105,7 +102,6 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
                 className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700 disabled:opacity-40"><Plus size={15} /></button>
             </div>
           </div>
-          {/* Manual */}
           <div>
             <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">O agregar manualmente</label>
             <div className="flex gap-2">
@@ -250,7 +246,7 @@ function MovRow({ m, onEdit, onDelete, colorMonto }) {
   );
 }
 
-function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, vencimientos }) {
+function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, vencimientos, labelDisponible }) {
   const restante = disponible - gastos;
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2">
@@ -260,7 +256,8 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, vencimien
       </div>
       <div className="space-y-1.5 text-sm">
         <div className="flex justify-between text-slate-600 dark:text-slate-300">
-          <span>Disponible</span><span className="font-semibold text-green-600">{fmt(disponible)}</span>
+          <span>{labelDisponible || 'Disponible'}</span>
+          <span className="font-semibold text-green-600">{fmt(disponible)}</span>
         </div>
         <div className="flex justify-between text-slate-600 dark:text-slate-300">
           <span>Gastos</span><span className="font-semibold text-red-500">{fmt(gastos)}</span>
@@ -292,13 +289,22 @@ export default function CajaView({ rubros = [] }) {
   const [showForm, setShowForm]     = useState(false);
   const [tipoForm, setTipoForm]     = useState(null);
   const [editingMov, setEditingMov] = useState(null);
-  const [saldoInput, setSaldoInput] = useState('');
-  const [editandoSaldo, setEditandoSaldo] = useState(false);
-  const saldoEditRef = useRef(null);
+
+  // Saldo efectivo
+  const [saldoInput, setSaldoInput]         = useState('');
+  const [editandoSaldo, setEditandoSaldo]   = useState(false);
   const [saldoAutoCalculado, setSaldoAutoCalculado] = useState(null);
+  const saldoEditRef = useRef(null);
+
+  // Saldo cuenta (transferencia)
+  const [saldoCuentaInput, setSaldoCuentaInput]       = useState('');
+  const [editandoSaldoCuenta, setEditandoSaldoCuenta] = useState(false);
+  const [saldoCuentaAyer, setSaldoCuentaAyer]         = useState(null);
+  const saldoCuentaEditRef = useRef(null);
+
   const [vencimientos, setVencimientos] = useState([]);
-  const [config, setConfig]         = useState({ empleados: [], proveedores: [] });
-  const [showConfig, setShowConfig] = useState(false);
+  const [config, setConfig]             = useState({ empleados: [], proveedores: [] });
+  const [showConfig, setShowConfig]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
 
   const calcularSaldoAyer = (movsAyer) => {
@@ -319,6 +325,7 @@ export default function CajaView({ rubros = [] }) {
     setMovs(data);
     const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
     setSaldoAutoCalculado(tieneSaldoManual ? null : calcularSaldoAyer(dataAyer));
+    setSaldoCuentaAyer(dataAyer.find(m => m.tipo === 'saldo_cuenta')?.monto ?? null);
     setLoading(false);
   };
 
@@ -334,7 +341,6 @@ export default function CajaView({ rubros = [] }) {
     } catch {}
   };
 
-  // Cargamos todos los subrubros para el ConfigPanel
   const cargarSubrubros = async () => {
     try {
       const results = await Promise.all(rubros.map(r => subrubrosApi.getByRubro(r.id)));
@@ -349,13 +355,23 @@ export default function CajaView({ rubros = [] }) {
     if (!editandoSaldo) return;
     const handler = (e) => {
       if (saldoEditRef.current && !saldoEditRef.current.contains(e.target)) {
-        setEditandoSaldo(false);
-        setSaldoInput('');
+        setEditandoSaldo(false); setSaldoInput('');
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [editandoSaldo]);
+
+  useEffect(() => {
+    if (!editandoSaldoCuenta) return;
+    const handler = (e) => {
+      if (saldoCuentaEditRef.current && !saldoCuentaEditRef.current.contains(e.target)) {
+        setEditandoSaldoCuenta(false); setSaldoCuentaInput('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [editandoSaldoCuenta]);
 
   const handleSave = async (data) => {
     try {
@@ -366,9 +382,7 @@ export default function CajaView({ rubros = [] }) {
         await cajaApi.create(data);
         toast.success('Guardado');
       }
-      setShowForm(false);
-      setEditingMov(null);
-      setTipoForm(null);
+      setShowForm(false); setEditingMov(null); setTipoForm(null);
       cargar();
     } catch { toast.error('Error al guardar'); }
   };
@@ -388,10 +402,18 @@ export default function CajaView({ rubros = [] }) {
     const existing = movs.find(m => m.tipo === 'saldo_inicial');
     if (existing) await cajaApi.update(existing.id, { monto: n, concepto: 'Saldo anterior', metodo: 'efectivo' });
     else await cajaApi.create({ fecha, tipo: 'saldo_inicial', concepto: 'Saldo anterior', monto: n, metodo: 'efectivo', es_especial: false });
-    setSaldoInput('');
-    setEditandoSaldo(false);
-    cargar();
-    toast.success('Saldo inicial guardado');
+    setSaldoInput(''); setEditandoSaldo(false);
+    cargar(); toast.success('Saldo inicial guardado');
+  };
+
+  const handleSaldoCuenta = async () => {
+    const n = Number(saldoCuentaInput);
+    if (isNaN(n) || saldoCuentaInput === '') return;
+    const existing = movs.find(m => m.tipo === 'saldo_cuenta');
+    if (existing) await cajaApi.update(existing.id, { monto: n, concepto: 'Saldo en cuenta', metodo: 'transferencia' });
+    else await cajaApi.create({ fecha, tipo: 'saldo_cuenta', concepto: 'Saldo en cuenta', monto: n, metodo: 'transferencia', es_especial: false });
+    setSaldoCuentaInput(''); setEditandoSaldoCuenta(false);
+    cargar(); toast.success('Saldo en cuenta guardado');
   };
 
   const handleSaveConfig = async (data) => {
@@ -400,20 +422,43 @@ export default function CajaView({ rubros = [] }) {
     toast.success('Configuración guardada');
   };
 
-  const saldoMov     = movs.find(m => m.tipo === 'saldo_inicial');
-  const saldoInicial = saldoMov?.monto ?? saldoAutoCalculado ?? 0;
-  const empleados    = movs.filter(m => m.tipo === 'empleado');
+  // ── Cálculos ────────────────────────────────────────────────────────────────
+  const saldoMov      = movs.find(m => m.tipo === 'saldo_inicial');
+  const saldoInicial  = saldoMov?.monto ?? saldoAutoCalculado ?? 0;
+  const saldoCuentaMov = movs.find(m => m.tipo === 'saldo_cuenta');
+  const saldoCuentaHoy = saldoCuentaMov?.monto ?? null;
+
+  // Ingreso del día por transferencia = diferencia entre saldo de cuenta de hoy y ayer
+  const ingresoTransDia = (saldoCuentaHoy !== null && saldoCuentaAyer !== null)
+    ? saldoCuentaHoy - saldoCuentaAyer
+    : null;
+
+  const empleados     = movs.filter(m => m.tipo === 'empleado');
   const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra');
-  const gastos       = movs.filter(m => m.tipo === 'gasto');
+  const gastos        = movs.filter(m => m.tipo === 'gasto');
 
-  const disponibleEfvo  = saldoInicial + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0) + ingresosExtra.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
-  const disponibleTrans = empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0) + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
-  const gastosEfvo      = gastos.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
-  const gastosTrans     = gastos.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
-  const vencEfvo        = vencimientos.filter(v => v.metodo !== 'transferencia');
-  const vencTrans       = vencimientos.filter(v => v.metodo === 'transferencia');
+  const disponibleEfvo  = saldoInicial
+    + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
+    + ingresosExtra.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
 
-  const formProps = { fecha, onSave: handleSave, onCancel: () => { setShowForm(false); setEditingMov(null); }, empleadosList: config.empleados || [], proveedoresList: config.proveedores || [] };
+  // Si hay saldo de cuenta registrado, el disponible es el delta (ingreso real del día)
+  // Si no, suma los ingresos individuales por transferencia como antes
+  const disponibleTrans = ingresoTransDia !== null
+    ? ingresoTransDia
+    : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
+      + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+
+  const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
+  const gastosTrans = gastos.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+  const vencEfvo    = vencimientos.filter(v => v.metodo !== 'transferencia');
+  const vencTrans   = vencimientos.filter(v => v.metodo === 'transferencia');
+
+  const formProps = {
+    fecha, onSave: handleSave,
+    onCancel: () => { setShowForm(false); setEditingMov(null); },
+    empleadosList: config.empleados || [],
+    proveedoresList: config.proveedores || [],
+  };
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
@@ -441,38 +486,82 @@ export default function CajaView({ rubros = [] }) {
         </button>
       </div>
 
-      {/* Saldo inicial */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wallet size={15} className="text-slate-500" />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Saldo del día anterior</span>
+      {/* Saldos del día — fila de dos tarjetas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+        {/* Saldo efectivo anterior */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet size={15} className="text-slate-500" />
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Saldo del día anterior</span>
+            </div>
+            {!editandoSaldo && (
+              <button onClick={() => { setSaldoInput(saldoInicial || ''); setEditandoSaldo(true); }}
+                className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                <Pencil size={11} /> {saldoMov ? 'Editar' : 'Ajustar'}
+              </button>
+            )}
           </div>
-          {!editandoSaldo && (
-            <button onClick={() => { setSaldoInput(saldoInicial || ''); setEditandoSaldo(true); }}
-              className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-              <Pencil size={11} /> {saldoMov ? 'Editar' : 'Ajustar'}
-            </button>
+          {editandoSaldo ? (
+            <div ref={saldoEditRef} className="flex gap-2 mt-3">
+              <input type="number" min="0" step="any" className={inputCls} placeholder="Saldo del día anterior"
+                value={saldoInput} onChange={e => setSaldoInput(e.target.value)} autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleSaldoInicial()} />
+              <button onClick={handleSaldoInicial} className="bg-blue-600 text-white px-3 rounded-lg text-sm hover:bg-blue-700">OK</button>
+              <button onClick={() => setEditandoSaldo(false)} className="text-slate-400 hover:text-slate-600 px-2">✕</button>
+            </div>
+          ) : (
+            <div className="mt-1">
+              <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+                {saldoInicial ? fmt(saldoInicial) : '—'}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {saldoMov ? 'Ajustado manualmente' : saldoAutoCalculado !== null ? 'Calculado del día anterior' : 'Sin datos del día anterior'}
+              </p>
+            </div>
           )}
         </div>
-        {editandoSaldo ? (
-          <div ref={saldoEditRef} className="flex gap-2 mt-3">
-            <input type="number" min="0" step="any" className={inputCls} placeholder="Saldo del día anterior"
-              value={saldoInput} onChange={e => setSaldoInput(e.target.value)} autoFocus
-              onKeyDown={e => e.key === 'Enter' && handleSaldoInicial()} />
-            <button onClick={handleSaldoInicial} className="bg-blue-600 text-white px-3 rounded-lg text-sm hover:bg-blue-700">OK</button>
-            <button onClick={() => setEditandoSaldo(false)} className="text-slate-400 hover:text-slate-600 px-2">✕</button>
+
+        {/* Saldo en cuenta bancaria */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ArrowLeftRight size={15} className="text-blue-500" />
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Saldo en cuenta</span>
+            </div>
+            {!editandoSaldoCuenta && (
+              <button onClick={() => { setSaldoCuentaInput(saldoCuentaHoy ?? ''); setEditandoSaldoCuenta(true); }}
+                className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                <Pencil size={11} /> {saldoCuentaMov ? 'Editar' : 'Ingresar'}
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="mt-1">
-            <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
-              {saldoInicial ? fmt(saldoInicial) : '—'}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {saldoMov ? 'Ajustado manualmente' : saldoAutoCalculado !== null ? 'Calculado del día anterior' : 'Sin datos del día anterior'}
-            </p>
-          </div>
-        )}
+          {editandoSaldoCuenta ? (
+            <div ref={saldoCuentaEditRef} className="flex gap-2 mt-3">
+              <input type="number" min="0" step="any" className={inputCls} placeholder="Saldo actual en cuenta"
+                value={saldoCuentaInput} onChange={e => setSaldoCuentaInput(e.target.value)} autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleSaldoCuenta()} />
+              <button onClick={handleSaldoCuenta} className="bg-blue-600 text-white px-3 rounded-lg text-sm hover:bg-blue-700">OK</button>
+              <button onClick={() => setEditandoSaldoCuenta(false)} className="text-slate-400 hover:text-slate-600 px-2">✕</button>
+            </div>
+          ) : (
+            <div className="mt-1">
+              <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+                {saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—'}
+              </p>
+              {ingresoTransDia !== null ? (
+                <p className={`text-xs mt-0.5 font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
+                  {ingresoTransDia >= 0 ? '↑' : '↓'} {fmt(Math.abs(ingresoTransDia))} ingreso del día
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy para ver el delta' : 'Sin datos de cuenta'}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Ingresos extra */}
@@ -543,8 +632,11 @@ export default function CajaView({ rubros = [] }) {
 
       {/* Resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600" disponible={disponibleEfvo} gastos={gastosEfvo} vencimientos={vencEfvo} />
-        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600" disponible={disponibleTrans} gastos={gastosTrans} vencimientos={vencTrans} />
+        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600"
+          disponible={disponibleEfvo} gastos={gastosEfvo} vencimientos={vencEfvo} />
+        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600"
+          disponible={disponibleTrans} gastos={gastosTrans} vencimientos={vencTrans}
+          labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
       </div>
 
       {showConfig && (
