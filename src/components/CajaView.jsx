@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cajaApi, movimientosApi, subrubrosApi } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
@@ -129,12 +129,21 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
 
 // ── Formulario de entrada ───────────────────────────────────────────────────
 function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList }) {
+  const ref = useRef(null);
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
   const [monto, setMonto]       = useState(initial?.monto || '');
   const [metodo, setMetodo]     = useState(initial?.metodo || 'efectivo');
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
   const [seleccion, setSeleccion] = useState('');
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onCancel();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onCancel]);
 
   const lista = tipo === 'empleado' ? empleadosList : tipo === 'gasto' ? proveedoresList : [];
 
@@ -156,7 +165,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   ];
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 space-y-3 border border-slate-200 dark:border-slate-600">
+    <form ref={ref} onSubmit={handleSubmit} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 space-y-3 border border-slate-200 dark:border-slate-600">
       {!tipoForzado && (
         <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
           {TIPOS_FORM.map(t => (
@@ -285,6 +294,7 @@ export default function CajaView({ rubros = [] }) {
   const [editingMov, setEditingMov] = useState(null);
   const [saldoInput, setSaldoInput] = useState('');
   const [editandoSaldo, setEditandoSaldo] = useState(false);
+  const saldoEditRef = useRef(null);
   const [saldoAutoCalculado, setSaldoAutoCalculado] = useState(null);
   const [vencimientos, setVencimientos] = useState([]);
   const [config, setConfig]         = useState({ empleados: [], proveedores: [] });
@@ -334,6 +344,18 @@ export default function CajaView({ rubros = [] }) {
 
   useEffect(() => { cargar(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
+
+  useEffect(() => {
+    if (!editandoSaldo) return;
+    const handler = (e) => {
+      if (saldoEditRef.current && !saldoEditRef.current.contains(e.target)) {
+        setEditandoSaldo(false);
+        setSaldoInput('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [editandoSaldo]);
 
   const handleSave = async (data) => {
     try {
@@ -434,7 +456,7 @@ export default function CajaView({ rubros = [] }) {
           )}
         </div>
         {editandoSaldo ? (
-          <div className="flex gap-2 mt-3">
+          <div ref={saldoEditRef} className="flex gap-2 mt-3">
             <input type="number" min="0" step="any" className={inputCls} placeholder="Saldo del día anterior"
               value={saldoInput} onChange={e => setSaldoInput(e.target.value)} autoFocus
               onKeyDown={e => e.key === 'Enter' && handleSaldoInicial()} />
