@@ -183,4 +183,6 @@ export const cajaApi = {
   create: (data) => api.post('/caja', data).then(r => r.data),
   update: (id, data) => api.put(`/caja/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/caja/${id}`).then(r => r.data),
+  getConfig: () => api.get('/caja/config').then(r => r.data),
+  saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
 };

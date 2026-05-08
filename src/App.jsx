@@ -582,7 +582,7 @@ export default function App() {
           ) : activeView === 'graficas' ? (
             <Graficas rubros={rubros} />
           ) : activeView === 'caja' ? (
-            <CajaView />
+            <CajaView rubros={rubros} />
           ) : (
             <Dashboard
               locales={locales}

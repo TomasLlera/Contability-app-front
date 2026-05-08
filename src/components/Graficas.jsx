@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { dashboardApi, subrubrosApi } from '../api';
-import { TrendingUp, TrendingDown, Minus, ChevronRight, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { dashboardApi, subrubrosApi, cajaApi } from '../api';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -16,6 +16,13 @@ function getRubroIcon(rubro) {
   if (n.includes('client') || n.includes('venta')) return '🏪';
   return RUBRO_ICONS[rubro.nombre.charCodeAt(0) % RUBRO_ICONS.length];
 }
+
+const todayStr = () => new Date().toISOString().split('T')[0];
+const addDays = (dateStr, n) => {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+};
 
 function FinancialCard({ label, value, negative, sub }) {
   return (
@@ -171,6 +178,48 @@ function GraficoTendencia({ tendencia, metrica }) {
   );
 }
 
+function GraficoCajaDia({ datos }) {
+  const maxVal = Math.max(...datos.flatMap(d => [d.ingresos, d.gastos]), 1);
+  const today = todayStr();
+
+  return (
+    <div>
+      <div className="flex items-end gap-1 h-40 mb-2">
+        {datos.map(d => {
+          const [, mes, dd] = d.fecha.split('-');
+          const isToday = d.fecha === today;
+          return (
+            <div key={d.fecha} className="flex-1 h-full flex flex-col items-center gap-0.5 group relative min-w-0">
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                <p className="font-semibold mb-1">{dd}/{mes}</p>
+                <p className="text-green-400">↑ {fmt(d.ingresos)}</p>
+                <p className="text-red-400">↓ {fmt(d.gastos)}</p>
+              </div>
+              <div className="w-full flex-1 flex items-end gap-0.5">
+                <div
+                  className="flex-1 rounded-t-sm bg-green-400 dark:bg-green-600 transition-all duration-500 min-h-0.5"
+                  style={{ height: `${Math.max((d.ingresos / maxVal) * 100, d.ingresos > 0 ? 2 : 0)}%` }}
+                />
+                <div
+                  className="flex-1 rounded-t-sm bg-red-400 dark:bg-red-600 transition-all duration-500 min-h-0.5"
+                  style={{ height: `${Math.max((d.gastos / maxVal) * 100, d.gastos > 0 ? 2 : 0)}%` }}
+                />
+              </div>
+              <p className={`text-xs truncate ${isToday ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>
+                {dd}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-green-400" />Ingresos</div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-red-400" />Gastos</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Graficas({ rubros = [] }) {
   const [resumen, setResumen] = useState(null);
   const [selectedRubroId, setSelectedRubroId] = useState(null);
@@ -181,6 +230,11 @@ export default function Graficas({ rubros = [] }) {
   const [loadingTendencia, setLoadingTendencia] = useState(false);
   const [comparacion, setComparacion] = useState([]);
 
+  // Caja
+  const [cajaPreset, setCajaPreset] = useState(14);
+  const [cajaMovs, setCajaMovs] = useState([]);
+  const [cajaLoading, setCajaLoading] = useState(false);
+
   useEffect(() => {
     dashboardApi.getResumen().then(setResumen);
   }, []);
@@ -189,7 +243,6 @@ export default function Graficas({ rubros = [] }) {
     if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id);
   }, [rubros]);
 
-  // Al cambiar de rubro: cargar subrubros, comparación y resetear selección
   useEffect(() => {
     if (!selectedRubroId) return;
     setSelectedSubrubroId(null);
@@ -200,7 +253,6 @@ export default function Graficas({ rubros = [] }) {
       .catch(() => {});
   }, [selectedRubroId]);
 
-  // Al cambiar rubro o subrubro: cargar tendencia
   useEffect(() => {
     if (!selectedRubroId) return;
     setLoadingTendencia(true);
@@ -211,6 +263,30 @@ export default function Graficas({ rubros = [] }) {
       .then(d => setTendencia(d.tendencia ?? []))
       .finally(() => setLoadingTendencia(false));
   }, [selectedRubroId, selectedSubrubroId]);
+
+  useEffect(() => {
+    const hasta = todayStr();
+    const desde = addDays(hasta, -(cajaPreset - 1));
+    setCajaLoading(true);
+    cajaApi.getRango(desde, hasta)
+      .then(data => setCajaMovs(data))
+      .catch(() => {})
+      .finally(() => setCajaLoading(false));
+  }, [cajaPreset]);
+
+  const cajaByDia = useMemo(() => {
+    const map = {};
+    cajaMovs.forEach(m => {
+      if (!map[m.fecha]) map[m.fecha] = { ingresos: 0, gastos: 0 };
+      if (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') map[m.fecha].ingresos += m.monto;
+      if (m.tipo === 'gasto') map[m.fecha].gastos += m.monto;
+    });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, v]) => ({ fecha, ...v }));
+  }, [cajaMovs]);
+
+  const totalIngresos = cajaByDia.reduce((s, d) => s + d.ingresos, 0);
+  const totalGastos   = cajaByDia.reduce((s, d) => s + d.gastos, 0);
+  const balance       = totalIngresos - totalGastos;
 
   const rubroSeleccionado = rubros.find(r => r.id === selectedRubroId);
   const subrubroSeleccionado = subrubros.find(s => s.id === selectedSubrubroId);
@@ -230,10 +306,9 @@ export default function Graficas({ rubros = [] }) {
         </div>
       )}
 
-      {/* Gráfico interactivo */}
+      {/* Gráfico interactivo de rubros */}
       {rubros.length > 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-          {/* Fila 1: título + métricas */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Tendencia mensual</h3>
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
@@ -253,7 +328,6 @@ export default function Graficas({ rubros = [] }) {
             </div>
           </div>
 
-          {/* Fila 2: selectores rubro / subrubro */}
           <div className="flex flex-wrap items-center gap-2 mb-5">
             <select
               value={selectedRubroId ?? ''}
@@ -301,11 +375,57 @@ export default function Graficas({ rubros = [] }) {
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
-          <p className="text-5xl mb-4">📊</p>
+          <BarChart3 size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
           <p className="font-semibold text-slate-600 dark:text-slate-300">Sin rubros para graficar</p>
           <p className="text-sm text-slate-400 mt-1">Creá rubros y cargá movimientos para ver las tendencias</p>
         </div>
       )}
+
+      {/* Caja del día — Historial */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto flex items-center gap-2">
+            <ClipboardList size={14} className="text-blue-500" /> Caja del día — Historial
+          </h3>
+          <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+            {[7, 14, 30].map(n => (
+              <button key={n} onClick={() => setCajaPreset(n)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  cajaPreset === n
+                    ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}>
+                {n}d
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {cajaLoading ? (
+          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+        ) : cajaByDia.length === 0 ? (
+          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos de caja para este período</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900/50 rounded-xl p-3">
+                <p className="text-xs text-green-700 dark:text-green-400 font-medium mb-1">Ingresos</p>
+                <p className="text-lg font-bold text-green-700 dark:text-green-400">{fmt(totalIngresos)}</p>
+              </div>
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-xl p-3">
+                <p className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Gastos</p>
+                <p className="text-lg font-bold text-red-600 dark:text-red-400">{fmt(totalGastos)}</p>
+              </div>
+              <div className={`rounded-xl p-3 border ${balance >= 0 ? 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600' : 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'}`}>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">Balance neto</p>
+                <p className={`text-lg font-bold ${balance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(balance)}</p>
+              </div>
+            </div>
+            <GraficoCajaDia datos={cajaByDia} />
+          </>
+        )}
+      </div>
+
     </div>
   );
 }
