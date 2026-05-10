@@ -73,7 +73,7 @@ function GraficoRanking({ comparacion, metrica, selectedId, onSelect }) {
   const vals = comparacion.map(s => Math.max(s[metrica] ?? 0, 0));
   const maxVal = Math.max(...vals, 1);
   return (
-    <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700">
+    <div className="mt-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Ranking de subrubros</h4>
         {selectedId && (
@@ -203,6 +203,7 @@ function CajaBarChart({ datos, chartCfg }) {
 export default function Graficas({ rubros = [] }) {
   const [tab, setTab] = useState('rubros');
   const [showResumen, setShowResumen] = useState(false);
+  const [showRanking, setShowRanking] = useState(false);
   const [resumen, setResumen] = useState(null);
   const [selectedRubroId, setSelectedRubroId] = useState(null);
   const [subrubros, setSubrubros] = useState([]);
@@ -365,7 +366,18 @@ export default function Graficas({ rubros = [] }) {
               {loadingTendencia
                 ? <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
                 : <GraficoTendencia tendencia={tendencia} metrica={metrica} />}
-              <GraficoRanking comparacion={comparacion} metrica={metrica} selectedId={selectedSubrubroId} onSelect={setSelectedSubrubroId} />
+              {comparacion.length > 0 && (
+                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700">
+                  <button
+                    onClick={() => setShowRanking(v => !v)}
+                    className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  >
+                    {showRanking ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    {showRanking ? 'Ocultar ranking de subrubros' : 'Ver ranking de subrubros'}
+                  </button>
+                  {showRanking && <GraficoRanking comparacion={comparacion} metrica={metrica} selectedId={selectedSubrubroId} onSelect={setSelectedSubrubroId} />}
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
