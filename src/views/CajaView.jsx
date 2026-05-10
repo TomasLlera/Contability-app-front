@@ -2,11 +2,36 @@ import { useState, useEffect, useRef } from 'react';
 import { cajaApi, movimientosApi, subrubrosApi } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
-  Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check
+  Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+
+function InfoTooltip({ text }) {
+  const [show, setShow] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!show) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setShow(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [show]);
+  return (
+    <div ref={ref} className="relative inline-flex shrink-0">
+      <button type="button" onClick={() => setShow(v => !v)}
+        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+        <HelpCircle size={13} />
+      </button>
+      {show && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg px-3 py-2.5 z-20 shadow-lg leading-relaxed">
+          {text}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+        </div>
+      )}
+    </div>
+  );
+}
 const todayStr = () => new Date().toISOString().split('T')[0];
 const addDays = (dateStr, n) => {
   const d = new Date(dateStr + 'T00:00:00');
@@ -492,9 +517,10 @@ export default function CajaView({ rubros = [] }) {
         {/* Saldo efectivo anterior */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wallet size={15} className="text-slate-500" />
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Saldo del día anterior</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <Wallet size={15} className="text-slate-500 shrink-0" />
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Saldo del día anterior</span>
+              <InfoTooltip text="Efectivo en caja al empezar el día. Se calcula automáticamente del cierre de ayer. Ajustalo si hay una diferencia." />
             </div>
             {!editandoSaldo && (
               <button onClick={() => { setSaldoInput(saldoInicial || ''); setEditandoSaldo(true); }}
@@ -516,9 +542,12 @@ export default function CajaView({ rubros = [] }) {
               <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
                 {saldoInicial ? fmt(saldoInicial) : '—'}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {saldoMov ? 'Ajustado manualmente' : saldoAutoCalculado !== null ? 'Calculado del día anterior' : 'Sin datos del día anterior'}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">💵 Efectivo</span>
+                <span className="text-xs text-slate-400">
+                  {saldoMov ? 'Ajustado manualmente' : saldoAutoCalculado !== null ? 'Efectivo del día anterior' : 'Sin datos del día anterior'}
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -526,9 +555,10 @@ export default function CajaView({ rubros = [] }) {
         {/* Saldo en cuenta bancaria */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ArrowLeftRight size={15} className="text-blue-500" />
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Saldo en cuenta</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <ArrowLeftRight size={15} className="text-blue-500 shrink-0" />
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Saldo en cuenta</span>
+              <InfoTooltip text="Total en la cuenta bancaria hoy. El sistema calcula el ingreso por transferencia restando el saldo de ayer al de hoy." />
             </div>
             {!editandoSaldoCuenta && (
               <button onClick={() => { setSaldoCuentaInput(saldoCuentaHoy ?? ''); setEditandoSaldoCuenta(true); }}
@@ -550,15 +580,18 @@ export default function CajaView({ rubros = [] }) {
               <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
                 {saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—'}
               </p>
-              {ingresoTransDia !== null ? (
-                <p className={`text-xs mt-0.5 font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-                  {ingresoTransDia >= 0 ? '↑' : '↓'} {fmt(Math.abs(ingresoTransDia))} ingreso del día
-                </p>
-              ) : (
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy para ver el delta' : 'Sin datos de cuenta'}
-                </p>
-              )}
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>
+                {ingresoTransDia !== null ? (
+                  <span className={`text-xs font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
+                    {ingresoTransDia >= 0 ? '↑' : '↓'} {fmt(Math.abs(ingresoTransDia))} ingreso del día bancario
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-400">
+                    {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy para ver el ingreso' : 'Sin datos de cuenta'}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
