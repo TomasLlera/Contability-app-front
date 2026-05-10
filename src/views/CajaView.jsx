@@ -7,8 +7,21 @@ import {
 import toast from 'react-hot-toast';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const todayStr = () => new Date().toISOString().split('T')[0];
+const addDays = (dateStr, n) => {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+};
+const formatFecha = (dateStr) => {
+  const d = new Date(dateStr + 'T00:00:00');
+  const s = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+const selectCls = inputCls;
 
-function InfoTooltip({ text }) {
+const InfoTooltip = ({ text }) => {
   const [show, setShow] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -31,21 +44,7 @@ function InfoTooltip({ text }) {
       )}
     </div>
   );
-}
-const todayStr = () => new Date().toISOString().split('T')[0];
-const addDays = (dateStr, n) => {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
 };
-const formatFecha = (dateStr) => {
-  const d = new Date(dateStr + 'T00:00:00');
-  const s = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-};
-
-const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-const selectCls = inputCls;
 
 // ── Panel de configuración ──────────────────────────────────────────────────
 function ConfigPanel({ config, rubros, onSave, onClose }) {
