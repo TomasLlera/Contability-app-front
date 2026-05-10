@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { subrubrosApi, rubrosApi, dashboardApi, getErrorMsg } from '../api';
 import Modal from '../components/Modal';
 import CamposManager from '../components/CamposManager';
@@ -21,6 +21,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
   const [editNombre, setEditNombre] = useState('');
   const [editIcon, setEditIcon] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const editingSubRef = useRef(null);
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -48,6 +49,17 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
   useEffect(() => {
     setSelectedSubrubro(initialSubrubro ?? null);
   }, [rubro.id, initialSubrubro?.id]);
+
+  useEffect(() => {
+    if (!editingId) return;
+    const handler = (e) => {
+      if (editingSubRef.current && !editingSubRef.current.contains(e.target)) {
+        setEditingId(null); setShowIconPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [editingId]);
 
   const handleAdd = async () => {
     if (!nuevoNombre.trim()) return;
@@ -150,7 +162,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all group overflow-hidden"
           >
             {editingId === sub.id ? (
-              <div className="p-4 space-y-2" onClick={e => e.stopPropagation()}>
+              <div ref={editingSubRef} className="p-4 space-y-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"

@@ -52,6 +52,8 @@ export default function App() {
   const lastScrollY = useRef(0);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+  const editingRubroRef = useRef(null);
+  const editingLocalRef = useRef(null);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -78,6 +80,28 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!editingRubro) return;
+    const handler = (e) => {
+      if (editingRubroRef.current && !editingRubroRef.current.contains(e.target)) {
+        setEditingRubro(null); setShowIconPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [editingRubro]);
+
+  useEffect(() => {
+    if (!editingLocal) return;
+    const handler = (e) => {
+      if (editingLocalRef.current && !editingLocalRef.current.contains(e.target)) {
+        setEditingLocal(null); setShowLocalIconPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [editingLocal]);
 
   // Local CRUD
   const [showNewLocal, setShowNewLocal] = useState(false);
@@ -331,7 +355,7 @@ export default function App() {
               return (
                 <div key={local.id}>
                   {editingLocal === local.id ? (
-                    <div className="px-2 py-1.5 space-y-1.5" onClick={e => e.stopPropagation()}>
+                    <div ref={editingLocalRef} className="px-2 py-1.5 space-y-1.5">
                       <div className="flex items-center gap-1">
                         <button type="button"
                           onClick={() => setShowLocalIconPicker(o => !o)}
@@ -387,7 +411,7 @@ export default function App() {
                       {localRubros.map(rubro => (
                         <div key={rubro.id} className="group relative">
                           {editingRubro === rubro.id ? (
-                            <div className="py-1 space-y-1.5" onClick={e => e.stopPropagation()}>
+                            <div ref={editingRubroRef} className="py-1 space-y-1.5">
                               <div className="flex items-center gap-1">
                                 <button type="button"
                                   onClick={() => setShowIconPicker(o => !o)}
