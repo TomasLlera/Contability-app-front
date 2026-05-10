@@ -81,6 +81,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Local CRUD
+  const [showNewLocal, setShowNewLocal] = useState(false);
+  const [nuevoLocal, setNuevoLocal] = useState('');
+  const [editingLocal, setEditingLocal] = useState(null);
+  const [editLocalNombre, setEditLocalNombre] = useState('');
+  const [editLocalIcon, setEditLocalIcon] = useState('🏠');
+  const [showLocalIconPicker, setShowLocalIconPicker] = useState(false);
+
+  // Rubro CRUD
+  const [showNewRubro, setShowNewRubro] = useState(null);
+  const [nuevoRubro, setNuevoRubro] = useState('');
+  const [editingRubro, setEditingRubro] = useState(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [editIcon, setEditIcon] = useState('');
+  const [showIconPicker, setShowIconPicker] = useState(false);
+
   useEffect(() => {
     if (!editingRubro) return;
     const handler = (e) => {
@@ -102,22 +118,6 @@ export default function App() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [editingLocal]);
-
-  // Local CRUD
-  const [showNewLocal, setShowNewLocal] = useState(false);
-  const [nuevoLocal, setNuevoLocal] = useState('');
-  const [editingLocal, setEditingLocal] = useState(null);
-  const [editLocalNombre, setEditLocalNombre] = useState('');
-  const [editLocalIcon, setEditLocalIcon] = useState('🏠');
-  const [showLocalIconPicker, setShowLocalIconPicker] = useState(false);
-
-  // Rubro CRUD
-  const [showNewRubro, setShowNewRubro] = useState(null);
-  const [nuevoRubro, setNuevoRubro] = useState('');
-  const [editingRubro, setEditingRubro] = useState(null);
-  const [editNombre, setEditNombre] = useState('');
-  const [editIcon, setEditIcon] = useState('');
-  const [showIconPicker, setShowIconPicker] = useState(false);
 
   useEffect(() => {
     if (loggedIn) {
