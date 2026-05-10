@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardApi, subrubrosApi, cajaApi } from '../api';
-import { TrendingUp, TrendingDown, Minus, ChevronRight, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -202,6 +202,7 @@ function CajaBarChart({ datos, chartCfg }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Graficas({ rubros = [] }) {
   const [tab, setTab] = useState('rubros');
+  const [showResumen, setShowResumen] = useState(false);
   const [resumen, setResumen] = useState(null);
   const [selectedRubroId, setSelectedRubroId] = useState(null);
   const [subrubros, setSubrubros] = useState([]);
@@ -314,13 +315,22 @@ export default function Graficas({ rubros = [] }) {
       {/* Tab: Rubros */}
       {tab === 'rubros' && (
         <>
-          {resumen && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FinancialCard label="Facturado este mes" value={resumen.facturadoMes} sub="Total de facturas ingresadas" />
-              <FinancialCard label="Pagado este mes" value={resumen.pagadoMes} sub="Total de pagos registrados" />
-              <FinancialCard label="Deuda total acumulada" value={resumen.deudaTotal} negative sub="Diferencia histórica facturado − pagado" />
-            </div>
-          )}
+          <div>
+            <button
+              onClick={() => setShowResumen(v => !v)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors mb-2"
+            >
+              {showResumen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              {showResumen ? 'Ocultar resumen del mes' : 'Ver resumen del mes'}
+            </button>
+            {showResumen && resumen && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2">
+                <FinancialCard label="Facturado este mes" value={resumen.facturadoMes} sub="Total de facturas ingresadas" />
+                <FinancialCard label="Pagado este mes" value={resumen.pagadoMes} sub="Total de pagos registrados" />
+                <FinancialCard label="Deuda total acumulada" value={resumen.deudaTotal} negative sub="Diferencia histórica facturado − pagado" />
+              </div>
+            )}
+          </div>
 
           {rubros.length > 0 ? (
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
