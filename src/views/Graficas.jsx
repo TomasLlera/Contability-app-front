@@ -201,6 +201,7 @@ function CajaBarChart({ datos, chartCfg }) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Graficas({ rubros = [] }) {
+  const [tab, setTab] = useState('rubros');
   const [resumen, setResumen] = useState(null);
   const [selectedRubroId, setSelectedRubroId] = useState(null);
   const [subrubros, setSubrubros] = useState([]);
@@ -291,109 +292,128 @@ export default function Graficas({ rubros = [] }) {
   const activeCajaCfg = CAJA_CHARTS.find(c => c.key === cajaMetrica) || CAJA_CHARTS[0];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-5">
 
-      {resumen && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <FinancialCard label="Facturado este mes" value={resumen.facturadoMes} sub="Total de facturas ingresadas" />
-          <FinancialCard label="Pagado este mes" value={resumen.pagadoMes} sub="Total de pagos registrados" />
-          <FinancialCard label="Deuda total acumulada" value={resumen.deudaTotal} negative sub="Diferencia histórica facturado − pagado" />
-        </div>
+      {/* Tabs */}
+      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
+        {[['rubros', '📊 Rubros'], ['caja', '🗂️ Caja']].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === key
+                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Rubros */}
+      {tab === 'rubros' && (
+        <>
+          {resumen && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FinancialCard label="Facturado este mes" value={resumen.facturadoMes} sub="Total de facturas ingresadas" />
+              <FinancialCard label="Pagado este mes" value={resumen.pagadoMes} sub="Total de pagos registrados" />
+              <FinancialCard label="Deuda total acumulada" value={resumen.deudaTotal} negative sub="Diferencia histórica facturado − pagado" />
+            </div>
+          )}
+
+          {rubros.length > 0 ? (
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Tendencia mensual</h3>
+                <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+                  {METRICAS.map(m => (
+                    <button key={m.key} onClick={() => setMetrica(m.key)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${metrica === m.key ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                <select value={selectedRubroId ?? ''} onChange={e => setSelectedRubroId(Number(e.target.value))}
+                  className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  {rubros.map(r => <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>)}
+                </select>
+                {subrubros.length > 0 && (
+                  <>
+                    <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 shrink-0" />
+                    <select value={selectedSubrubroId ?? ''} onChange={e => setSelectedSubrubroId(e.target.value ? Number(e.target.value) : null)}
+                      className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                      <option value="">Todos los subrubros</option>
+                      {subrubros.map(s => <option key={s.id} value={s.id}>{s.icon ? `${s.icon} ` : ''}{s.nombre}</option>)}
+                    </select>
+                  </>
+                )}
+                <span className="hidden sm:block text-xs text-slate-400 dark:text-slate-500 shrink-0">últimos 6 meses</span>
+              </div>
+              {loadingTendencia
+                ? <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+                : <GraficoTendencia tendencia={tendencia} metrica={metrica} />}
+              <GraficoRanking comparacion={comparacion} metrica={metrica} selectedId={selectedSubrubroId} onSelect={setSelectedSubrubroId} />
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
+              <BarChart3 size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+              <p className="font-semibold text-slate-600 dark:text-slate-300">Sin rubros para graficar</p>
+              <p className="text-sm text-slate-400 mt-1">Creá rubros y cargá movimientos para ver las tendencias</p>
+            </div>
+          )}
+        </>
       )}
 
-      {rubros.length > 0 ? (
+      {/* Tab: Caja */}
+      {tab === 'caja' && (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Tendencia mensual</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2 mr-auto">
+              <ClipboardList size={14} className="text-blue-500" /> Historial de caja
+            </h3>
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-              {METRICAS.map(m => (
-                <button key={m.key} onClick={() => setMetrica(m.key)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${metrica === m.key ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
-                  {m.label}
+              {[['dia','Día'],['mes','Mes'],['anio','Año']].map(([v, l]) => (
+                <button key={v} onClick={() => { setCajaVista(v); setCajaPreset(CAJA_PRESETS[v][1]); }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${cajaVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+              {CAJA_PRESETS[cajaVista].map(n => (
+                <button key={n} onClick={() => setCajaPreset(n)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${cajaPreset === n ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                  {n}{cajaVista === 'dia' ? 'd' : cajaVista === 'mes' ? 'm' : 'a'}
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            <select value={selectedRubroId ?? ''} onChange={e => setSelectedRubroId(Number(e.target.value))}
-              className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
-              {rubros.map(r => <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>)}
-            </select>
-            {subrubros.length > 0 && (
-              <>
-                <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 shrink-0" />
-                <select value={selectedSubrubroId ?? ''} onChange={e => setSelectedSubrubroId(e.target.value ? Number(e.target.value) : null)}
-                  className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                  <option value="">Todos los subrubros</option>
-                  {subrubros.map(s => <option key={s.id} value={s.id}>{s.icon ? `${s.icon} ` : ''}{s.nombre}</option>)}
-                </select>
-              </>
-            )}
-            <span className="hidden sm:block text-xs text-slate-400 dark:text-slate-500 shrink-0">últimos 6 meses</span>
+
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-5">
+            {CAJA_CHARTS.map(c => (
+              <button key={c.key} onClick={() => setCajaMetrica(c.key)}
+                className={`px-2 py-2 rounded-lg text-xs font-medium transition-colors text-center leading-tight ${
+                  cajaMetrica === c.key
+                    ? `${c.color} text-white shadow-sm`
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}>
+                {c.label}
+              </button>
+            ))}
           </div>
-          {loadingTendencia
-            ? <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
-            : <GraficoTendencia tendencia={tendencia} metrica={metrica} />}
-          <GraficoRanking comparacion={comparacion} metrica={metrica} selectedId={selectedSubrubroId} onSelect={setSelectedSubrubroId} />
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
-          <BarChart3 size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-          <p className="font-semibold text-slate-600 dark:text-slate-300">Sin rubros para graficar</p>
-          <p className="text-sm text-slate-400 mt-1">Creá rubros y cargá movimientos para ver las tendencias</p>
+
+          {cajaLoading ? (
+            <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+          ) : cajaAggregated.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos de caja para este período</div>
+          ) : (
+            <CajaBarChart datos={cajaAggregated} chartCfg={activeCajaCfg} />
+          )}
         </div>
       )}
-
-      {/* Caja — Historial */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-        {/* Header: título + vista + preset */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2 mr-auto">
-            <ClipboardList size={14} className="text-blue-500" /> Caja
-          </h3>
-          {/* Vista selector */}
-          <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-            {[['dia','Día'],['mes','Mes'],['anio','Año']].map(([v, l]) => (
-              <button key={v} onClick={() => { setCajaVista(v); setCajaPreset(CAJA_PRESETS[v][1]); }}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${cajaVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
-                {l}
-              </button>
-            ))}
-          </div>
-          {/* Preset selector */}
-          <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-            {CAJA_PRESETS[cajaVista].map(n => (
-              <button key={n} onClick={() => setCajaPreset(n)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${cajaPreset === n ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
-                {n}{cajaVista === 'dia' ? 'd' : cajaVista === 'mes' ? 'm' : 'a'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Selector de métrica — 6 botones */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-5">
-          {CAJA_CHARTS.map(c => (
-            <button key={c.key} onClick={() => setCajaMetrica(c.key)}
-              className={`px-2 py-2 rounded-lg text-xs font-medium transition-colors text-center leading-tight ${
-                cajaMetrica === c.key
-                  ? `${c.color} text-white shadow-sm`
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-              }`}>
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Gráfico */}
-        {cajaLoading ? (
-          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
-        ) : cajaAggregated.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos de caja para este período</div>
-        ) : (
-          <CajaBarChart datos={cajaAggregated} chartCfg={activeCajaCfg} />
-        )}
-      </div>
 
     </div>
   );
