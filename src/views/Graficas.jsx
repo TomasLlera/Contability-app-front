@@ -201,7 +201,7 @@ function CajaBarChart({ datos, chartCfg }) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Graficas({ rubros = [] }) {
-  const [tab, setTab] = useState('rubros');
+  const [tab, setTab] = useState(() => sessionStorage.getItem('graficas_tab') || 'rubros');
   const [showResumen, setShowResumen] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [resumen, setResumen] = useState(null);
@@ -301,7 +301,7 @@ export default function Graficas({ rubros = [] }) {
         {[['rubros', '📊 Rubros'], ['caja', '🗂️ Caja']].map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => { setTab(key); sessionStorage.setItem('graficas_tab', key); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === key
                 ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'

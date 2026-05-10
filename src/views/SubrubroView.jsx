@@ -316,7 +316,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fecha</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide sticky left-0 z-10 bg-slate-50 dark:bg-slate-700/60">Fecha</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monto</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pago</th>
                 {camposNumericos.map(c => (
@@ -349,8 +349,8 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                   : '';
 
                 return (
-                  <tr key={m.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${rowCls}`}>
-                    <td className="px-4 py-3 whitespace-nowrap font-medium">
+                  <tr key={m.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${rowCls}`}>
+                    <td className="px-4 py-3 whitespace-nowrap font-medium sticky left-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50">
                       {m.fecha
                         ? <span className="text-slate-600 dark:text-slate-300">{m.fecha}</span>
                         : <span className="text-amber-500 text-xs italic">Sin fecha</span>

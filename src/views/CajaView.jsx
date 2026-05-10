@@ -379,6 +379,16 @@ export default function CajaView({ rubros = [] }) {
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
 
   useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'ArrowLeft') setFecha(f => addDays(f, -1));
+      if (e.key === 'ArrowRight') setFecha(f => addDays(f, 1));
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
     if (!editandoSaldo) return;
     const handler = (e) => {
       if (saldoEditRef.current && !saldoEditRef.current.contains(e.target)) {
