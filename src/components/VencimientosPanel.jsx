@@ -5,10 +5,10 @@ import { AlertTriangle } from 'lucide-react';
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
 
 function diasInfo(dias) {
-  if (dias < 0) return { label: `Vencida hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`, cls: 'bg-red-500', textCls: 'text-red-700 bg-red-50 border-red-200' };
-  if (dias === 0) return { label: 'Vence hoy', cls: 'bg-red-500', textCls: 'text-red-700 bg-red-50 border-red-200' };
-  if (dias <= 7) return { label: `Vence en ${dias} día${dias !== 1 ? 's' : ''}`, cls: 'bg-amber-400', textCls: 'text-amber-700 bg-amber-50 border-amber-200' };
-  return { label: `Vence en ${dias} días`, cls: 'bg-blue-400', textCls: 'text-blue-700 bg-blue-50 border-blue-200' };
+  if (dias < 0) return { label: `Vencida hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`, cls: 'bg-red-500', textCls: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800' };
+  if (dias === 0) return { label: 'Vence hoy', cls: 'bg-red-500', textCls: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800' };
+  if (dias <= 7) return { label: `Vence en ${dias} día${dias !== 1 ? 's' : ''}`, cls: 'bg-amber-400', textCls: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800' };
+  return { label: `Vence en ${dias} días`, cls: 'bg-blue-400', textCls: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800' };
 }
 
 export default function VencimientosPanel({ onNavigate, items: itemsProp }) {
@@ -33,8 +33,8 @@ export default function VencimientosPanel({ onNavigate, items: itemsProp }) {
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
         <AlertTriangle size={18} className="text-amber-500 shrink-0" />
-        <h2 className="text-base font-semibold text-slate-700">Vencimientos próximos</h2>
-        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+        <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200">Vencimientos próximos</h2>
+        <span className="text-xs bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-full font-medium">
           {items.length} factura{items.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -54,7 +54,7 @@ export default function VencimientosPanel({ onNavigate, items: itemsProp }) {
                   <span className="font-semibold text-sm">{item.subrubro?.nombre}</span>
                   <span className="text-xs opacity-60">{item.rubro?.nombre}</span>
                   {item.campos_extra?.nro_factura && (
-                    <span className="font-mono text-xs bg-white/60 px-1.5 py-0.5 rounded border border-current/20">
+                    <span className="font-mono text-xs bg-white/60 dark:bg-white/10 px-1.5 py-0.5 rounded border border-current/20">
                       {item.campos_extra.nro_factura}
                     </span>
                   )}

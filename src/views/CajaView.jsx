@@ -40,7 +40,8 @@ const addDays = (dateStr, n) => {
 };
 const formatFecha = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const s = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -315,6 +316,8 @@ export default function CajaView({ rubros = [] }) {
   const [tipoForm, setTipoForm]     = useState(null);
   const [editingMov, setEditingMov] = useState(null);
 
+  const dateInputRef = useRef(null);
+
   // Saldo efectivo
   const [saldoInput, setSaldoInput]         = useState('');
   const [editandoSaldo, setEditandoSaldo]   = useState(false);
@@ -488,25 +491,31 @@ export default function CajaView({ rubros = [] }) {
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
       {/* Navegación de fecha */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <button onClick={() => setFecha(addDays(fecha, -1))}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1 text-center">
-          <p className="font-semibold text-slate-800 dark:text-slate-100 capitalize">{formatFecha(fecha)}</p>
+          <button
+            onClick={() => { try { dateInputRef.current?.showPicker(); } catch { dateInputRef.current?.click(); } }}
+            className="font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+          >
+            {formatFecha(fecha)}
+          </button>
           {fecha !== todayStr() && (
-            <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline">Ir a hoy</button>
+            <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline block mx-auto">Ir a hoy</button>
           )}
         </div>
         <button onClick={() => setFecha(addDays(fecha, 1))} disabled={fecha >= todayStr()}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30">
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30 shrink-0">
           <ChevronRight size={18} />
         </button>
-        <input type="date" value={fecha} max={todayStr()} onChange={e => setFecha(e.target.value)}
-          className="hidden sm:block border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input ref={dateInputRef} type="date" value={fecha} max={todayStr()}
+          onChange={e => setFecha(e.target.value)}
+          className="sr-only" />
         <button onClick={() => setShowConfig(true)}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Configurar empleados y proveedores">
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0" title="Configurar empleados y proveedores">
           <Settings size={16} />
         </button>
       </div>
