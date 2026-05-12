@@ -149,14 +149,23 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
 }
 
 // ── Formulario de entrada ───────────────────────────────────────────────────
-function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList }) {
+function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, rubros = [], prefillSubrubro = null }) {
   const ref = useRef(null);
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
-  const [monto, setMonto]       = useState(initial?.monto || '');
+  const [monto, setMonto]       = useState(initial?.monto || prefillSubrubro?.monto || '');
   const [metodo, setMetodo]     = useState(initial?.metodo || 'efectivo');
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
-  const [seleccion, setSeleccion] = useState('');
+  const [seleccionEmpleado, setSeleccionEmpleado] = useState('');
+
+  // Subrubro state (gastos)
+  const [rubroIdSel, setRubroIdSel]             = useState('');
+  const [subsDelRubro, setSubsDelRubro]         = useState([]);
+  const [subrubroIdSel, setSubrubroIdSel]       = useState('');
+  const [boletas, setBoletas]                   = useState([]);
+  const [boletasSel, setBoletasSel]             = useState(new Set());
+  const [cargandoSubs, setCargandoSubs]         = useState(false);
+  const [cargandoBoletas, setCargandoBoletas]   = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -166,17 +175,74 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     return () => document.removeEventListener('mousedown', handler);
   }, [onCancel]);
 
-  const lista = tipo === 'empleado' ? empleadosList : tipo === 'gasto' ? proveedoresList : [];
+  // Prefill desde vencimiento
+  useEffect(() => {
+    if (!prefillSubrubro?.rubroId) return;
+    setRubroIdSel(String(prefillSubrubro.rubroId));
+  }, [prefillSubrubro]);
 
-  const handleSeleccion = (val) => {
-    setSeleccion(val);
-    if (val) setConcepto(val);
+  useEffect(() => {
+    if (!prefillSubrubro?.subrubroId || !subsDelRubro.length) return;
+    setSubrubroIdSel(String(prefillSubrubro.subrubroId));
+  }, [subsDelRubro, prefillSubrubro]);
+
+  useEffect(() => {
+    if (!prefillSubrubro?.boletaId || !boletas.length) return;
+    setBoletasSel(new Set([prefillSubrubro.boletaId]));
+  }, [boletas, prefillSubrubro]);
+
+  // Cargar subrubros al elegir rubro
+  useEffect(() => {
+    if (!rubroIdSel) { setSubsDelRubro([]); setSubrubroIdSel(''); return; }
+    setCargandoSubs(true);
+    subrubrosApi.getByRubro(rubroIdSel)
+      .then(s => setSubsDelRubro(s))
+      .catch(() => {})
+      .finally(() => setCargandoSubs(false));
+    setSubrubroIdSel('');
+    setBoletas([]);
+    setBoletasSel(new Set());
+  }, [rubroIdSel]);
+
+  // Cargar boletas al elegir subrubro
+  useEffect(() => {
+    if (!subrubroIdSel || subrubroIdSel === '__nuevo__') { setBoletas([]); setBoletasSel(new Set()); return; }
+    setCargandoBoletas(true);
+    movimientosApi.getBySubrubro(subrubroIdSel)
+      .then(data => setBoletas((data.movimientos || []).filter(m => m.tipo === 'factura' && !m.pagado)))
+      .catch(() => setBoletas([]))
+      .finally(() => setCargandoBoletas(false));
+    setBoletasSel(new Set());
+  }, [subrubroIdSel]);
+
+  // Auto-completar concepto con nombre del subrubro
+  useEffect(() => {
+    if (!subrubroIdSel || subrubroIdSel === '__nuevo__') return;
+    const sub = subsDelRubro.find(s => String(s.id) === subrubroIdSel);
+    if (sub && !concepto) setConcepto(sub.nombre);
+  }, [subrubroIdSel, subsDelRubro]);
+
+  const handleSeleccionEmpleado = (val) => {
+    setSeleccionEmpleado(val);
+    if (val && val !== '__otro__') setConcepto(val);
+  };
+
+  const resetGastoState = () => {
+    setRubroIdSel(''); setSubsDelRubro([]); setSubrubroIdSel('');
+    setBoletas([]); setBoletasSel(new Set());
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!concepto.trim() || !Number(monto)) return;
-    onSave({ fecha, tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial });
+    const esNuevoSub = tipo === 'gasto' && subrubroIdSel === '__nuevo__';
+    onSave({
+      fecha, tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial,
+      subrubro_id: tipo === 'gasto' && subrubroIdSel && !esNuevoSub ? Number(subrubroIdSel) : null,
+      boletas_seleccionadas: tipo === 'gasto' ? [...boletasSel] : [],
+      nuevo_subrubro_rubro_id: esNuevoSub ? rubroIdSel : null,
+      nuevo_subrubro_nombre: esNuevoSub ? concepto.trim() : null,
+    });
   };
 
   const TIPOS_FORM = [
@@ -190,7 +256,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
       {!tipoForzado && (
         <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
           {TIPOS_FORM.map(t => (
-            <button key={t.value} type="button" onClick={() => { setTipo(t.value); setSeleccion(''); setConcepto(''); }}
+            <button key={t.value} type="button" onClick={() => { setTipo(t.value); setSeleccionEmpleado(''); setConcepto(''); resetGastoState(); }}
               className={`flex-1 py-2 transition-colors ${tipo === t.value ? `${t.color} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
               {t.label}
             </button>
@@ -198,18 +264,64 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
         </div>
       )}
 
-      {lista.length > 0 && (
-        <select className={selectCls} value={seleccion} onChange={e => handleSeleccion(e.target.value)}>
-          <option value="">— Elegir de la lista —</option>
-          {lista.map((item, i) => <option key={i} value={item.nombre}>{item.nombre}</option>)}
+      {/* Empleado: lista rápida */}
+      {tipo === 'empleado' && empleadosList.length > 0 && (
+        <select className={selectCls} value={seleccionEmpleado} onChange={e => handleSeleccionEmpleado(e.target.value)}>
+          <option value="">— Elegir empleado —</option>
+          {empleadosList.map((item, i) => <option key={i} value={item.nombre}>{item.nombre}</option>)}
           <option value="__otro__">Otro (escribir)</option>
         </select>
       )}
 
-      {(lista.length === 0 || seleccion === '__otro__' || !seleccion) && (
+      {/* Gasto: selector rubro + subrubro */}
+      {tipo === 'gasto' && (
+        <div className="grid grid-cols-2 gap-2">
+          <select className={selectCls} value={rubroIdSel} onChange={e => setRubroIdSel(e.target.value)}>
+            <option value="">— Rubro —</option>
+            {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+          </select>
+          <select className={selectCls} value={subrubroIdSel} onChange={e => setSubrubroIdSel(e.target.value)} disabled={!rubroIdSel || cargandoSubs}>
+            <option value="">— {cargandoSubs ? 'Cargando...' : 'Subrubro'} —</option>
+            {subsDelRubro.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            {rubroIdSel && concepto.trim() && !subsDelRubro.find(s => s.nombre.toLowerCase() === concepto.trim().toLowerCase()) && (
+              <option value="__nuevo__">+ Crear "{concepto.trim()}"</option>
+            )}
+          </select>
+        </div>
+      )}
+
+      {/* Concepto */}
+      {(tipo !== 'empleado' || !empleadosList.length || seleccionEmpleado === '__otro__' || !seleccionEmpleado) && (
         <input type="text" className={inputCls}
           placeholder={tipo === 'empleado' ? 'Nombre del empleado' : tipo === 'ingreso_extra' ? 'Descripción del ingreso' : 'Proveedor o concepto'}
-          value={concepto} onChange={e => setConcepto(e.target.value)} required autoFocus={!lista.length} />
+          value={concepto}
+          onChange={e => { setConcepto(e.target.value); if (subrubroIdSel === '__nuevo__' && !e.target.value.trim()) setSubrubroIdSel(''); }}
+          required autoFocus={tipo !== 'empleado' || !empleadosList.length} />
+      )}
+
+      {/* Boletas pendientes del subrubro */}
+      {tipo === 'gasto' && subrubroIdSel && subrubroIdSel !== '__nuevo__' && (
+        cargandoBoletas ? (
+          <p className="text-xs text-slate-400 text-center py-1">Cargando boletas...</p>
+        ) : boletas.length > 0 ? (
+          <div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">Boletas pendientes</p>
+            <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden max-h-36 overflow-y-auto">
+              {boletas.map(b => (
+                <label key={b.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer border-b border-slate-100 dark:border-slate-700 last:border-0 transition-colors ${boletasSel.has(b.id) ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <input type="checkbox" checked={boletasSel.has(b.id)}
+                    onChange={() => setBoletasSel(prev => { const n = new Set(prev); n.has(b.id) ? n.delete(b.id) : n.add(b.id); return n; })}
+                    className="accent-blue-600 shrink-0" />
+                  <span className="text-xs text-slate-500 w-20 shrink-0">{b.fecha}</span>
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex-1">{fmt(b.monto)}</span>
+                  {b.campos_extra?.nro_factura && <span className="text-xs text-slate-400 truncate max-w-20">#{b.campos_extra.nro_factura}</span>}
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 text-center py-1">Sin boletas pendientes</p>
+        )
       )}
 
       <div className="grid grid-cols-2 gap-2">
@@ -329,7 +441,9 @@ export default function CajaView({ rubros = [] }) {
   const [saldoCuentaAyer, setSaldoCuentaAyer]         = useState(null);
   const saldoCuentaEditRef = useRef(null);
 
-  const [vencimientos, setVencimientos] = useState([]);
+  const [vencimientos, setVencimientos]       = useState([]);
+  const [vencimientosHoy, setVencimientosHoy] = useState([]);
+  const [vencimientoPrefill, setVencimientoPrefill] = useState(null);
   const [config, setConfig]             = useState({ empleados: [], proveedores: [] });
   const [showConfig, setShowConfig]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
@@ -368,6 +482,13 @@ export default function CajaView({ rubros = [] }) {
     } catch {}
   };
 
+  const cargarVencimientosHoy = async () => {
+    try {
+      const data = await movimientosApi.getVencimientosDia(fecha);
+      setVencimientosHoy(data || []);
+    } catch {}
+  };
+
   const cargarSubrubros = async () => {
     try {
       const results = await Promise.all(rubros.map(r => subrubrosApi.getByRubro(r.id)));
@@ -375,7 +496,7 @@ export default function CajaView({ rubros = [] }) {
     } catch {}
   };
 
-  useEffect(() => { cargar(); }, [fecha]);
+  useEffect(() => { cargar(); cargarVencimientosHoy(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
 
   useEffect(() => {
@@ -412,15 +533,47 @@ export default function CajaView({ rubros = [] }) {
 
   const handleSave = async (data) => {
     try {
+      const { subrubro_id, boletas_seleccionadas, nuevo_subrubro_rubro_id, nuevo_subrubro_nombre, ...cajaData } = data;
+
+      let finalSubrubroId = subrubro_id;
+
+      // Crear subrubro nuevo si corresponde
+      if (nuevo_subrubro_nombre && nuevo_subrubro_rubro_id) {
+        const newSub = await subrubrosApi.create(nuevo_subrubro_rubro_id, nuevo_subrubro_nombre);
+        finalSubrubroId = newSub.id;
+        const updatedConfig = { ...config, proveedores: [...(config.proveedores || []), { nombre: nuevo_subrubro_nombre, subrubro_id: newSub.id }] };
+        await cajaApi.saveConfig(updatedConfig);
+        setConfig(updatedConfig);
+        cargarSubrubros();
+      }
+
       if (editingMov) {
-        await cajaApi.update(editingMov.id, data);
+        await cajaApi.update(editingMov.id, { ...cajaData, subrubro_id: finalSubrubroId ?? null });
         toast.success('Actualizado');
       } else {
-        await cajaApi.create(data);
+        await cajaApi.create({ ...cajaData, subrubro_id: finalSubrubroId ?? null });
+        // Registrar pago en el subrubro para sincronizar boletas
+        if (finalSubrubroId && cajaData.tipo === 'gasto') {
+          if (boletas_seleccionadas?.length > 0) {
+            await movimientosApi.pagoVinculado(finalSubrubroId, {
+              pago: cajaData.monto,
+              facturas_vinculadas_ids: boletas_seleccionadas,
+              fecha: cajaData.fecha,
+              campos_extra: {},
+              concepto_diferencia: 'Diferencia',
+            });
+          } else {
+            await movimientosApi.create(finalSubrubroId, {
+              tipo: 'pago', pago: cajaData.monto, monto: 0,
+              fecha: cajaData.fecha, campos_extra: {}, facturas_vinculadas_ids: [],
+            });
+          }
+        }
         toast.success('Guardado');
       }
-      setShowForm(false); setEditingMov(null); setTipoForm(null);
-      cargar();
+
+      setShowForm(false); setEditingMov(null); setTipoForm(null); setVencimientoPrefill(null);
+      cargar(); cargarVencimientosHoy();
     } catch { toast.error('Error al guardar'); }
   };
 
@@ -430,8 +583,20 @@ export default function CajaView({ rubros = [] }) {
     toast.success('Eliminado');
   };
 
-  const handleEdit = (m) => { setEditingMov(m); setShowForm(true); setTipoForm(null); };
-  const openForm  = (tipo) => { setTipoForm(tipo); setEditingMov(null); setShowForm(true); };
+  const handleEdit = (m) => { setEditingMov(m); setShowForm(true); setTipoForm(null); setVencimientoPrefill(null); };
+  const openForm  = (tipo) => { setTipoForm(tipo); setEditingMov(null); setShowForm(true); setVencimientoPrefill(null); };
+
+  const handlePagarVencimiento = (v) => {
+    setEditingMov(null);
+    setTipoForm('gasto');
+    setShowForm(true);
+    setVencimientoPrefill({
+      rubroId: v.rubro?.id ?? v.rubro?._id,
+      subrubroId: v.subrubro?.id ?? v.subrubro?._id ?? v.subrubro_id,
+      boletaId: v.id,
+      monto: v.monto,
+    });
+  };
 
   const handleSaldoInicial = async () => {
     const n = Number(saldoInput);
@@ -492,9 +657,10 @@ export default function CajaView({ rubros = [] }) {
 
   const formProps = {
     fecha, onSave: handleSave,
-    onCancel: () => { setShowForm(false); setEditingMov(null); },
+    onCancel: () => { setShowForm(false); setEditingMov(null); setVencimientoPrefill(null); },
     empleadosList: config.empleados || [],
-    proveedoresList: config.proveedores || [],
+    rubros,
+    prefillSubrubro: vencimientoPrefill,
   };
 
   return (
@@ -614,6 +780,41 @@ export default function CajaView({ rubros = [] }) {
           )}
         </div>
       </div>
+
+      {/* Vencimientos del día */}
+      {vencimientosHoy.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Vencimientos del día</h3>
+            <span className="text-xs text-amber-600 dark:text-amber-400">({vencimientosHoy.length})</span>
+          </div>
+          <div className="space-y-2">
+            {vencimientosHoy.map(v => {
+              const yaPagado = gastos.some(g => g.subrubro_id === (v.subrubro?.id ?? v.subrubro_id));
+              return (
+                <div key={v.id} className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-lg px-3 py-2.5 border border-amber-100 dark:border-amber-900/50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+                      {v.subrubro?.nombre ?? 'Subrubro'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {v.rubro?.nombre ?? ''}{v.rubro?.nombre ? ' · ' : ''}{fmt(v.monto)}
+                    </p>
+                  </div>
+                  {yaPagado
+                    ? <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 shrink-0">Pagado</span>
+                    : <button onClick={() => handlePagarVencimiento(v)}
+                        className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg shrink-0 transition-colors">
+                        Pagar
+                      </button>
+                  }
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Ingresos extra */}
       <div>

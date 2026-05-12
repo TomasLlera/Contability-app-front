@@ -160,6 +160,7 @@ export const movimientosApi = {
     api.put(`/movimientos/${id}/pago-vinculado`, data).then(r => r.data),
   delete: (id) => api.delete(`/movimientos/${id}`),
   getVencimientos: (dias = 30) => api.get('/movimientos/vencimientos/proximos', { params: { dias } }).then(r => r.data),
+  getVencimientosDia: (fecha) => api.get('/movimientos/vencimientos/dia', { params: { fecha } }).then(r => r.data),
   search: (q, limit = 25) => api.get('/movimientos/search', { params: { q, limit } }).then(r => r.data),
   exportExcel: (subrubroId, nombre, desde = null, hasta = null) => {
     const params = new URLSearchParams();
