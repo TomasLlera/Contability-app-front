@@ -80,6 +80,11 @@ export const authApi = {
     }),
   logout: () => localStorage.removeItem('token'),
   isLoggedIn: () => !!localStorage.getItem('token'),
+  getRole: () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try { return JSON.parse(atob(token.split('.')[1])).role || 'admin'; } catch { return 'admin'; }
+  },
   // Renueva el token si le quedan menos de 3 días de vida
   refreshIfNeeded: async () => {
     const token = localStorage.getItem('token');
@@ -186,6 +191,23 @@ export const movimientosApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data);
   },
+};
+
+export const usersApi = {
+  getAll: () => api.get('/users').then(r => r.data),
+  create: (usuario, password, role) => api.post('/users', { usuario, password, role }).then(r => r.data),
+  delete: (id) => api.delete(`/users/${id}`).then(r => r.data),
+  changePassword: (id, password) => api.put(`/users/${id}/password`, { password }).then(r => r.data),
+};
+
+export const stockApi = {
+  getProductos: () => api.get('/stock/productos').then(r => r.data),
+  createProducto: (data) => api.post('/stock/productos', data).then(r => r.data),
+  updateProducto: (id, data) => api.put(`/stock/productos/${id}`, data).then(r => r.data),
+  deleteProducto: (id) => api.delete(`/stock/productos/${id}`).then(r => r.data),
+  getMovimientos: (productoId) => api.get(`/stock/movimientos/${productoId}`).then(r => r.data),
+  createMovimiento: (data) => api.post('/stock/movimientos', data).then(r => r.data),
+  getAlertas: () => api.get('/stock/alertas').then(r => r.data),
 };
 
 export const appConfigApi = {

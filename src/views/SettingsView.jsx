@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { appConfigApi, getErrorMsg } from '../api';
+import { appConfigApi, usersApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, ChevronRight } from 'lucide-react';
+import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 const SECCIONES = [
   { key: 'alertas',  label: 'Alertas',   icon: Bell,      ready: true },
+  { key: 'usuarios', label: 'Usuarios',  icon: Users,     ready: true },
   { key: 'idioma',   label: 'Idioma',    icon: Globe,     ready: false },
   { key: 'moneda',   label: 'Moneda',    icon: DollarSign, ready: false },
   { key: 'negocio',  label: 'Negocio',   icon: Building2, ready: false },
-  { key: 'usuarios', label: 'Usuarios',  icon: Users,     ready: false },
 ];
 
 function Proximamente({ label }) {
@@ -139,6 +139,121 @@ function AlertasSection() {
   );
 }
 
+function UsuariosSection() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [nuevoUser, setNuevoUser] = useState('');
+  const [nuevoPass, setNuevoPass] = useState('');
+  const [nuevoRole, setNuevoRole] = useState('viewer');
+  const [showPass, setShowPass] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [changingPassId, setChangingPassId] = useState(null);
+  const [newPassValue, setNewPassValue] = useState('');
+
+  const cargar = () => usersApi.getAll().then(setUsers).finally(() => setLoading(false));
+  useEffect(() => { cargar(); }, []);
+
+  const handleCreate = async () => {
+    if (!nuevoUser.trim() || !nuevoPass.trim()) { toast.error('Completá usuario y contraseña'); return; }
+    if (nuevoPass.length < 6) { toast.error('La contraseña debe tener al menos 6 caracteres'); return; }
+    setSaving(true);
+    try {
+      await usersApi.create(nuevoUser.trim(), nuevoPass, nuevoRole);
+      toast.success('Usuario creado');
+      setNuevoUser(''); setNuevoPass('');
+      cargar();
+    } catch (err) { toast.error(getErrorMsg(err)); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await usersApi.delete(id);
+      toast.success('Usuario eliminado');
+      cargar();
+    } catch (err) { toast.error(getErrorMsg(err)); }
+  };
+
+  const handleChangePass = async (id) => {
+    if (!newPassValue || newPassValue.length < 6) { toast.error('Mínimo 6 caracteres'); return; }
+    try {
+      await usersApi.changePassword(id, newPassValue);
+      toast.success('Contraseña actualizada');
+      setChangingPassId(null); setNewPassValue('');
+    } catch (err) { toast.error(getErrorMsg(err)); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Cargando...</div>;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Usuarios</h2>
+        <p className="text-xs text-slate-400">Gestioná quién puede acceder y con qué permisos</p>
+      </div>
+
+      <div className="space-y-2">
+        {users.map(u => (
+          <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${u.role === 'admin' ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-slate-200 dark:bg-slate-600'}`}>
+              {u.role === 'admin' ? <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" /> : <ShieldAlert size={14} className="text-slate-500 dark:text-slate-400" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{u.usuario}</p>
+              <p className="text-xs text-slate-400">{u.role === 'admin' ? 'Administrador' : 'Solo lectura'}</p>
+            </div>
+            {changingPassId === u.id ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="password"
+                  value={newPassValue}
+                  onChange={e => setNewPassValue(e.target.value)}
+                  placeholder="Nueva contraseña"
+                  autoFocus
+                  className="w-36 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button onClick={() => handleChangePass(u.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700">OK</button>
+                <button onClick={() => { setChangingPassId(null); setNewPassValue(''); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => { setChangingPassId(u.id); setNewPassValue(''); }} className="text-slate-400 hover:text-blue-600 transition-colors" title="Cambiar contraseña">
+                  <KeyRound size={14} />
+                </button>
+                <button onClick={() => handleDelete(u.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nuevo usuario</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input value={nuevoUser} onChange={e => setNuevoUser(e.target.value)} placeholder="Usuario" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
+          <div className="relative">
+            <input type={showPass ? 'text' : 'password'} value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} placeholder="Contraseña (mín. 6)" className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
+            <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+              {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <select value={nuevoRole} onChange={e => setNuevoRole(e.target.value)} className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="viewer">Solo lectura</option>
+            <option value="admin">Administrador</option>
+          </select>
+          <button onClick={handleCreate} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+            <Plus size={14} /> {saving ? 'Creando...' : 'Crear'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsView() {
   const [seccion, setSeccion] = useState('alertas');
   const activa = SECCIONES.find(s => s.key === seccion);
@@ -176,8 +291,8 @@ export default function SettingsView() {
 
         {/* Contenido */}
         <div className="flex-1 p-6">
-          {activa?.ready
-            ? <AlertasSection />
+          {activa?.key === 'alertas' ? <AlertasSection />
+            : activa?.key === 'usuarios' ? <UsuariosSection />
             : <Proximamente label={activa?.label} />
           }
         </div>

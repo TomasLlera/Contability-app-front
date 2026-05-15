@@ -5,11 +5,12 @@ import Dashboard from './views/Dashboard';
 import Graficas from './views/Graficas';
 import CajaView from './views/CajaView';
 import SettingsView from './views/SettingsView';
+import StockView from './views/StockView';
 import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -29,6 +30,7 @@ function getRubroIcon(rubro) {
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(authApi.isLoggedIn());
+  const [role, setRole] = useState(() => authApi.getRole());
   const [locales, setLocales] = useState([]);
   const [rubros, setRubros] = useState([]);
   const [rubroStats, setRubroStats] = useState({});
@@ -261,7 +263,7 @@ export default function App() {
   const isRubroActive = activeView !== 'inicio' && activeView !== 'graficas' && activeView?.id;
   const activeLocal = isRubroActive ? locales.find(l => l.id === activeView.local_id) : null;
 
-  if (!loggedIn) return <Login onLogin={() => setLoggedIn(true)} />;
+  if (!loggedIn) return <Login onLogin={() => { setLoggedIn(true); setRole(authApi.getRole()); }} />;
 
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -342,6 +344,16 @@ export default function App() {
           >
             <ClipboardList size={15} />
             Caja del día
+          </button>
+
+          <button
+            onClick={() => { setActiveView('stock'); setInitialSubrubro(null); closeSidebar(); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              activeView === 'stock' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            }`}
+          >
+            <Package size={15} />
+            Stock
           </button>
 
           <button
@@ -600,6 +612,11 @@ export default function App() {
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Caja del día</h1>
               <p className="text-xs text-slate-400">Registro diario de movimientos</p>
             </div>
+          ) : activeView === 'stock' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Stock</h1>
+              <p className="text-xs text-slate-400">Gestión de productos e inventario</p>
+            </div>
           ) : activeView === 'config' ? (
             <div>
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Configuración</h1>
@@ -666,11 +683,14 @@ export default function App() {
               initialSubrubro={initialSubrubro}
               onBack={() => { setActiveView('inicio'); setInitialSubrubro(null); cargar(); }}
               sidebarRight={sidebarRight}
+              role={role}
             />
           ) : activeView === 'graficas' ? (
             <Graficas rubros={rubros} />
           ) : activeView === 'caja' ? (
             <CajaView rubros={rubros} />
+          ) : activeView === 'stock' ? (
+            <StockView role={role} />
           ) : activeView === 'config' ? (
             <SettingsView />
           ) : (

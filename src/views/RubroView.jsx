@@ -12,7 +12,8 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 
 const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
 
-export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight }) {
+export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight, role }) {
+  const isAdmin = role !== 'viewer';
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubro, setSelectedSubrubro] = useState(initialSubrubro ?? null);
   const [showCampos, setShowCampos] = useState(false);
@@ -108,6 +109,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
         subrubro={sub}
         onBack={() => { setSelectedSubrubro(null); cargar(); }}
         sidebarRight={sidebarRight}
+        role={role}
       />
     );
   }
@@ -126,32 +128,36 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <button
-          onClick={() => setShowImport(true)}
-          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
-        >
-          <Upload size={14} /> Importar Excel
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowImport(true)}
+            className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+          >
+            <Upload size={14} /> Importar Excel
+          </button>
+        )}
         <button
           onClick={() => setShowCampos(true)}
           className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
           <Settings2 size={14} /> Columnas
         </button>
-        <button
-          onClick={() => setConfirmModal({
-            message: `¿Vaciar TODOS los movimientos de todos los proveedores en "${rubro.nombre}"? Esta acción no se puede deshacer.`,
-            onConfirm: async () => {
-              await rubrosApi.clearAllMovimientos(rubro.id);
-              setConfirmModal(null);
-              cargar();
-              toast.success('Movimientos eliminados');
-            },
-          })}
-          className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
-        >
-          <Trash2 size={14} /> Vaciar todo
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setConfirmModal({
+              message: `¿Vaciar TODOS los movimientos de todos los proveedores en "${rubro.nombre}"? Esta acción no se puede deshacer.`,
+              onConfirm: async () => {
+                await rubrosApi.clearAllMovimientos(rubro.id);
+                setConfirmModal(null);
+                cargar();
+                toast.success('Movimientos eliminados');
+              },
+            })}
+            className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
+          >
+            <Trash2 size={14} /> Vaciar todo
+          </button>
+        )}
       </div>
 
       {/* Grid de subrubros */}
@@ -235,37 +241,39 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                     </div>
                   )}
                 </button>
-                <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={e => { e.stopPropagation(); setEditingId(sub.id); setEditNombre(sub.nombre); setEditIcon(sub.icon || ''); setShowIconPicker(false); }}
-                    className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
-                  >Editar</button>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      setConfirmModal({
-                        message: `¿Vaciar todos los movimientos de "${sub.nombre}"? Esta acción no se puede deshacer.`,
-                        onConfirm: async () => {
-                          await subrubrosApi.clearMovimientos(sub.id);
-                          setConfirmModal(null);
-                          toast.success('Movimientos eliminados');
-                        },
-                      });
-                    }}
-                    className="text-xs text-slate-400 hover:text-orange-500 transition-colors"
-                  >Vaciar</button>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDelete(sub.id); }}
-                    className="text-xs text-slate-400 hover:text-red-500 transition-colors"
-                  >Borrar</button>
-                </div>
+                {isAdmin && (
+                  <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={e => { e.stopPropagation(); setEditingId(sub.id); setEditNombre(sub.nombre); setEditIcon(sub.icon || ''); setShowIconPicker(false); }}
+                      className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
+                    >Editar</button>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setConfirmModal({
+                          message: `¿Vaciar todos los movimientos de "${sub.nombre}"? Esta acción no se puede deshacer.`,
+                          onConfirm: async () => {
+                            await subrubrosApi.clearMovimientos(sub.id);
+                            setConfirmModal(null);
+                            toast.success('Movimientos eliminados');
+                          },
+                        });
+                      }}
+                      className="text-xs text-slate-400 hover:text-orange-500 transition-colors"
+                    >Vaciar</button>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDelete(sub.id); }}
+                      className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+                    >Borrar</button>
+                  </div>
+                )}
               </>
             )}
           </div>
         ))}
 
-        {/* Nueva tarjeta */}
-        <div className="border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-500 transition-colors">
+        {/* Nueva tarjeta — solo admin */}
+        {isAdmin && <div className="border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-500 transition-colors">
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
             Nuevo {rubro.nombre.toLowerCase()}
           </p>
@@ -282,7 +290,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           >
             <Plus size={14} /> Agregar
           </button>
-        </div>
+        </div>}
 
         {filtrados.length === 0 && search && (
           <div className="col-span-full text-center py-8 text-slate-400">
