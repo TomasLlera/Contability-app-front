@@ -275,6 +275,203 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
   );
 }
 
+function PreciosTab({ productos, onActualizar }) {
+  const [filtroSub, setFiltroSub] = useState('');
+  const [filtroCat, setFiltroCat] = useState('');
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [ajusteTipo, setAjusteTipo] = useState('porcentaje');
+  const [ajusteCampo, setAjusteCampo] = useState('venta');
+  const [ajusteValor, setAjusteValor] = useState('');
+  const [applying, setApplying] = useState(false);
+
+  const subrubrosUniq = [...new Set(productos.filter(p => p.subrubro_nombre).map(p => p.subrubro_nombre))].sort();
+  const categoriasUniq = [...new Set(productos.filter(p => p.categoria).map(p => p.categoria))].sort();
+
+  const filtrados = productos.filter(p => {
+    if (filtroSub && p.subrubro_nombre !== filtroSub) return false;
+    if (filtroCat && p.categoria !== filtroCat) return false;
+    return true;
+  });
+
+  const allSelected = filtrados.length > 0 && filtrados.every(p => seleccionados.has(p.id));
+
+  const toggle = (id) => setSeleccionados(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const toggleAll = () => {
+    if (allSelected) setSeleccionados(new Set());
+    else setSeleccionados(new Set(filtrados.map(p => p.id)));
+  };
+
+  const calcNew = (precio) => {
+    const v = Number(ajusteValor);
+    if (!ajusteValor) return null;
+    if (ajusteTipo === 'porcentaje') return Math.round(precio * (1 + v / 100));
+    if (ajusteTipo === 'monto') return Math.round(precio + v);
+    if (ajusteTipo === 'fijar') return v;
+    return null;
+  };
+
+  const getPreview = (p) => ({
+    costo: (ajusteCampo === 'costo' || ajusteCampo === 'ambos') ? calcNew(p.precio_costo) : null,
+    venta: (ajusteCampo === 'venta' || ajusteCampo === 'ambos') ? calcNew(p.precio_venta) : null,
+  });
+
+  const handleApply = async () => {
+    if (seleccionados.size === 0) { toast.error('Seleccioná al menos un producto'); return; }
+    if (!ajusteValor) { toast.error('Ingresá un valor'); return; }
+    setApplying(true);
+    try {
+      const res = await stockApi.bulkUpdatePrecios([...seleccionados], ajusteCampo, ajusteTipo, Number(ajusteValor));
+      toast.success(`Precios actualizados en ${res.updated} producto${res.updated !== 1 ? 's' : ''}`);
+      setSeleccionados(new Set());
+      setAjusteValor('');
+      onActualizar();
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <select value={filtroSub} onChange={e => { setFiltroSub(e.target.value); setSeleccionados(new Set()); }}
+          className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Todos los subrubros</option>
+          {subrubrosUniq.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filtroCat} onChange={e => { setFiltroCat(e.target.value); setSeleccionados(new Set()); }}
+          className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Todas las categorías</option>
+          {categoriasUniq.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {(filtroSub || filtroCat) && (
+          <button onClick={() => { setFiltroSub(''); setFiltroCat(''); setSeleccionados(new Set()); }}
+            className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+            Limpiar filtros
+          </button>
+        )}
+        <span className="ml-auto text-xs text-slate-400">{filtrados.length} productos</span>
+      </div>
+
+      {/* Panel de ajuste */}
+      <div className="bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Ajuste de precios</span>
+          {seleccionados.size > 0 && (
+            <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-medium">
+              {seleccionados.size} seleccionado{seleccionados.size !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div>
+            <label className={labelCls}>Tipo de ajuste</label>
+            <select value={ajusteTipo} onChange={e => setAjusteTipo(e.target.value)}
+              className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="porcentaje">Aumentar %</option>
+              <option value="monto">Aumentar $</option>
+              <option value="fijar">Precio fijo</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Valor</label>
+            <div className="relative">
+              <input type="number" min="0" value={ajusteValor} onChange={e => setAjusteValor(e.target.value)}
+                placeholder="0"
+                className="w-28 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-7 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                {ajusteTipo === 'porcentaje' ? '%' : '$'}
+              </span>
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Aplicar a</label>
+            <select value={ajusteCampo} onChange={e => setAjusteCampo(e.target.value)}
+              className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="venta">Precio venta</option>
+              <option value="costo">Precio costo</option>
+              <option value="ambos">Ambos</option>
+            </select>
+          </div>
+          <button
+            onClick={handleApply}
+            disabled={applying || seleccionados.size === 0 || !ajusteValor}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <Check size={14} />
+            {applying ? 'Aplicando...' : seleccionados.size > 0 ? `Aplicar a ${seleccionados.size}` : 'Aplicar'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabla */}
+      {filtrados.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 text-sm">Sin productos para mostrar</div>
+      ) : (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded accent-blue-600 cursor-pointer" />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Producto</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide hidden sm:table-cell">Subrubro / Cat.</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Costo</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Venta</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {filtrados.map(p => {
+                const checked = seleccionados.has(p.id);
+                const preview = checked && ajusteValor ? getPreview(p) : null;
+                return (
+                  <tr key={p.id} onClick={() => toggle(p.id)}
+                    className={`cursor-pointer transition-colors ${checked ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={checked} onChange={() => toggle(p.id)} className="rounded accent-blue-600 cursor-pointer" />
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{p.nombre}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <div className="flex flex-col gap-0.5">
+                        {p.subrubro_nombre && <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full w-fit">{p.subrubro_nombre}</span>}
+                        {p.categoria && <span className="text-xs text-slate-400">{p.categoria}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {preview?.costo != null && preview.costo !== p.precio_costo ? (
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="text-xs text-slate-400 line-through">{fmt(p.precio_costo)}</span>
+                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{fmt(preview.costo)}</span>
+                        </div>
+                      ) : <span className="text-slate-600 dark:text-slate-300">{p.precio_costo ? fmt(p.precio_costo) : '—'}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {preview?.venta != null && preview.venta !== p.precio_venta ? (
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="text-xs text-slate-400 line-through">{fmt(p.precio_venta)}</span>
+                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{fmt(preview.venta)}</span>
+                        </div>
+                      ) : <span className="text-slate-600 dark:text-slate-300">{p.precio_venta ? fmt(p.precio_venta) : '—'}</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MovimientoModal({ producto, onClose, onDone }) {
   const [tipo, setTipo] = useState('entrada');
   const [cantidad, setCantidad] = useState('');
@@ -423,6 +620,7 @@ export default function StockView({ role }) {
         {[
           ['productos', `Productos (${productos.length})`],
           ...(isAdmin ? [['agregar', 'Agregar producto']] : []),
+          ...(isAdmin ? [['precios', 'Actualizar precios']] : []),
           ['historial', 'Historial'],
         ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
@@ -528,6 +726,11 @@ export default function StockView({ role }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Tab: Actualizar precios */}
+      {tab === 'precios' && isAdmin && (
+        <PreciosTab productos={productos} onActualizar={cargar} />
       )}
 
       {/* Tab: Historial */}

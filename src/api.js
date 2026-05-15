@@ -208,6 +208,8 @@ export const stockApi = {
   getMovimientos: (productoId) => api.get(`/stock/movimientos/${productoId}`).then(r => r.data),
   createMovimiento: (data) => api.post('/stock/movimientos', data).then(r => r.data),
   getAlertas: () => api.get('/stock/alertas').then(r => r.data),
+  bulkUpdatePrecios: (ids, campo, tipo, valor) =>
+    api.put('/stock/productos/bulk-precio', { ids, campo, tipo, valor }).then(r => r.data),
 };
 
 export const appConfigApi = {
