@@ -210,6 +210,18 @@ export const stockApi = {
   getAlertas: () => api.get('/stock/alertas').then(r => r.data),
   bulkUpdatePrecios: (ids, campo, tipo, valor) =>
     api.put('/stock/productos/bulk-precio', { ids, campo, tipo, valor }).then(r => r.data),
+  exportProductos: async () => {
+    const res = await api.get('/stock/export-productos', { responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a'); a.href = url; a.download = 'productos.xlsx'; a.click();
+    URL.revokeObjectURL(url);
+  },
+  importProductos: (file) => {
+    const fd = new FormData(); fd.append('file', file);
+    return api.post('/stock/import-productos', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+  },
+  getGraficas: (vista = 'mes', anio) =>
+    api.get('/stock/graficas', { params: { vista, anio } }).then(r => r.data),
 };
 
 export const appConfigApi = {

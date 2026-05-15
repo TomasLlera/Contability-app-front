@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { stockApi, subrubrosApi, rubrosApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, ChevronDown, X, Check, Link2, Percent } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, ChevronDown, X, Check, Link2, Percent, Download, Upload } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
@@ -538,6 +538,8 @@ export default function StockView({ role }) {
   const [historialId, setHistorialId] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [formKey, setFormKey] = useState(0);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef(null);
 
   const cargar = async () => {
     try {
@@ -591,6 +593,23 @@ export default function StockView({ role }) {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
+  const handleExport = async () => {
+    try { await stockApi.exportProductos(); }
+    catch (err) { toast.error(getErrorMsg(err)); }
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const res = await stockApi.importProductos(file);
+      toast.success(`Importado: ${res.creados} creados, ${res.actualizados} actualizados`);
+      cargar();
+    } catch (err) { toast.error(getErrorMsg(err)); }
+    finally { setImporting(false); e.target.value = ''; }
+  };
+
   const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.categoria || '').toLowerCase().includes(search.toLowerCase()));
 
   if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>;
@@ -640,12 +659,27 @@ export default function StockView({ role }) {
       {/* Tab: Productos */}
       {tab === 'productos' && (
         <div className="space-y-4">
-          <input
-            className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Buscar producto o categoría..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <div className="flex gap-2">
+            <input
+              className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Buscar producto o categoría..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            <button onClick={handleExport} title="Exportar Excel"
+              className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-sm">
+              <Download size={14} /> <span className="hidden sm:inline">Exportar</span>
+            </button>
+            {isAdmin && (
+              <>
+                <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
+                <button onClick={() => importRef.current?.click()} disabled={importing} title="Importar Excel"
+                  className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-sm disabled:opacity-50">
+                  <Upload size={14} /> <span className="hidden sm:inline">{importing ? 'Importando...' : 'Importar'}</span>
+                </button>
+              </>
+            )}
+          </div>
 
           {filtrados.length === 0 ? (
             <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { dashboardApi, subrubrosApi, cajaApi } from '../api';
+import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
 
 const MESES = { '01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun',
                 '07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic' };
@@ -220,6 +221,12 @@ export default function Graficas({ rubros = [] }) {
   const [cajaMovs, setCajaMovs]       = useState([]);
   const [cajaLoading, setCajaLoading] = useState(false);
 
+  // Stock
+  const [stockVista, setStockVista]   = useState('mes');
+  const [stockAnio, setStockAnio]     = useState(new Date().getFullYear());
+  const [stockData, setStockData]     = useState(null);
+  const [stockLoading, setStockLoading] = useState(false);
+
   useEffect(() => { dashboardApi.getResumen().then(setResumen); }, []);
   useEffect(() => { if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id); }, [rubros]);
 
@@ -256,6 +263,13 @@ export default function Graficas({ rubros = [] }) {
     setCajaLoading(true);
     cajaApi.getRango(desde, hasta).then(data => setCajaMovs(data)).catch(() => {}).finally(() => setCajaLoading(false));
   }, [cajaPreset, cajaVista]);
+
+  useEffect(() => {
+    if (tab !== 'stock') return;
+    setStockLoading(true);
+    stockApi.getGraficas(stockVista, stockVista === 'dia' ? undefined : stockAnio)
+      .then(setStockData).catch(() => {}).finally(() => setStockLoading(false));
+  }, [tab, stockVista, stockAnio]);
 
   const cajaAggregated = useMemo(() => {
     const getKey = (fecha) => {
@@ -298,7 +312,7 @@ export default function Graficas({ rubros = [] }) {
 
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-        {[['rubros', '📊 Rubros'], ['caja', '🗂️ Caja']].map(([key, label]) => (
+        {[['rubros', '📊 Rubros'], ['caja', '🗂️ Caja'], ['stock', '📦 Stock']].map(([key, label]) => (
           <button
             key={key}
             onClick={() => { setTab(key); sessionStorage.setItem('graficas_tab', key); }}
@@ -434,6 +448,94 @@ export default function Graficas({ rubros = [] }) {
           ) : (
             <CajaBarChart datos={cajaAggregated} chartCfg={activeCajaCfg} />
           )}
+        </div>
+      )}
+
+      {/* Tab: Stock */}
+      {tab === 'stock' && (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mr-auto">Ventas y ganancia de stock</h3>
+              <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+                {[['dia','Días'],['mes','Meses'],['anio','Años']].map(([v, l]) => (
+                  <button key={v} onClick={() => setStockVista(v)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${stockVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {stockVista !== 'dia' && (
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setStockAnio(a => a - 1)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs">‹</button>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200 w-10 text-center">{stockAnio}</span>
+                  <button onClick={() => setStockAnio(a => a + 1)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs">›</button>
+                </div>
+              )}
+            </div>
+
+            {stockLoading ? (
+              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+            ) : !stockData || stockData.datos.every(d => d.ganancia === 0 && d.ingresos === 0) ? (
+              <div className="h-48 flex flex-col items-center justify-center text-slate-400 gap-2">
+                <span className="text-3xl">📦</span>
+                <p className="text-sm">Sin ventas registradas en este período</p>
+                <p className="text-xs text-slate-300 dark:text-slate-600">Los datos aparecen al registrar salidas de stock con precio de venta cargado</p>
+              </div>
+            ) : (() => {
+              const datos = stockData.datos;
+              const maxGanancia = Math.max(...datos.map(d => d.ganancia), 1);
+              const maxIngresos = Math.max(...datos.map(d => d.ingresos), 1);
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Ganancia total', value: fmt(stockData.totales.ganancia), color: 'text-emerald-600 dark:text-emerald-400' },
+                      { label: 'Ingresos totales', value: fmt(stockData.totales.ingresos), color: 'text-blue-600 dark:text-blue-400' },
+                      { label: 'Unidades vendidas', value: fmtNum(stockData.totales.unidades), color: 'text-slate-700 dark:text-slate-200' },
+                    ].map(k => (
+                      <div key={k.label} className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 text-center">
+                        <p className="text-xs text-slate-400 mb-1">{k.label}</p>
+                        <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Ganancia por período</p>
+                    <div className="flex items-end gap-1" style={{ height: '140px' }}>
+                      {datos.map(d => {
+                        const pct = (d.ganancia / maxGanancia) * 100;
+                        return (
+                          <div key={d.periodo} className="flex-1 flex flex-col items-center gap-1 group" style={{ height: '140px', justifyContent: 'flex-end' }}>
+                            <div className="w-full bg-emerald-500 dark:bg-emerald-600 rounded-t transition-all group-hover:bg-emerald-400"
+                              style={{ height: `${Math.max(pct, d.ganancia > 0 ? 3 : 0)}%` }}
+                              title={`${d.label}: ${fmt(d.ganancia)}`} />
+                            <span className="text-xs text-slate-400 truncate w-full text-center leading-none pb-0.5">{d.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Ingresos por período</p>
+                    <div className="flex items-end gap-1" style={{ height: '120px' }}>
+                      {datos.map(d => {
+                        const pct = (d.ingresos / maxIngresos) * 100;
+                        return (
+                          <div key={d.periodo} className="flex-1 flex flex-col items-center gap-1 group" style={{ height: '120px', justifyContent: 'flex-end' }}>
+                            <div className="w-full bg-blue-400 dark:bg-blue-600 rounded-t transition-all group-hover:bg-blue-300"
+                              style={{ height: `${Math.max(pct, d.ingresos > 0 ? 3 : 0)}%` }}
+                              title={`${d.label}: ${fmt(d.ingresos)}`} />
+                            <span className="text-xs text-slate-400 truncate w-full text-center leading-none pb-0.5">{d.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
 
