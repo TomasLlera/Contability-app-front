@@ -11,13 +11,13 @@ const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-400 m
 
 const UNIDADES = [
   { value: 'unidad', label: 'Unidad' },
-  { value: 'kg', label: 'Kg' },
-  { value: 'g', label: 'g' },
+  { value: 'kg', label: 'Kilogramo' },
+  { value: 'g', label: 'Gramo' },
   { value: 'litro', label: 'Litro' },
-  { value: 'ml', label: 'ml' },
+  { value: 'ml', label: 'Mililitro' },
   { value: 'm', label: 'Metro' },
-  { value: 'cm', label: 'cm' },
-  { value: 'm2', label: 'm²' },
+  { value: 'cm', label: 'Centímetro' },
+  { value: 'm2', label: 'Metro cuadrado' },
   { value: 'caja', label: 'Caja' },
   { value: 'bolsa', label: 'Bolsa' },
   { value: 'rollo', label: 'Rollo' },
@@ -27,35 +27,33 @@ const UNIDADES = [
 
 function SubrubroSelector({ value, valueName, onChange, rubros }) {
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(null);
-  const [subrubrosMap, setSubrubrosMap] = useState({});
+  const [rubroActivo, setRubroActivo] = useState(null);
+  const [subrubros, setSubrubros] = useState([]);
   const ref = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setRubroActivo(null); } };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const toggleRubro = async (rubroId) => {
-    if (expanded === rubroId) { setExpanded(null); return; }
-    setExpanded(rubroId);
-    if (!subrubrosMap[rubroId]) {
-      const subs = await subrubrosApi.getByRubro(rubroId);
-      setSubrubrosMap(prev => ({ ...prev, [rubroId]: subs }));
-    }
+  const handleOpenRubro = async (r) => {
+    setRubroActivo(r);
+    const subs = await subrubrosApi.getByRubro(r.id);
+    setSubrubros(subs);
   };
 
   const handleSelect = (id, name) => {
     onChange(id, name);
     setOpen(false);
+    setRubroActivo(null);
   };
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setOpen(o => !o); setRubroActivo(null); }}
         className="w-full flex items-center gap-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
       >
         <Link2 size={13} className="text-slate-400 shrink-0" />
@@ -73,30 +71,48 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg overflow-hidden">
-          <div
-            onClick={() => handleSelect(null, null)}
-            className={`flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-700 ${!value ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-          >
-            <X size={12} />
-            <span>Sin vínculo</span>
-          </div>
-          <div className="max-h-52 overflow-y-auto">
-            {rubros.map(r => (
-              <div key={r.id}>
-                <div
-                  onClick={() => toggleRubro(r.id)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-300"
-                >
-                  <span className="text-base shrink-0">{r.icon || '📁'}</span>
-                  <span className="flex-1 font-medium">{r.nombre}</span>
-                  <ChevronRight size={13} className={`text-slate-400 transition-transform ${expanded === r.id ? 'rotate-90' : ''}`} />
-                </div>
-                {expanded === r.id && (subrubrosMap[r.id] || []).map(s => (
+        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg overflow-hidden" style={{ maxHeight: '220px', display: 'flex', flexDirection: 'column' }}>
+          {!rubroActivo ? (
+            <>
+              <div
+                onClick={() => handleSelect(null, null)}
+                className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-700 shrink-0 ${!value ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+              >
+                <X size={12} /><span>Sin vínculo</span>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {rubros.map(r => (
+                  <div
+                    key={r.id}
+                    onClick={() => handleOpenRubro(r)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-300"
+                  >
+                    <span className="text-base shrink-0">{r.icon || '📁'}</span>
+                    <span className="flex-1 font-medium truncate">{r.nombre}</span>
+                    <ChevronRight size={13} className="text-slate-400 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setRubroActivo(null)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 transition-colors shrink-0 text-left"
+              >
+                <ChevronRight size={13} className="rotate-180 shrink-0" />
+                <span className="text-base shrink-0">{rubroActivo.icon || '📁'}</span>
+                <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{rubroActivo.nombre}</span>
+              </button>
+              <div className="overflow-y-auto flex-1">
+                {subrubros.length === 0 && (
+                  <p className="px-4 py-3 text-xs text-slate-400">Sin subrubros</p>
+                )}
+                {subrubros.map(s => (
                   <div
                     key={s.id}
                     onClick={() => handleSelect(s.id, s.nombre)}
-                    className={`flex items-center gap-2 pl-9 pr-3 py-2 text-sm cursor-pointer transition-colors ${value === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${value === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                   >
                     {s.icon && <span className="text-sm shrink-0">{s.icon}</span>}
                     <span className="flex-1 truncate">{s.nombre}</span>
@@ -104,8 +120,8 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       )}
     </div>
