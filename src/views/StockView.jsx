@@ -336,11 +336,11 @@ export default function StockView({ role }) {
   const [rubros, setRubros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [movModal, setMovModal] = useState(null);
   const [historialId, setHistorialId] = useState(null);
   const [historial, setHistorial] = useState([]);
+  const [formKey, setFormKey] = useState(0);
 
   const cargar = async () => {
     try {
@@ -371,7 +371,8 @@ export default function StockView({ role }) {
     try {
       await stockApi.createProducto(form);
       toast.success('Producto creado');
-      setShowForm(false);
+      setFormKey(k => k + 1);
+      setTab('productos');
       cargar();
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
@@ -419,7 +420,11 @@ export default function StockView({ role }) {
 
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-        {[['productos', `📦 Productos (${productos.length})`], ['historial', '📋 Historial']].map(([key, label]) => (
+        {[
+          ['productos', `Productos (${productos.length})`],
+          ...(isAdmin ? [['agregar', 'Agregar producto']] : []),
+          ['historial', 'Historial'],
+        ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>
             {label}
@@ -427,29 +432,22 @@ export default function StockView({ role }) {
         ))}
       </div>
 
+      {/* Tab: Agregar producto */}
+      {tab === 'agregar' && isAdmin && (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6">
+          <ProductoForm key={formKey} rubros={rubros} onSave={handleCreate} onCancel={() => setTab('productos')} />
+        </div>
+      )}
+
       {/* Tab: Productos */}
       {tab === 'productos' && (
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <input
-              className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Buscar producto o categoría..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            {isAdmin && !showForm && (
-              <button onClick={() => setShowForm(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5">
-                <Plus size={14} /> Nuevo
-              </button>
-            )}
-          </div>
-
-          {showForm && isAdmin && (
-            <div className="bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Nuevo producto</h3>
-              <ProductoForm rubros={rubros} onSave={handleCreate} onCancel={() => setShowForm(false)} />
-            </div>
-          )}
+          <input
+            className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Buscar producto o categoría..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
 
           {filtrados.length === 0 ? (
             <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
