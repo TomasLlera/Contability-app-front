@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { stockApi, subrubrosApi, rubrosApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, X, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, ChevronDown, X, Check, Link2, Percent } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
@@ -9,9 +9,33 @@ const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400';
 const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1';
 
-function SubrubroSelector({ value, onChange, rubros }) {
+const UNIDADES = [
+  { value: 'unidad', label: 'Unidad' },
+  { value: 'kg', label: 'Kg' },
+  { value: 'g', label: 'g' },
+  { value: 'litro', label: 'Litro' },
+  { value: 'ml', label: 'ml' },
+  { value: 'm', label: 'Metro' },
+  { value: 'cm', label: 'cm' },
+  { value: 'm2', label: 'm²' },
+  { value: 'caja', label: 'Caja' },
+  { value: 'bolsa', label: 'Bolsa' },
+  { value: 'rollo', label: 'Rollo' },
+  { value: 'par', label: 'Par' },
+  { value: 'docena', label: 'Docena' },
+];
+
+function SubrubroSelector({ value, valueName, onChange, rubros }) {
+  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [subrubrosMap, setSubrubrosMap] = useState({});
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const toggleRubro = async (rubroId) => {
     if (expanded === rubroId) { setExpanded(null); return; }
@@ -22,37 +46,68 @@ function SubrubroSelector({ value, onChange, rubros }) {
     }
   };
 
+  const handleSelect = (id, name) => {
+    onChange(id, name);
+    setOpen(false);
+  };
+
   return (
-    <div className="border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden max-h-48 overflow-y-auto bg-white dark:bg-slate-700">
-      <div
-        className={`px-3 py-2 text-sm cursor-pointer transition-colors ${!value ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'}`}
-        onClick={() => onChange(null)}
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
       >
-        Sin vínculo
-      </div>
-      {rubros.map(r => (
-        <div key={r.id}>
+        <Link2 size={13} className="text-slate-400 shrink-0" />
+        <span className={`flex-1 text-left truncate ${value ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+          {valueName || 'Sin vínculo'}
+        </span>
+        {value && (
+          <span
+            role="button"
+            onClick={e => { e.stopPropagation(); onChange(null, null); }}
+            className="text-slate-300 hover:text-red-400 transition-colors shrink-0"
+          ><X size={13} /></span>
+        )}
+        <ChevronDown size={13} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg overflow-hidden">
           <div
-            className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors text-slate-700 dark:text-slate-300 border-t border-slate-100 dark:border-slate-600"
-            onClick={() => toggleRubro(r.id)}
+            onClick={() => handleSelect(null, null)}
+            className={`flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-700 ${!value ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
-            <span className="text-base">{r.icon || '📁'}</span>
-            <span className="flex-1 font-medium">{r.nombre}</span>
-            <ChevronRight size={13} className={`transition-transform ${expanded === r.id ? 'rotate-90' : ''}`} />
+            <X size={12} />
+            <span>Sin vínculo</span>
           </div>
-          {expanded === r.id && (subrubrosMap[r.id] || []).map(s => (
-            <div
-              key={s.id}
-              className={`flex items-center gap-2 pl-8 pr-3 py-1.5 text-sm cursor-pointer transition-colors ${value === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'}`}
-              onClick={() => onChange(s.id)}
-            >
-              {s.icon && <span className="text-sm">{s.icon}</span>}
-              <span>{s.nombre}</span>
-              {value === s.id && <Check size={12} className="ml-auto" />}
-            </div>
-          ))}
+          <div className="max-h-52 overflow-y-auto">
+            {rubros.map(r => (
+              <div key={r.id}>
+                <div
+                  onClick={() => toggleRubro(r.id)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-300"
+                >
+                  <span className="text-base shrink-0">{r.icon || '📁'}</span>
+                  <span className="flex-1 font-medium">{r.nombre}</span>
+                  <ChevronRight size={13} className={`text-slate-400 transition-transform ${expanded === r.id ? 'rotate-90' : ''}`} />
+                </div>
+                {expanded === r.id && (subrubrosMap[r.id] || []).map(s => (
+                  <div
+                    key={s.id}
+                    onClick={() => handleSelect(s.id, s.nombre)}
+                    className={`flex items-center gap-2 pl-9 pr-3 py-2 text-sm cursor-pointer transition-colors ${value === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                  >
+                    {s.icon && <span className="text-sm shrink-0">{s.icon}</span>}
+                    <span className="flex-1 truncate">{s.nombre}</span>
+                    {value === s.id && <Check size={12} className="shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -69,9 +124,43 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
     subrubro_id: inicial?.subrubro_id || null,
     descripcion: inicial?.descripcion || '',
   });
+  const [subrubroName, setSubrubroName] = useState(inicial?.subrubro_nombre || null);
+  const [margen, setMargen] = useState(() => {
+    const c = Number(inicial?.precio_costo);
+    const v = Number(inicial?.precio_venta);
+    if (c > 0 && v > 0) return String(Math.round(((v / c) - 1) * 100));
+    return '';
+  });
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleCostoChange = (v) => {
+    set('precio_costo', v);
+    const costo = Number(v);
+    if (costo > 0 && margen !== '') {
+      set('precio_venta', String(Math.round(costo * (1 + Number(margen) / 100))));
+    }
+  };
+
+  const handleMargenChange = (v) => {
+    setMargen(v);
+    const costo = Number(form.precio_costo);
+    if (costo > 0 && v !== '') {
+      set('precio_venta', String(Math.round(costo * (1 + Number(v) / 100))));
+    }
+  };
+
+  const handleVentaChange = (v) => {
+    set('precio_venta', v);
+    const costo = Number(form.precio_costo);
+    const venta = Number(v);
+    if (costo > 0 && venta > 0) {
+      setMargen(String(Math.round(((venta / costo) - 1) * 100)));
+    } else {
+      setMargen('');
+    }
+  };
 
   const handleSave = async () => {
     if (!form.nombre.trim()) { toast.error('Nombre requerido'); return; }
@@ -94,8 +183,8 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
         <div>
           <label className={labelCls}>Unidad</label>
           <select className={inputCls} value={form.unidad} onChange={e => set('unidad', e.target.value)}>
-            {['unidad', 'kg', 'g', 'litro', 'ml', 'm', 'cm', 'm²', 'caja', 'bolsa', 'rollo', 'par'].map(u => (
-              <option key={u} value={u}>{u}</option>
+            {UNIDADES.map(u => (
+              <option key={u.value} value={u.value}>{u.label}</option>
             ))}
           </select>
         </div>
@@ -103,25 +192,59 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
           <label className={labelCls}>Stock mínimo</label>
           <input className={inputCls} type="number" min="0" value={form.stock_minimo} onChange={e => set('stock_minimo', e.target.value)} placeholder="0" />
         </div>
-        <div>
-          <label className={labelCls}>Precio costo</label>
-          <input className={inputCls} type="number" min="0" value={form.precio_costo} onChange={e => set('precio_costo', e.target.value)} placeholder="0" />
-        </div>
-        <div>
-          <label className={labelCls}>Precio venta</label>
-          <input className={inputCls} type="number" min="0" value={form.precio_venta} onChange={e => set('precio_venta', e.target.value)} placeholder="0" />
-        </div>
-        {!inicial && (
+      </div>
+
+      {/* Precios con margen */}
+      <div className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 space-y-3">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Precios</p>
+        <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className={labelCls}>Stock inicial</label>
-            <input className={inputCls} type="number" min="0" value={form.stock_actual} onChange={e => set('stock_actual', e.target.value)} placeholder="0" />
+            <label className={labelCls}>Costo</label>
+            <input className={inputCls} type="number" min="0" value={form.precio_costo} onChange={e => handleCostoChange(e.target.value)} placeholder="0" />
           </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              <Percent size={11} /> Ganancia
+            </label>
+            <div className="relative">
+              <input
+                className={inputCls + ' pr-6'}
+                type="number"
+                min="0"
+                value={margen}
+                onChange={e => handleMargenChange(e.target.value)}
+                placeholder="0"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Venta</label>
+            <input className={inputCls} type="number" min="0" value={form.precio_venta} onChange={e => handleVentaChange(e.target.value)} placeholder="0" />
+          </div>
+        </div>
+        {Number(form.precio_costo) > 0 && Number(form.precio_venta) > 0 && (
+          <p className="text-xs text-slate-400">
+            Ganancia: <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmt(Number(form.precio_venta) - Number(form.precio_costo))}</span> por unidad
+          </p>
         )}
       </div>
 
+      {!inicial && (
+        <div>
+          <label className={labelCls}>Stock inicial</label>
+          <input className={inputCls} type="number" min="0" value={form.stock_actual} onChange={e => set('stock_actual', e.target.value)} placeholder="0" />
+        </div>
+      )}
+
       <div>
-        <label className={labelCls}>Vincular a subrubro (opcional)</label>
-        <SubrubroSelector value={form.subrubro_id} onChange={v => set('subrubro_id', v)} rubros={rubros} />
+        <label className={labelCls}>Vincular a subrubro <span className="font-normal text-slate-400">(opcional)</span></label>
+        <SubrubroSelector
+          value={form.subrubro_id}
+          valueName={subrubroName}
+          onChange={(id, name) => { set('subrubro_id', id); setSubrubroName(name); }}
+          rubros={rubros}
+        />
       </div>
 
       <div className="flex gap-2 pt-2">
