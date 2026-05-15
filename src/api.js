@@ -72,13 +72,29 @@ export const getErrorMsg = (err) => {
   return data?.error || data?.message || `Error ${err.response.status}`;
 };
 
+const INACTIVITY_MS = 60 * 60 * 1000; // 1 hora
+
 export const authApi = {
   login: (usuario, password) =>
     axios.post(`${BASE}/auth/login`, { usuario, password }).then(r => {
       localStorage.setItem('token', r.data.token);
+      localStorage.setItem('lastActivity', String(Date.now()));
       return r.data;
     }),
-  logout: () => localStorage.removeItem('token'),
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('lastActivity');
+  },
+  updateActivity: () => localStorage.setItem('lastActivity', String(Date.now())),
+  checkInactivity: () => {
+    const last = Number(localStorage.getItem('lastActivity') || 0);
+    if (last && Date.now() - last > INACTIVITY_MS) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('lastActivity');
+      return true;
+    }
+    return false;
+  },
   isLoggedIn: () => !!localStorage.getItem('token'),
   getRole: () => {
     const token = localStorage.getItem('token');
@@ -238,4 +254,6 @@ export const cajaApi = {
   delete: (id) => api.delete(`/caja/${id}`).then(r => r.data),
   getConfig: () => api.get('/caja/config').then(r => r.data),
   saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
+  getVencimientosSync: (fecha) => api.get('/caja/vencimientos-sync', { params: { fecha } }).then(r => r.data),
+  getFacturasPendientes: (subrubro_id) => api.get('/caja/facturas-pendientes', { params: { subrubro_id } }).then(r => r.data),
 };

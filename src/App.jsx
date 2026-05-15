@@ -10,7 +10,7 @@ import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -29,7 +29,10 @@ function getRubroIcon(rubro) {
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(authApi.isLoggedIn());
+  const [loggedIn, setLoggedIn] = useState(() => {
+    if (authApi.checkInactivity()) return false;
+    return authApi.isLoggedIn();
+  });
   const [role, setRole] = useState(() => authApi.getRole());
   const [locales, setLocales] = useState([]);
   const [rubros, setRubros] = useState([]);
@@ -40,6 +43,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [localesSectionOpen, setLocalesSectionOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'dark';
@@ -127,8 +131,27 @@ export default function App() {
       authApi.refreshIfNeeded();
       cargar();
       cargarVencCount();
-      const interval = setInterval(cargarVencCount, 5 * 60 * 1000);
-      return () => clearInterval(interval);
+      const vencInterval = setInterval(cargarVencCount, 5 * 60 * 1000);
+
+      // Cierra sesión tras 1 hora de inactividad (persiste entre recargas)
+      authApi.updateActivity();
+      const updateActivity = () => authApi.updateActivity();
+      window.addEventListener('mousemove', updateActivity);
+      window.addEventListener('keydown', updateActivity);
+      window.addEventListener('click', updateActivity);
+      window.addEventListener('touchstart', updateActivity);
+      const inactivityInterval = setInterval(() => {
+        if (authApi.checkInactivity()) setLoggedIn(false);
+      }, 60 * 1000);
+
+      return () => {
+        clearInterval(vencInterval);
+        clearInterval(inactivityInterval);
+        window.removeEventListener('mousemove', updateActivity);
+        window.removeEventListener('keydown', updateActivity);
+        window.removeEventListener('click', updateActivity);
+        window.removeEventListener('touchstart', updateActivity);
+      };
     } else {
       setLoading(false);
     }
@@ -366,12 +389,18 @@ export default function App() {
             Configuración
           </button>
 
-          <div className="pt-4">
-            <div className="flex items-center px-3 py-1 mb-1">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex-1">Locales</span>
-              <span className="text-xs text-slate-600">{locales.length}</span>
-            </div>
+          <div className="pt-1">
+            <button
+              onClick={() => setLocalesSectionOpen(v => !v)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700/60 hover:text-white"
+            >
+              <Building2 size={15} />
+              <span className="flex-1 text-left">Locales</span>
+              <span className="text-xs text-slate-500 mr-1">{locales.length}</span>
+              {localesSectionOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
 
+            {localesSectionOpen && <>
             {locales.map(local => {
               const localRubros = rubros.filter(r => r.local_id === local.id);
               const isExpanded = expandedLocales.has(local.id);
@@ -548,6 +577,7 @@ export default function App() {
                 <Plus size={12} /> Nuevo local
               </button>
             )}
+            </>}
           </div>
         </nav>
 

@@ -26,7 +26,13 @@ const addDays = (dateStr, n) => {
 };
 
 // ── Caja charts config ────────────────────────────────────────────────────────
-const CAJA_PRESETS = { dia: [7, 14, 30], mes: [3, 6, 12], anio: [2, 3, 5] };
+const CAJA_PRESETS = { dia: ['mes', 30, 60], mes: [3, 6, 12], anio: [2, 3, 5] };
+const presetLabel = (v, vista) => {
+  if (v === 'mes') return 'Este mes';
+  if (vista === 'dia') return `${v}d`;
+  if (vista === 'mes') return `${v}m`;
+  return `${v}a`;
+};
 const CAJA_CHARTS = [
   { key: 'ingresosEfvo',     label: 'Ingreso efectivo',    color: 'bg-green-500',  colorLight: 'bg-green-200 dark:bg-green-900/50',   text: 'text-green-700 dark:text-green-400' },
   { key: 'transDelta',       label: 'Ingreso trans',       color: 'bg-blue-500',   colorLight: 'bg-blue-200 dark:bg-blue-900/50',     text: 'text-blue-600 dark:text-blue-400' },
@@ -216,7 +222,7 @@ export default function Graficas({ rubros = [] }) {
 
   // Caja
   const [cajaVista, setCajaVista]     = useState('dia');
-  const [cajaPreset, setCajaPreset]   = useState(14);
+  const [cajaPreset, setCajaPreset]   = useState('mes');
   const [cajaMetrica, setCajaMetrica] = useState('ingresosEfvo');
   const [cajaMovs, setCajaMovs]       = useState([]);
   const [cajaLoading, setCajaLoading] = useState(false);
@@ -247,10 +253,15 @@ export default function Graficas({ rubros = [] }) {
   }, [selectedRubroId, selectedSubrubroId]);
 
   useEffect(() => {
+    if (tab !== 'caja') return;
     const hasta = todayStr();
     let desde;
     if (cajaVista === 'dia') {
-      desde = addDays(hasta, -(cajaPreset - 1));
+      if (cajaPreset === 'mes') {
+        desde = todayStr().slice(0, 7) + '-01';
+      } else {
+        desde = addDays(hasta, -(Number(cajaPreset) - 1));
+      }
     } else if (cajaVista === 'mes') {
       const d = new Date(hasta + 'T00:00:00');
       d.setMonth(d.getMonth() - cajaPreset);
@@ -262,7 +273,7 @@ export default function Graficas({ rubros = [] }) {
     }
     setCajaLoading(true);
     cajaApi.getRango(desde, hasta).then(data => setCajaMovs(data)).catch(() => {}).finally(() => setCajaLoading(false));
-  }, [cajaPreset, cajaVista]);
+  }, [tab, cajaPreset, cajaVista]);
 
   useEffect(() => {
     if (tab !== 'stock') return;

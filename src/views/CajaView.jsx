@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { cajaApi, movimientosApi, subrubrosApi } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
-  Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle
+  Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
+  AlertCircle, Link2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -17,6 +18,11 @@ const formatFecha = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00');
   const s = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   return s.charAt(0).toUpperCase() + s.slice(1);
+};
+const formatFechaCorta = (dateStr) => {
+  if (!dateStr) return '';
+  const [, m, d] = dateStr.split('-');
+  return `${d}/${m}`;
 };
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const selectCls = inputCls;
@@ -47,12 +53,14 @@ const InfoTooltip = ({ text }) => {
 };
 
 // ── Panel de configuración ──────────────────────────────────────────────────
-function ConfigPanel({ config, rubros, onSave, onClose }) {
+function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
   const [empleados, setEmpleados] = useState(config.empleados || []);
   const [proveedores, setProveedores] = useState(config.proveedores || []);
   const [nuevoEmp, setNuevoEmp] = useState('');
   const [nuevoProv, setNuevoProv] = useState('');
   const [nuevoProvSub, setNuevoProvSub] = useState('');
+  const [rubrosSync, setRubrosSync] = useState(config.rubros_sync || []);
+  const [diasAnticipacion, setDiasAnticipacion] = useState(config.dias_anticipacion_caja ?? 3);
 
   const addEmpleado = () => {
     if (!nuevoEmp.trim()) return;
@@ -72,8 +80,14 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
     }
   };
 
+  const toggleRubroSync = (rubroId) => {
+    setRubrosSync(prev =>
+      prev.includes(rubroId) ? prev.filter(id => id !== rubroId) : [...prev, rubroId]
+    );
+  };
+
   const handleSave = async () => {
-    await onSave({ empleados, proveedores });
+    await onSave({ empleados, proveedores, rubros_sync: rubrosSync, dias_anticipacion_caja: Number(diasAnticipacion) });
     onClose();
   };
 
@@ -85,6 +99,35 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
 
+        {/* Sincronización de rubros */}
+        <div className="mb-5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1.5"><Link2 size={13} /> Sincronizar vencimientos</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Las boletas de estos rubros aparecerán automáticamente en la caja cuando estén por vencer.</p>
+          {allRubros.length === 0
+            ? <p className="text-xs text-slate-400">No hay rubros disponibles.</p>
+            : allRubros.map(r => (
+              <label key={r.id} className="flex items-center gap-2 py-1.5 cursor-pointer">
+                <input type="checkbox" className="accent-blue-600"
+                  checked={rubrosSync.includes(r.id)}
+                  onChange={() => toggleRubroSync(r.id)} />
+                <span className="text-sm text-slate-700 dark:text-slate-200">{r.icon ? `${r.icon} ` : ''}{r.nombre}</span>
+              </label>
+            ))
+          }
+          {rubrosSync.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+              <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Días de anticipación</label>
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" max="30" value={diasAnticipacion}
+                  onChange={e => setDiasAnticipacion(e.target.value)}
+                  className="w-20 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-xs text-slate-500">días antes del vencimiento</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Empleados */}
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Users size={13} className="text-green-600" /> Empleados</h3>
           <div className="space-y-1.5 mb-2">
@@ -104,6 +147,7 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
           </div>
         </div>
 
+        {/* Proveedores */}
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><ShoppingCart size={13} className="text-red-500" /> Proveedores</h3>
           <div className="space-y-1.5 mb-2">
@@ -149,7 +193,7 @@ function ConfigPanel({ config, rubros, onSave, onClose }) {
 }
 
 // ── Formulario de entrada ───────────────────────────────────────────────────
-function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList }) {
+function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList, rubros, allSubrubros }) {
   const ref = useRef(null);
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
@@ -157,6 +201,17 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   const [metodo, setMetodo]     = useState(initial?.metodo || 'efectivo');
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
   const [seleccion, setSeleccion] = useState('');
+
+  // Vinculación a subrubro (solo para gastos nuevos)
+  const [rubroSel, setRubroSel]       = useState('');
+  const [subrubroSel, setSubrubroSel] = useState('');
+  const [facturasSub, setFacturasSub] = useState([]);
+  const [facturaSel, setFacturaSel]   = useState('');
+  const [loadingFacturas, setLoadingFacturas] = useState(false);
+
+  const subrubrosDel = rubroSel
+    ? allSubrubros.filter(s => String(s.rubro_id) === rubroSel)
+    : [];
 
   useEffect(() => {
     const handler = (e) => {
@@ -166,17 +221,54 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     return () => document.removeEventListener('mousedown', handler);
   }, [onCancel]);
 
+  useEffect(() => {
+    if (!subrubroSel) { setFacturasSub([]); setFacturaSel(''); return; }
+    setLoadingFacturas(true);
+    cajaApi.getFacturasPendientes(subrubroSel)
+      .then(data => { setFacturasSub(data); setFacturaSel(''); })
+      .catch(() => setFacturasSub([]))
+      .finally(() => setLoadingFacturas(false));
+  }, [subrubroSel]);
+
+  // Proveedor → auto-selecciona subrubro si está vinculado
+  useEffect(() => {
+    if (!seleccion) return;
+    const prov = proveedoresList.find(p => p.nombre === seleccion);
+    if (prov?.subrubro_id) {
+      const sub = allSubrubros.find(s => s.id === prov.subrubro_id);
+      if (sub) {
+        setRubroSel(String(sub.rubro_id));
+        setSubrubroSel(String(sub.id));
+      }
+    }
+  }, [seleccion]);
+
+  const handleFacturaSel = (id) => {
+    setFacturaSel(id);
+    if (id) {
+      const f = facturasSub.find(f => String(f.id) === id);
+      if (f) setMonto(f.monto);
+    }
+  };
+
   const lista = tipo === 'empleado' ? empleadosList : tipo === 'gasto' ? proveedoresList : [];
 
   const handleSeleccion = (val) => {
     setSeleccion(val);
-    if (val) setConcepto(val);
+    if (val && val !== '__otro__') setConcepto(val);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!concepto.trim() || !Number(monto)) return;
-    onSave({ fecha, tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial });
+    const data = {
+      fecha, tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial,
+    };
+    if (subrubroSel) {
+      data.subrubro_id = Number(subrubroSel);
+      if (facturaSel) data.movimiento_id = Number(facturaSel);
+    }
+    onSave(data);
   };
 
   const TIPOS_FORM = [
@@ -185,12 +277,14 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     { value: 'ingreso_extra', label: 'Ingreso extra', color: 'bg-amber-500' },
   ];
 
+  const esGastoNuevo = tipo === 'gasto' && !initial;
+
   return (
     <form ref={ref} onSubmit={handleSubmit} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 space-y-3 border border-slate-200 dark:border-slate-600">
       {!tipoForzado && (
         <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
           {TIPOS_FORM.map(t => (
-            <button key={t.value} type="button" onClick={() => { setTipo(t.value); setSeleccion(''); setConcepto(''); }}
+            <button key={t.value} type="button" onClick={() => { setTipo(t.value); setSeleccion(''); setConcepto(''); setRubroSel(''); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}
               className={`flex-1 py-2 transition-colors ${tipo === t.value ? `${t.color} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
               {t.label}
             </button>
@@ -206,10 +300,50 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
         </select>
       )}
 
-      {(lista.length === 0 || seleccion === '__otro__' || !seleccion) && (
+      {(lista.length === 0 || seleccion === '__otro__' || !seleccion) && !subrubroSel && (
         <input type="text" className={inputCls}
           placeholder={tipo === 'empleado' ? 'Nombre del empleado' : tipo === 'ingreso_extra' ? 'Descripción del ingreso' : 'Proveedor o concepto'}
           value={concepto} onChange={e => setConcepto(e.target.value)} required autoFocus={!lista.length} />
+      )}
+
+      {/* Selector de subrubro directo en gastos nuevos */}
+      {esGastoNuevo && rubros.length > 0 && (
+        <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-600">
+          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1"><Link2 size={11} className="text-blue-400" /> Subrubro <span className="text-slate-400">(opcional — registra un pago en el subrubro)</span></p>
+          <div className="flex gap-2">
+            <select className={selectCls} value={rubroSel} onChange={e => { setRubroSel(e.target.value); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}>
+              <option value="">— Rubro —</option>
+              {rubros.map(r => <option key={r.id} value={r.id}>{r.icon ? `${r.icon} ` : ''}{r.nombre}</option>)}
+            </select>
+            <select className={selectCls} value={subrubroSel} onChange={e => {
+              const id = e.target.value;
+              setSubrubroSel(id);
+              if (id) {
+                const sub = subrubrosDel.find(s => String(s.id) === id);
+                if (sub) setConcepto(sub.nombre);
+              }
+            }} disabled={!rubroSel}>
+              <option value="">— Subrubro —</option>
+              {subrubrosDel.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          </div>
+          {subrubroSel && (
+            loadingFacturas
+              ? <p className="text-xs text-slate-400">Cargando boletas...</p>
+              : facturasSub.length === 0
+                ? <p className="text-xs text-slate-400">Sin boletas pendientes.</p>
+                : (
+                  <select className={selectCls} value={facturaSel} onChange={e => handleFacturaSel(e.target.value)}>
+                    <option value="">— Boleta pendiente (opcional) —</option>
+                    {facturasSub.map(f => (
+                      <option key={f.id} value={f.id}>
+                        {f.concepto || 'Sin concepto'} — {fmt(f.monto)}{f.fecha_vencimiento ? ` — vence ${formatFechaCorta(f.fecha_vencimiento)}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-2">
@@ -254,19 +388,92 @@ function MetodoBadge({ metodo }) {
     : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">Transf.</span>;
 }
 
-function MovRow({ m, onEdit, onDelete, colorMonto }) {
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
+  const esPendiente  = m.tipo === 'gasto' && m.confirmado === false;
+  const esConfirmado = m.tipo === 'gasto' && m.confirmado === true;
+  const esGasto      = m.tipo === 'gasto';
+
   return (
-    <div className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3">
+    <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${
+      esPendiente
+        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600 border-dashed'
+        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+    }`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{m.concepto}</p>
+          <p className={`text-sm font-medium truncate ${esPendiente ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
+            {m.concepto}
+          </p>
           {m.es_especial && <Star size={11} className="text-amber-500 shrink-0" />}
         </div>
-        <MetodoBadge metodo={m.metodo} />
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <MetodoBadge metodo={m.metodo} />
+          {esPendiente && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">Sin confirmar</span>}
+          {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> Registrado en subrubro</span>}
+        </div>
       </div>
-      <p className={`text-base font-bold whitespace-nowrap ${colorMonto}`}>{fmt(m.monto)}</p>
+      <p className={`text-base font-bold whitespace-nowrap ${esPendiente ? 'text-slate-400 dark:text-slate-500' : colorMonto}`}>
+        {fmt(m.monto)}
+      </p>
+      {esGasto && (
+        <button onClick={() => onConfirmar(m)}
+          title={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
+          className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+            esConfirmado
+              ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
+              : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
+          }`}>
+          <Check size={14} />
+        </button>
+      )}
       <button onClick={() => onEdit(m)} className="text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
       <button onClick={() => onDelete(m.id)} className="text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
+    </div>
+  );
+}
+
+// ── Fila de vencimiento sugerido (auto-sync) ────────────────────────────────
+function SugeridoRow({ s, onConfirmar, onDescartar }) {
+  const [monto, setMonto]   = useState(s.monto);
+  const [metodo, setMetodo] = useState('efectivo');
+
+  const hoy = todayStr();
+  const esHoy = s.fecha_vencimiento === hoy;
+  const esMañana = s.fecha_vencimiento === addDays(hoy, 1);
+  const labelVenc = esHoy ? 'hoy' : esMañana ? 'mañana' : `${formatFechaCorta(s.fecha_vencimiento)}`;
+
+  return (
+    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 border-dashed rounded-xl px-3 py-3">
+      <AlertCircle size={14} className="text-amber-500 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{s.subrubro_nombre}</p>
+          {s.concepto && <p className="text-xs text-slate-400 truncate">{s.concepto}</p>}
+          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${esHoy ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'}`}>
+            vence {labelVenc}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden text-xs">
+            {[['efectivo', 'Efectivo'], ['transferencia', 'Transf.']].map(([v, l]) => (
+              <button key={v} type="button" onClick={() => setMetodo(v)}
+                className={`px-2.5 py-1 transition-colors ${metodo === v ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <input type="number" min="0" step="any" value={monto} onChange={e => setMonto(Number(e.target.value))}
+            className="w-28 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-sm font-semibold text-right focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        </div>
+      </div>
+      <button onClick={() => onConfirmar(s, monto, metodo)} title="Confirmar pago"
+        className="p-2 rounded-lg bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70 shrink-0">
+        <Check size={14} />
+      </button>
+      <button onClick={() => onDescartar(s.movimiento_id)} title="Ignorar hoy"
+        className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0">
+        <X size={14} />
+      </button>
     </div>
   );
 }
@@ -330,30 +537,81 @@ export default function CajaView({ rubros = [] }) {
   const saldoCuentaEditRef = useRef(null);
 
   const [vencimientos, setVencimientos] = useState([]);
-  const [config, setConfig]             = useState({ empleados: [], proveedores: [] });
+  const [config, setConfig]             = useState({ empleados: [], proveedores: [], rubros_sync: [], dias_anticipacion_caja: 3 });
   const [showConfig, setShowConfig]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
 
-  const calcularSaldoAyer = (movsAyer) => {
-    const saldoInicial = movsAyer.find(m => m.tipo === 'saldo_inicial')?.monto || 0;
-    const efvoDisp = saldoInicial
-      + movsAyer.filter(m => m.tipo === 'empleado'      && m.metodo === 'efectivo').reduce((s,m) => s+m.monto, 0)
-      + movsAyer.filter(m => m.tipo === 'ingreso_extra' && m.metodo === 'efectivo').reduce((s,m) => s+m.monto, 0);
-    const efvoGastos = movsAyer.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo').reduce((s,m) => s+m.monto, 0);
-    return efvoDisp - efvoGastos;
+  // Vencimientos auto-sincronizados
+  const [sugeridos, setSugeridos] = useState([]);
+
+  const getDismissedKey = (f) => `caja_dismissed_${f}`;
+  const getDismissed = (f) => {
+    try { return JSON.parse(sessionStorage.getItem(getDismissedKey(f)) || '[]'); } catch { return []; }
+  };
+  const addDismissed = (f, movimientoId) => {
+    const prev = getDismissed(f);
+    sessionStorage.setItem(getDismissedKey(f), JSON.stringify([...new Set([...prev, movimientoId])]));
   };
 
   const cargar = async () => {
     setLoading(true);
-    const [data, dataAyer] = await Promise.all([
-      cajaApi.getByFecha(fecha),
-      cajaApi.getByFecha(addDays(fecha, -1)),
-    ]);
-    setMovs(data);
-    const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
-    setSaldoAutoCalculado(tieneSaldoManual ? null : calcularSaldoAyer(dataAyer));
-    setSaldoCuentaAyer(dataAyer.find(m => m.tipo === 'saldo_cuenta')?.monto ?? null);
+    try {
+      const data = await cajaApi.getByFecha(fecha);
+      setMovs(data);
+
+      const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
+
+      if (tieneSaldoManual) {
+        setSaldoAutoCalculado(null);
+        const dataAyer = await cajaApi.getByFecha(addDays(fecha, -1));
+        setSaldoCuentaAyer(dataAyer.find(m => m.tipo === 'saldo_cuenta')?.monto ?? null);
+      } else {
+        // Busca hasta 30 días atrás para encadenar el saldo correctamente
+        const hasta = addDays(fecha, -1);
+        const desde = addDays(fecha, -30);
+        const historial = await cajaApi.getRango(desde, hasta);
+
+        setSaldoCuentaAyer(
+          historial.filter(m => m.fecha === hasta).find(m => m.tipo === 'saldo_cuenta')?.monto ?? null
+        );
+
+        const byDate = {};
+        historial.forEach(m => {
+          if (!byDate[m.fecha]) byDate[m.fecha] = [];
+          byDate[m.fecha].push(m);
+        });
+
+        const dates = Object.keys(byDate).sort();
+
+        // Encuentra el último saldo_inicial almacenado (busca de más reciente a más antiguo)
+        let saldoBase = 0;
+        let startIdx = -1;
+        for (let i = dates.length - 1; i >= 0; i--) {
+          const entry = byDate[dates[i]].find(m => m.tipo === 'saldo_inicial');
+          if (entry) { saldoBase = entry.monto; startIdx = i; break; }
+        }
+
+        // Encadena el saldo corriendo desde el último ancla hasta ayer
+        let running = saldoBase;
+        for (let i = Math.max(startIdx, 0); i < dates.length; i++) {
+          const ms = byDate[dates[i]];
+          running += ms.filter(m => (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') && m.metodo === 'efectivo').reduce((s, m) => s + m.monto, 0);
+          running -= ms.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo').reduce((s, m) => s + m.monto, 0);
+        }
+
+        setSaldoAutoCalculado(running);
+      }
+    } catch {}
     setLoading(false);
+  };
+
+  const cargarSugeridos = async () => {
+    if (!config.rubros_sync?.length) { setSugeridos([]); return; }
+    try {
+      const data = await cajaApi.getVencimientosSync(fecha);
+      const dismissed = getDismissed(fecha);
+      setSugeridos(data.filter(s => !dismissed.includes(s.movimiento_id)));
+    } catch { setSugeridos([]); }
   };
 
   const cargarConfig = async () => {
@@ -377,6 +635,7 @@ export default function CajaView({ rubros = [] }) {
 
   useEffect(() => { cargar(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
+  useEffect(() => { cargarSugeridos(); }, [fecha, config.rubros_sync]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -417,11 +676,33 @@ export default function CajaView({ rubros = [] }) {
         toast.success('Actualizado');
       } else {
         await cajaApi.create(data);
-        toast.success('Guardado');
+        toast.success('Guardado — confirmá el pago para que descuente de la caja');
       }
       setShowForm(false); setEditingMov(null); setTipoForm(null);
       cargar();
     } catch { toast.error('Error al guardar'); }
+  };
+
+  const handleConfirmarGasto = async (m) => {
+    try {
+      if (m.confirmado === true) {
+        await cajaApi.update(m.id, { confirmado: false });
+        cargar();
+        toast.success('Confirmación revertida');
+      } else {
+        await cajaApi.update(m.id, { confirmado: true });
+        if (m.subrubro_id) {
+          await movimientosApi.create(m.subrubro_id, {
+            tipo: 'pago',
+            pago: m.monto,
+            fecha: m.fecha,
+            concepto: `Pago caja: ${m.concepto}`,
+          });
+        }
+        cargar();
+        toast.success('Pago confirmado');
+      }
+    } catch { toast.error('Error al confirmar'); }
   };
 
   const handleDelete = async (id) => {
@@ -459,13 +740,41 @@ export default function CajaView({ rubros = [] }) {
     toast.success('Configuración guardada');
   };
 
+  const handleConfirmarSugerido = async (s, monto, metodo) => {
+    try {
+      await cajaApi.create({
+        fecha,
+        tipo: 'gasto',
+        concepto: s.subrubro_nombre + (s.concepto ? ` - ${s.concepto}` : ''),
+        monto: Number(monto),
+        metodo,
+        subrubro_id: s.subrubro_id,
+        movimiento_id: s.movimiento_id,
+        es_especial: false,
+      });
+      await movimientosApi.create(s.subrubro_id, {
+        tipo: 'pago',
+        pago: Number(monto),
+        fecha,
+        concepto: `Pago caja: ${s.subrubro_nombre}`,
+      });
+      setSugeridos(prev => prev.filter(x => x.movimiento_id !== s.movimiento_id));
+      cargar();
+      toast.success(`Pago de ${s.subrubro_nombre} confirmado`);
+    } catch { toast.error('Error al confirmar pago'); }
+  };
+
+  const handleDescartarSugerido = (movimientoId) => {
+    addDismissed(fecha, movimientoId);
+    setSugeridos(prev => prev.filter(s => s.movimiento_id !== movimientoId));
+  };
+
   // ── Cálculos ────────────────────────────────────────────────────────────────
   const saldoMov      = movs.find(m => m.tipo === 'saldo_inicial');
   const saldoInicial  = saldoMov?.monto ?? saldoAutoCalculado ?? 0;
   const saldoCuentaMov = movs.find(m => m.tipo === 'saldo_cuenta');
   const saldoCuentaHoy = saldoCuentaMov?.monto ?? null;
 
-  // Ingreso del día por transferencia = diferencia entre saldo de cuenta de hoy y ayer
   const ingresoTransDia = (saldoCuentaHoy !== null && saldoCuentaAyer !== null)
     ? saldoCuentaHoy - saldoCuentaAyer
     : null;
@@ -478,15 +787,14 @@ export default function CajaView({ rubros = [] }) {
     + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
     + ingresosExtra.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
 
-  // Si hay saldo de cuenta registrado, el disponible es el delta (ingreso real del día)
-  // Si no, suma los ingresos individuales por transferencia como antes
   const disponibleTrans = ingresoTransDia !== null
     ? ingresoTransDia
     : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
       + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
 
-  const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
-  const gastosTrans = gastos.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+  // Solo los gastos confirmados (confirmado !== false) descuentan de la caja
+  const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo'       && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
+  const gastosTrans = gastos.filter(m => m.metodo === 'transferencia'  && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
   const vencEfvo    = vencimientos.filter(v => v.metodo !== 'transferencia');
   const vencTrans   = vencimientos.filter(v => v.metodo === 'transferencia');
 
@@ -495,6 +803,8 @@ export default function CajaView({ rubros = [] }) {
     onCancel: () => { setShowForm(false); setEditingMov(null); },
     empleadosList: config.empleados || [],
     proveedoresList: config.proveedores || [],
+    rubros,
+    allSubrubros,
   };
 
   return (
@@ -529,10 +839,8 @@ export default function CajaView({ rubros = [] }) {
         </button>
       </div>
 
-      {/* Saldos del día — fila de dos tarjetas */}
+      {/* Saldos del día */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-        {/* Saldo efectivo anterior */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
@@ -570,7 +878,6 @@ export default function CajaView({ rubros = [] }) {
           )}
         </div>
 
-        {/* Saldo en cuenta bancaria */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
@@ -614,6 +921,25 @@ export default function CajaView({ rubros = [] }) {
           )}
         </div>
       </div>
+
+      {/* Vencimientos sincronizados (auto-sugeridos) */}
+      {sugeridos.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle size={14} className="text-amber-500" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Boletas por vencer</h3>
+            <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full">{sugeridos.length}</span>
+            <InfoTooltip text="Boletas de subrubros sincronizados próximas a vencer. Confirmá el pago para registrarlo en la caja y en el subrubro correspondiente." />
+          </div>
+          <div className="space-y-2">
+            {sugeridos.map(s => (
+              <SugeridoRow key={s.movimiento_id} s={s}
+                onConfirmar={handleConfirmarSugerido}
+                onDescartar={handleDescartarSugerido} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Ingresos extra */}
       <div>
@@ -676,7 +1002,7 @@ export default function CajaView({ rubros = [] }) {
         )}
         {gastos.map(m => (
           <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-red-500" />}
+            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" />}
           </div>
         ))}
       </div>
@@ -691,7 +1017,7 @@ export default function CajaView({ rubros = [] }) {
       </div>
 
       {showConfig && (
-        <ConfigPanel config={config} rubros={allSubrubros} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />
+        <ConfigPanel config={config} rubros={allSubrubros} allRubros={rubros} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />
       )}
     </div>
   );
