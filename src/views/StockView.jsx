@@ -204,15 +204,20 @@ export default function StockView({ role }) {
   const [historial, setHistorial] = useState([]);
 
   const cargar = async () => {
-    const [prods, alertss, rubross] = await Promise.all([
-      stockApi.getProductos(),
-      stockApi.getAlertas(),
-      rubrosApi.getAll(),
-    ]);
-    setProductos(prods);
-    setAlertas(alertss);
-    setRubros(rubross);
-    setLoading(false);
+    try {
+      const [prods, alertss, rubross] = await Promise.all([
+        stockApi.getProductos(),
+        stockApi.getAlertas(),
+        rubrosApi.getAll(),
+      ]);
+      setProductos(prods);
+      setAlertas(alertss);
+      setRubros(rubross);
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { cargar(); }, []);
