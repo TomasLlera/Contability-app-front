@@ -34,13 +34,17 @@ export default function ExportModal({ subrubro, onClose }) {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setLoading(true);
-    const p = PRESETS[preset];
-    const d = p.label === 'Todo' ? null : desde || null;
-    const h = p.label === 'Todo' ? null : hasta || null;
-    movimientosApi.exportExcel(subrubro.id, subrubro.nombre, d, h);
-    setTimeout(() => { setLoading(false); onClose(); }, 800);
+    try {
+      const p = PRESETS[preset];
+      const d = p.label === 'Todo' ? null : desde || null;
+      const h = p.label === 'Todo' ? null : hasta || null;
+      await movimientosApi.exportExcel(subrubro.id, subrubro.nombre, d, h);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isPersonalizado = PRESETS[preset].desde === null;

@@ -161,15 +161,17 @@ export const movimientosApi = {
   delete: (id) => api.delete(`/movimientos/${id}`),
   getVencimientos: (dias = 30) => api.get('/movimientos/vencimientos/proximos', { params: { dias } }).then(r => r.data),
   search: (q, limit = 25) => api.get('/movimientos/search', { params: { q, limit } }).then(r => r.data),
-  exportExcel: (subrubroId, nombre, desde = null, hasta = null) => {
-    const params = new URLSearchParams();
-    if (desde) params.set('desde', desde);
-    if (hasta) params.set('hasta', hasta);
-    const query = params.toString() ? `?${params}` : '';
+  exportExcel: async (subrubroId, nombre, desde = null, hasta = null) => {
+    const params = {};
+    if (desde) params.desde = desde;
+    if (hasta) params.hasta = hasta;
+    const res = await api.get(`/movimientos/export/${subrubroId}`, { params, responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
     const a = document.createElement('a');
-    a.href = `${BASE}/movimientos/export/${subrubroId}${query}`;
+    a.href = url;
     a.download = `${nombre}.xlsx`;
     a.click();
+    URL.revokeObjectURL(url);
   },
   importExcel: (rubroId, file, mapping, mode = 'skip_duplicates', sheets = null, skipRows = 0, fechaDesde = null, fechaHasta = null) => {
     const formData = new FormData();
