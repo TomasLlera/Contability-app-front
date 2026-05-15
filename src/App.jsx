@@ -4,11 +4,12 @@ import RubroView from './views/RubroView';
 import Dashboard from './views/Dashboard';
 import Graficas from './views/Graficas';
 import CajaView from './views/CajaView';
+import SettingsView from './views/SettingsView';
 import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -343,6 +344,16 @@ export default function App() {
             Caja del día
           </button>
 
+          <button
+            onClick={() => { setActiveView('config'); setInitialSubrubro(null); closeSidebar(); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              activeView === 'config' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            }`}
+          >
+            <Settings size={15} />
+            Configuración
+          </button>
+
           <div className="pt-4">
             <div className="flex items-center px-3 py-1 mb-1">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex-1">Locales</span>
@@ -589,6 +600,11 @@ export default function App() {
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Caja del día</h1>
               <p className="text-xs text-slate-400">Registro diario de movimientos</p>
             </div>
+          ) : activeView === 'config' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Configuración</h1>
+              <p className="text-xs text-slate-400">Alertas y preferencias del sistema</p>
+            </div>
           ) : (
             <div>
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Inicio</h1>
@@ -655,6 +671,8 @@ export default function App() {
             <Graficas rubros={rubros} />
           ) : activeView === 'caja' ? (
             <CajaView rubros={rubros} />
+          ) : activeView === 'config' ? (
+            <SettingsView />
           ) : (
             <Dashboard
               locales={locales}

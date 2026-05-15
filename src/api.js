@@ -186,6 +186,12 @@ export const movimientosApi = {
   },
 };
 
+export const appConfigApi = {
+  get: () => api.get('/config').then(r => r.data),
+  update: (data) => api.put('/config', data).then(r => r.data),
+  testEmail: () => api.post('/config/test-email').then(r => r.data),
+};
+
 export const cajaApi = {
   getByFecha: (fecha) => api.get('/caja', { params: { fecha } }).then(r => r.data),
   getRango: (desde, hasta) => api.get('/caja/rango', { params: { desde, hasta } }).then(r => r.data),
