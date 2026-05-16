@@ -10,7 +10,7 @@ import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2 } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -50,6 +50,7 @@ export default function App() {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   });
   const [sidebarRight, setSidebarRight] = useState(() => localStorage.getItem('sidebarSide') === 'right');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showCargaRapida, setShowCargaRapida] = useState(false);
@@ -168,6 +169,12 @@ export default function App() {
     return next;
   });
 
+  const toggleSidebarCollapsed = () => setSidebarCollapsed(v => {
+    const next = !v;
+    localStorage.setItem('sidebarCollapsed', String(next));
+    return next;
+  });
+
   const cargar = async () => {
     const [ls, rs] = await Promise.all([localesApi.getAll(), rubrosApi.getAll()]);
     setLocales(ls);
@@ -277,9 +284,10 @@ export default function App() {
   };
 
   const handleNavigateFromVenc = (rubro, subrubro) => {
-    if (rubro && subrubro) {
+    if (rubro) {
       setActiveView(rubro);
-      setInitialSubrubro(subrubro);
+      setInitialSubrubro(subrubro || null);
+      closeSidebar();
     }
   };
 
@@ -315,9 +323,24 @@ export default function App() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed md:sticky top-0 z-30 w-64 bg-slate-900 flex flex-col shrink-0 h-screen transition-transform duration-200
+      <aside className={`fixed md:sticky top-0 z-30 bg-slate-900 flex flex-col shrink-0 h-screen transition-[width,transform] duration-200
+        ${sidebarCollapsed ? 'w-64 md:w-6' : 'w-64'}
         ${sidebarRight ? 'right-0 left-auto' : 'left-0'}
         ${sidebarOpen ? 'translate-x-0' : sidebarRight ? 'translate-x-full' : '-translate-x-full'} md:translate-x-0`}>
+
+        {/* Strip colapsado — solo desktop */}
+        <div
+          onClick={toggleSidebarCollapsed}
+          className={`${sidebarCollapsed ? 'hidden md:flex' : 'hidden'} flex-1 flex-col items-center justify-center cursor-pointer transition-colors group
+            ${sidebarRight ? 'border-l-2' : 'border-r-2'} border-slate-500 hover:border-blue-400 bg-slate-900 hover:bg-slate-800`}
+        >
+          {sidebarRight
+            ? <ChevronLeft size={12} className="text-slate-500 group-hover:text-blue-400 transition-colors" />
+            : <ChevronRight size={12} className="text-slate-500 group-hover:text-blue-400 transition-colors" />}
+        </div>
+
+        {/* Contenido completo */}
+        <div className={`${sidebarCollapsed ? 'md:hidden' : ''} flex flex-col flex-1 min-h-0`}>
         <div className="px-4 py-4 border-b border-slate-700/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -603,8 +626,18 @@ export default function App() {
               {sidebarRight ? <PanelLeft size={13} /> : <PanelRight size={13} />}
               {sidebarRight ? 'Izquierda' : 'Derecha'}
             </button>
+            <span className="text-slate-700">·</span>
+            <button
+              onClick={toggleSidebarCollapsed}
+              className="hidden md:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              title="Ocultar barra lateral"
+            >
+              {sidebarRight ? <PanelRight size={13} /> : <PanelLeft size={13} />}
+              Ocultar
+            </button>
           </div>
         </div>
+        </div>{/* fin contenido completo */}
       </aside>
 
       {/* Main */}
@@ -729,6 +762,7 @@ export default function App() {
               rubros={rubros}
               rubroStats={rubroStats}
               onNavigate={handleNavigateFromVenc}
+              onViewChange={(view) => { setActiveView(view); closeSidebar(); }}
             />
           )}
         </main>

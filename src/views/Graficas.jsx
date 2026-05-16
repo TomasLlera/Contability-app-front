@@ -26,9 +26,8 @@ const addDays = (dateStr, n) => {
 };
 
 // ── Caja charts config ────────────────────────────────────────────────────────
-const CAJA_PRESETS = { dia: ['mes', 30, 60], mes: [3, 6, 12], anio: [2, 3, 5] };
+const CAJA_PRESETS = { dia: [15, 30, 60], mes: [3, 6, 12], anio: [2, 3, 5] };
 const presetLabel = (v, vista) => {
-  if (v === 'mes') return 'Este mes';
   if (vista === 'dia') return `${v}d`;
   if (vista === 'mes') return `${v}m`;
   return `${v}a`;
@@ -222,7 +221,7 @@ export default function Graficas({ rubros = [] }) {
 
   // Caja
   const [cajaVista, setCajaVista]     = useState('dia');
-  const [cajaPreset, setCajaPreset]   = useState('mes');
+  const [cajaPreset, setCajaPreset]   = useState(30);
   const [cajaMetrica, setCajaMetrica] = useState('ingresosEfvo');
   const [cajaMovs, setCajaMovs]       = useState([]);
   const [cajaLoading, setCajaLoading] = useState(false);

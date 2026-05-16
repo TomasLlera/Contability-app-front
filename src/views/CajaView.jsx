@@ -87,8 +87,12 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
   };
 
   const handleSave = async () => {
-    await onSave({ empleados, proveedores, rubros_sync: rubrosSync, dias_anticipacion_caja: Number(diasAnticipacion) });
-    onClose();
+    try {
+      await onSave({ empleados, proveedores, rubros_sync: rubrosSync, dias_anticipacion_caja: Number(diasAnticipacion) });
+      onClose();
+    } catch {
+      // error ya mostrado por handleSaveConfig
+    }
   };
 
   return (
@@ -596,7 +600,7 @@ export default function CajaView({ rubros = [] }) {
         for (let i = Math.max(startIdx, 0); i < dates.length; i++) {
           const ms = byDate[dates[i]];
           running += ms.filter(m => (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') && m.metodo === 'efectivo').reduce((s, m) => s + m.monto, 0);
-          running -= ms.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo').reduce((s, m) => s + m.monto, 0);
+          running -= ms.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo' && m.confirmado !== false).reduce((s, m) => s + m.monto, 0);
         }
 
         setSaldoAutoCalculado(running);
@@ -686,18 +690,23 @@ export default function CajaView({ rubros = [] }) {
   const handleConfirmarGasto = async (m) => {
     try {
       if (m.confirmado === true) {
-        await cajaApi.update(m.id, { confirmado: false });
+        // Desconfirmar: eliminar el pago del subrubro si existe
+        if (m.pago_mov_id) {
+          await movimientosApi.delete(m.pago_mov_id);
+        }
+        await cajaApi.update(m.id, { confirmado: false, pago_mov_id: null });
         cargar();
         toast.success('Confirmación revertida');
       } else {
         await cajaApi.update(m.id, { confirmado: true });
         if (m.subrubro_id) {
-          await movimientosApi.create(m.subrubro_id, {
+          const pago = await movimientosApi.create(m.subrubro_id, {
             tipo: 'pago',
             pago: m.monto,
             fecha: m.fecha,
             concepto: `Pago caja: ${m.concepto}`,
           });
+          if (pago?.id) await cajaApi.update(m.id, { pago_mov_id: pago.id });
         }
         cargar();
         toast.success('Pago confirmado');
@@ -706,6 +715,10 @@ export default function CajaView({ rubros = [] }) {
   };
 
   const handleDelete = async (id) => {
+    const mov = movs.find(m => m.id === id);
+    if (mov?.pago_mov_id && mov?.confirmado === true) {
+      try { await movimientosApi.delete(mov.pago_mov_id); } catch {}
+    }
     await cajaApi.delete(id);
     setMovs(prev => prev.filter(m => m.id !== id));
     toast.success('Eliminado');
@@ -735,13 +748,24 @@ export default function CajaView({ rubros = [] }) {
   };
 
   const handleSaveConfig = async (data) => {
-    await cajaApi.saveConfig(data);
-    setConfig(data);
-    toast.success('Configuración guardada');
+    try {
+      await cajaApi.saveConfig(data);
+      await cargarConfig();
+      toast.success('Configuración guardada');
+    } catch (e) {
+      toast.error('Error al guardar la configuración');
+      throw e;
+    }
   };
 
   const handleConfirmarSugerido = async (s, monto, metodo) => {
     try {
+      const pago = await movimientosApi.create(s.subrubro_id, {
+        tipo: 'pago',
+        pago: Number(monto),
+        fecha,
+        concepto: `Pago caja: ${s.subrubro_nombre}`,
+      });
       await cajaApi.create({
         fecha,
         tipo: 'gasto',
@@ -750,13 +774,9 @@ export default function CajaView({ rubros = [] }) {
         metodo,
         subrubro_id: s.subrubro_id,
         movimiento_id: s.movimiento_id,
+        pago_mov_id: pago?.id || null,
+        confirmado: true,
         es_especial: false,
-      });
-      await movimientosApi.create(s.subrubro_id, {
-        tipo: 'pago',
-        pago: Number(monto),
-        fecha,
-        concepto: `Pago caja: ${s.subrubro_nombre}`,
       });
       setSugeridos(prev => prev.filter(x => x.movimiento_id !== s.movimiento_id));
       cargar();

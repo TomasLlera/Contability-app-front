@@ -1,74 +1,297 @@
 import { useState, useEffect } from 'react';
-import { movimientosApi } from '../api';
-import { Folder, Users, Clock, AlertCircle, TrendingUp, FolderOpen } from 'lucide-react';
-import VencimientosPanel from '../components/VencimientosPanel';
+import { movimientosApi, cajaApi } from '../api';
+import {
+  AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
+  ChevronRight, Building2, CheckCircle2, AlertTriangle, Banknote,
+  ArrowLeftRight, Check
+} from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const todayStr = () => new Date().toISOString().split('T')[0];
 
-function StatCard({ label, value, sub, iconBg, iconText, icon }) {
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Buenos días';
+  if (h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+function getRubroIcon(rubro) {
+  if (rubro.icon) return rubro.icon;
+  const n = rubro.nombre.toLowerCase();
+  if (n.includes('emple') || n.includes('person')) return '👥';
+  if (n.includes('provee') || n.includes('vendor')) return '🚚';
+  if (n.includes('cliente') || n.includes('venta')) return '🏪';
+  return '📁';
+}
+
+function vencInfo(dias) {
+  if (dias < 0) return { label: `Vencida hace ${Math.abs(dias)}d`, dot: 'bg-red-500', row: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' };
+  if (dias === 0) return { label: 'Vence hoy', dot: 'bg-red-500', row: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400' };
+  if (dias <= 3) return { label: `${dias}d`, dot: 'bg-orange-400', row: 'border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400' };
+  if (dias <= 7) return { label: `${dias}d`, dot: 'bg-amber-400', row: 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' };
+  return { label: `${dias}d`, dot: 'bg-blue-400', row: 'border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400' };
+}
+
+function StatCard({ label, value, sub, iconBg, iconText, icon, urgent }) {
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 hover:shadow-md transition-shadow">
-      <div className={`w-10 h-10 ${iconBg} rounded-xl flex items-center justify-center ${iconText} mb-4`}>
+    <div className={`bg-white dark:bg-slate-800 border rounded-2xl p-4 hover:shadow-md transition-shadow ${urgent ? 'border-red-300 dark:border-red-700' : 'border-slate-200 dark:border-slate-700'}`}>
+      <div className={`w-9 h-9 ${iconBg} rounded-xl flex items-center justify-center ${iconText} mb-3`}>
         {icon}
       </div>
-      <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
+      <p className={`text-2xl font-bold ${urgent ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{value}</p>
       <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">{sub}</p>}
     </div>
   );
 }
 
-export default function Dashboard({ locales = [], rubros, rubroStats, onNavigate }) {
+export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [loadingVenc, setLoadingVenc] = useState(true);
+  const [cajaHoy, setCajaHoy] = useState([]);
 
   useEffect(() => {
-    movimientosApi.getVencimientos(30).then(data => { setVencimientos(data); setLoadingVenc(false); });
+    movimientosApi.getVencimientos(30).then(data => {
+      setVencimientos(Array.isArray(data) ? data : data?.vencimientos || []);
+      setLoadingVenc(false);
+    }).catch(() => setLoadingVenc(false));
+    cajaApi.getByFecha(todayStr()).then(setCajaHoy).catch(() => {});
   }, []);
 
   const totalSubrubros = Object.values(rubroStats).reduce((a, b) => a + b, 0);
-  const vencidos = vencimientos.filter(v => v.dias_restantes <= 0);
-  const proximos7d = vencimientos.filter(v => v.dias_restantes > 0 && v.dias_restantes <= 7);
+  const vencidos    = vencimientos.filter(v => v.dias_restantes <= 0);
+  const proximos7d  = vencimientos.filter(v => v.dias_restantes > 0 && v.dias_restantes <= 7);
   const montoVencido = vencidos.reduce((s, v) => s + v.monto, 0);
-  const montoProximo7 = proximos7d.reduce((s, v) => s + v.monto, 0);
+
+  // Caja hoy
+  const gastosHoy          = cajaHoy.filter(m => m.tipo === 'gasto');
+  const gastosConfirmados  = gastosHoy.filter(m => m.confirmado !== false);
+  const gastosPendientes   = gastosHoy.filter(m => m.confirmado === false);
+  const saldoMov           = cajaHoy.find(m => m.tipo === 'saldo_inicial');
+  const saldoCuentaMov     = cajaHoy.find(m => m.tipo === 'saldo_cuenta');
+  const ingresosExtra      = cajaHoy.filter(m => m.tipo === 'ingreso_extra');
+  const empleados          = cajaHoy.filter(m => m.tipo === 'empleado');
+  const totalConfirmados   = gastosConfirmados.reduce((s, m) => s + m.monto, 0);
+  const totalPendientes    = gastosPendientes.reduce((s, m) => s + m.monto, 0);
+  const totalIngresoExtra  = ingresosExtra.reduce((s, m) => s + m.monto, 0);
+  const totalEmpleados     = empleados.reduce((s, m) => s + m.monto, 0);
+
+  const tieneAlertas = vencidos.length > 0 || gastosPendientes.length > 0;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Locales" value={locales.length}
-          sub={`${rubros.length} rubro${rubros.length !== 1 ? 's' : ''} en total`}
-          iconBg="bg-blue-50 dark:bg-blue-900/30" iconText="text-blue-500" icon={<Folder size={20} />} />
-        <StatCard label="Subrubros" value={totalSubrubros}
-          sub={rubros.length > 0 ? `${(totalSubrubros / rubros.length).toFixed(1)} prom. por rubro` : '—'}
-          iconBg="bg-violet-50 dark:bg-violet-900/30" iconText="text-violet-500" icon={<Users size={20} />} />
-        <StatCard label="Vencen en 7 días" value={proximos7d.length}
-          sub={proximos7d.length > 0 ? fmt(montoProximo7) : 'Sin urgencias'}
-          iconBg="bg-amber-50 dark:bg-amber-900/30" iconText="text-amber-500" icon={<Clock size={20} />} />
-        <StatCard
-          label={vencidos.length > 0 ? 'Facturas vencidas' : 'Sin vencidas'}
-          value={vencidos.length}
-          sub={vencidos.length > 0 ? fmt(montoVencido) + ' pendiente' : 'Todo al día ✓'}
-          iconBg={vencidos.length > 0 ? 'bg-red-50 dark:bg-red-900/30' : 'bg-green-50 dark:bg-green-900/30'}
-          iconText={vencidos.length > 0 ? 'text-red-500' : 'text-green-500'}
-          icon={vencidos.length > 0 ? <AlertCircle size={20} /> : <TrendingUp size={20} />} />
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Próximos vencimientos</h3>
-        {loadingVenc ? (
-          <div className="h-32 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
-        ) : vencimientos.length === 0 ? (
-          <div className="h-32 flex flex-col items-center justify-center text-slate-400 gap-2">
-            <TrendingUp size={32} className="text-green-400" />
-            <p className="text-sm">Sin vencimientos en los próximos 30 días</p>
-          </div>
-        ) : (
-          <div className="overflow-y-auto max-h-64">
-            <VencimientosPanel items={vencimientos} onNavigate={onNavigate} />
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{greeting()}</h1>
+          <p className="text-sm text-slate-400 mt-0.5 capitalize">
+            {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        {tieneAlertas && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {vencidos.length > 0 && (
+              <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                <AlertCircle size={11} /> {vencidos.length} factura{vencidos.length !== 1 ? 's' : ''} vencida{vencidos.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {gastosPendientes.length > 0 && (
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                <Clock size={11} /> {gastosPendientes.length} gasto{gastosPendientes.length !== 1 ? 's' : ''} sin confirmar
+              </span>
+            )}
           </div>
         )}
       </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Locales"
+          value={locales.length}
+          sub={`${rubros.length} rubros · ${totalSubrubros} subrubros`}
+          iconBg="bg-blue-50 dark:bg-blue-900/30" iconText="text-blue-500"
+          icon={<Building2 size={18} />} />
+        <StatCard
+          label={vencidos.length > 0 ? 'Facturas vencidas' : 'Sin vencidas'}
+          value={vencidos.length > 0 ? vencidos.length : '✓'}
+          sub={vencidos.length > 0 ? fmt(montoVencido) + ' pendiente' : 'Todo al día'}
+          iconBg={vencidos.length > 0 ? 'bg-red-50 dark:bg-red-900/30' : 'bg-green-50 dark:bg-green-900/30'}
+          iconText={vencidos.length > 0 ? 'text-red-500' : 'text-green-500'}
+          icon={vencidos.length > 0 ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+          urgent={vencidos.length > 0} />
+        <StatCard
+          label="Vencen en 7 días"
+          value={proximos7d.length}
+          sub={proximos7d.length > 0 ? fmt(proximos7d.reduce((s, v) => s + v.monto, 0)) : 'Sin urgencias'}
+          iconBg="bg-amber-50 dark:bg-amber-900/30" iconText="text-amber-500"
+          icon={<Clock size={18} />} />
+        <StatCard
+          label={gastosPendientes.length > 0 ? 'Sin confirmar hoy' : 'Caja al día'}
+          value={gastosPendientes.length > 0 ? gastosPendientes.length : '✓'}
+          sub={gastosPendientes.length > 0 ? fmt(totalPendientes) + ' pendiente' : gastosConfirmados.length > 0 ? `${gastosConfirmados.length} confirmados` : 'Sin gastos hoy'}
+          iconBg={gastosPendientes.length > 0 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-green-50 dark:bg-green-900/30'}
+          iconText={gastosPendientes.length > 0 ? 'text-amber-500' : 'text-green-500'}
+          icon={<ClipboardList size={18} />} />
+      </div>
+
+      {/* Caja + Vencimientos */}
+      <div className={`grid gap-4 ${vencimientos.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
+
+        {/* Caja del día */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <ClipboardList size={15} className="text-slate-400" />
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Caja de hoy</h3>
+            </div>
+            <button onClick={() => onViewChange?.('caja')}
+              className="text-xs text-blue-500 hover:underline flex items-center gap-0.5 shrink-0">
+              Ver caja <ChevronRight size={12} />
+            </button>
+          </div>
+
+          {cajaHoy.length === 0 ? (
+            <div className="py-8 text-center">
+              <ClipboardList size={28} className="mx-auto mb-2 text-slate-200 dark:text-slate-700" />
+              <p className="text-sm text-slate-400">Sin movimientos hoy</p>
+              <button onClick={() => onViewChange?.('caja')}
+                className="mt-3 text-xs text-blue-500 hover:underline">
+                Abrir caja del día →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {saldoMov && (
+                <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Banknote size={12} className="text-slate-400" /> Saldo inicial efectivo
+                  </span>
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(saldoMov.monto)}</span>
+                </div>
+              )}
+              {saldoCuentaMov && (
+                <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <ArrowLeftRight size={12} className="text-slate-400" /> Saldo en cuenta
+                  </span>
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(saldoCuentaMov.monto)}</span>
+                </div>
+              )}
+              {totalIngresoExtra > 0 && (
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Ingresos extra</span>
+                  <span className="text-sm font-semibold text-amber-600">+ {fmt(totalIngresoExtra)}</span>
+                </div>
+              )}
+              {totalEmpleados > 0 && (
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Empleados</span>
+                  <span className="text-sm font-semibold text-green-600">+ {fmt(totalEmpleados)}</span>
+                </div>
+              )}
+              {gastosConfirmados.length > 0 && (
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Check size={11} className="text-green-500" /> {gastosConfirmados.length} gasto{gastosConfirmados.length !== 1 ? 's' : ''} confirmado{gastosConfirmados.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className="text-sm font-semibold text-red-500">− {fmt(totalConfirmados)}</span>
+                </div>
+              )}
+              {gastosPendientes.length > 0 && (
+                <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 mt-1">
+                  <span className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                    <Clock size={11} /> {gastosPendientes.length} sin confirmar
+                  </span>
+                  <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{fmt(totalPendientes)}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Vencimientos */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle size={15} className="text-amber-500" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Próximos vencimientos</h3>
+            {!loadingVenc && vencimientos.length > 0 && (
+              <span className="ml-auto text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                {vencimientos.length}
+              </span>
+            )}
+          </div>
+
+          {loadingVenc ? (
+            <div className="py-8 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+          ) : vencimientos.length === 0 ? (
+            <div className="py-8 text-center">
+              <TrendingUp size={28} className="mx-auto mb-2 text-green-300 dark:text-green-700" />
+              <p className="text-sm text-slate-400">Sin vencimientos en 30 días</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 overflow-y-auto max-h-64 pr-0.5">
+              {[...vencimientos].sort((a, b) => a.dias_restantes - b.dias_restantes).map(item => {
+                const info = vencInfo(item.dias_restantes);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => onNavigate?.(item.rubro, item.subrubro)}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer hover:opacity-80 transition-opacity ${info.row}`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${info.dot}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate">{item.subrubro?.nombre}</p>
+                      <p className="text-xs opacity-60 truncate">{item.rubro?.nombre}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold">{fmt(item.monto)}</p>
+                      <p className="text-xs opacity-60">{info.label}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Navegación rápida */}
+      {locales.length > 0 && rubros.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Navegación rápida</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {locales.map(local => {
+              const localRubros = rubros.filter(r => r.local_id === local.id);
+              if (localRubros.length === 0) return null;
+              return (
+                <div key={local.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-base">{local.icon || '🏠'}</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{local.nombre}</span>
+                    <span className="ml-auto text-xs text-slate-400">{localRubros.length} rubro{localRubros.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {localRubros.map(rubro => (
+                      <button key={rubro.id}
+                        onClick={() => onNavigate?.(rubro, null)}
+                        className="flex items-center gap-1.5 text-xs bg-slate-50 dark:bg-slate-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-700 rounded-lg px-2.5 py-1.5 transition-colors">
+                        <span>{getRubroIcon(rubro)}</span>
+                        <span>{rubro.nombre}</span>
+                        {rubroStats[rubro.id] > 0 && (
+                          <span className="text-slate-400 dark:text-slate-500 text-xs">{rubroStats[rubro.id]}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {rubros.length === 0 && (
         <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
