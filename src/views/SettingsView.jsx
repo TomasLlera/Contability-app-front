@@ -1,15 +1,132 @@
 import { useState, useEffect } from 'react';
-import { appConfigApi, usersApi, getErrorMsg } from '../api';
+import { appConfigApi, usersApi, auditApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History } from 'lucide-react';
 
 const SECCIONES = [
-  { key: 'alertas',  label: 'Alertas',   icon: Bell,      ready: true },
-  { key: 'usuarios', label: 'Usuarios',  icon: Users,     ready: true },
-  { key: 'idioma',   label: 'Idioma',    icon: Globe,     ready: false },
-  { key: 'moneda',   label: 'Moneda',    icon: DollarSign, ready: false },
-  { key: 'negocio',  label: 'Negocio',   icon: Building2, ready: false },
+  { key: 'alertas',   label: 'Alertas',    icon: Bell,       ready: true },
+  { key: 'usuarios',  label: 'Usuarios',   icon: Users,      ready: true },
+  { key: 'auditoria', label: 'Auditoría',  icon: History,    ready: true },
+  { key: 'idioma',    label: 'Idioma',     icon: Globe,      ready: false },
+  { key: 'moneda',    label: 'Moneda',     icon: DollarSign, ready: false },
+  { key: 'negocio',   label: 'Negocio',    icon: Building2,  ready: false },
 ];
+
+function AuditoriaSection() {
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [filtroRecurso, setFiltroRecurso] = useState('');
+  const [filtroUsuario, setFiltroUsuario] = useState('');
+  const limit = 25;
+
+  const cargar = async (p = page) => {
+    setLoading(true);
+    try {
+      const params = { page: p, limit };
+      if (filtroRecurso) params.recurso = filtroRecurso;
+      if (filtroUsuario) params.usuario = filtroUsuario;
+      const res = await auditApi.list(params);
+      setItems(res.items || []);
+      setTotal(res.total || 0);
+      setPage(p);
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { cargar(1); }, []); // eslint-disable-line
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const accionColor = (a) => ({
+    create: 'text-green-600 dark:text-green-400',
+    update: 'text-blue-600 dark:text-blue-400',
+    delete: 'text-red-600 dark:text-red-400',
+    login: 'text-slate-500 dark:text-slate-400',
+    login_failed: 'text-orange-600 dark:text-orange-400',
+  }[a] || 'text-slate-500');
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Auditoría</h2>
+        <p className="text-xs text-slate-400">Historial de cambios en el sistema ({total} registros)</p>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Filtrar por recurso (ej: movimiento)"
+          value={filtroRecurso}
+          onChange={e => setFiltroRecurso(e.target.value)}
+          className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <input
+          type="text"
+          placeholder="Usuario"
+          value={filtroUsuario}
+          onChange={e => setFiltroUsuario(e.target.value)}
+          className="w-40 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button onClick={() => cargar(1)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+          Filtrar
+        </button>
+      </div>
+
+      <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <div className="max-h-125 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0">
+              <tr className="text-xs text-slate-500 dark:text-slate-400 uppercase">
+                <th className="text-left px-3 py-2 font-medium">Fecha</th>
+                <th className="text-left px-3 py-2 font-medium">Usuario</th>
+                <th className="text-left px-3 py-2 font-medium">Acción</th>
+                <th className="text-left px-3 py-2 font-medium">Recurso</th>
+                <th className="text-left px-3 py-2 font-medium">ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {loading ? (
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Cargando...</td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Sin registros</td></tr>
+              ) : items.map(it => (
+                <tr key={it._id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                  <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    {new Date(it.fecha).toLocaleString('es-AR')}
+                  </td>
+                  <td className="px-3 py-1.5 text-slate-700 dark:text-slate-200">{it.usuario}</td>
+                  <td className={`px-3 py-1.5 font-medium ${accionColor(it.accion)}`}>{it.accion}</td>
+                  <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">{it.recurso}</td>
+                  <td className="px-3 py-1.5 text-slate-400 font-mono text-xs">{it.recurso_id ?? '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <span>Página {page} de {totalPages}</span>
+        <div className="flex gap-1">
+          <button
+            disabled={page <= 1 || loading}
+            onClick={() => cargar(page - 1)}
+            className="px-3 py-1 border border-slate-200 dark:border-slate-600 rounded disabled:opacity-50 hover:bg-slate-100 dark:hover:bg-slate-700"
+          >Anterior</button>
+          <button
+            disabled={page >= totalPages || loading}
+            onClick={() => cargar(page + 1)}
+            className="px-3 py-1 border border-slate-200 dark:border-slate-600 rounded disabled:opacity-50 hover:bg-slate-100 dark:hover:bg-slate-700"
+          >Siguiente</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Proximamente({ label }) {
   return (
@@ -293,6 +410,7 @@ export default function SettingsView() {
         <div className="flex-1 p-6">
           {activa?.key === 'alertas' ? <AlertasSection />
             : activa?.key === 'usuarios' ? <UsuariosSection />
+            : activa?.key === 'auditoria' ? <AuditoriaSection />
             : <Proximamente label={activa?.label} />
           }
         </div>

@@ -246,6 +246,10 @@ export const appConfigApi = {
   testEmail: () => api.post('/config/test-email').then(r => r.data),
 };
 
+export const auditApi = {
+  list: (params = {}) => api.get('/audit', { params }).then(r => r.data),
+};
+
 export const cajaApi = {
   getByFecha: (fecha) => api.get('/caja', { params: { fecha } }).then(r => r.data),
   getRango: (desde, hasta) => api.get('/caja/rango', { params: { desde, hasta } }).then(r => r.data),
