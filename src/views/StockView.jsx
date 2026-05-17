@@ -131,9 +131,11 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
 function ProductoForm({ rubros, inicial, onSave, onCancel }) {
   const [form, setForm] = useState({
     nombre: inicial?.nombre || '',
+    codigo_barra: inicial?.codigo_barra || '',
     categoria: inicial?.categoria || '',
     unidad: inicial?.unidad || 'unidad',
     precio_costo: inicial?.precio_costo || '',
+    iva: inicial?.iva ?? '',
     precio_venta: inicial?.precio_venta || '',
     stock_actual: inicial?.stock_actual ?? '',
     stock_minimo: inicial?.stock_minimo || '',
@@ -143,38 +145,56 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
   const [subrubroName, setSubrubroName] = useState(inicial?.subrubro_nombre || null);
   const [margen, setMargen] = useState(() => {
     const c = Number(inicial?.precio_costo);
+    const ivaVal = Number(inicial?.iva || 0);
     const v = Number(inicial?.precio_venta);
-    if (c > 0 && v > 0) return String(Math.round(((v / c) - 1) * 100));
+    const pci = c > 0 ? c * (1 + ivaVal / 100) : 0;
+    if (pci > 0 && v > 0) return String(Math.round(((v / pci) - 1) * 100));
     return '';
   });
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const calcPCI = (costo, iva) => costo > 0 ? Math.round(costo * (1 + iva / 100)) : 0;
+
   const handleCostoChange = (v) => {
     set('precio_costo', v);
     const costo = Number(v);
-    if (costo > 0 && margen !== '') {
-      set('precio_venta', String(Math.round(costo * (1 + Number(margen) / 100))));
+    const iva = Number(form.iva || 0);
+    const pci = calcPCI(costo, iva);
+    if (pci > 0 && margen !== '') {
+      set('precio_venta', String(Math.round(pci * (1 + Number(margen) / 100))));
+    }
+  };
+
+  const handleIvaChange = (v) => {
+    set('iva', v);
+    const costo = Number(form.precio_costo);
+    const iva = Number(v || 0);
+    const pci = calcPCI(costo, iva);
+    if (pci > 0 && margen !== '') {
+      set('precio_venta', String(Math.round(pci * (1 + Number(margen) / 100))));
     }
   };
 
   const handleMargenChange = (v) => {
     setMargen(v);
     const costo = Number(form.precio_costo);
-    if (costo > 0 && v !== '') {
-      set('precio_venta', String(Math.round(costo * (1 + Number(v) / 100))));
+    const iva = Number(form.iva || 0);
+    const pci = calcPCI(costo, iva);
+    if (pci > 0 && v !== '') {
+      set('precio_venta', String(Math.round(pci * (1 + Number(v) / 100))));
     }
   };
 
-  const handleVentaChange = (v) => {
+  const handlePrecioFinalChange = (v) => {
     set('precio_venta', v);
-    const costo = Number(form.precio_costo);
-    const venta = Number(v);
-    if (costo > 0 && venta > 0) {
-      setMargen(String(Math.round(((venta / costo) - 1) * 100)));
-    } else {
-      setMargen('');
+    const pf = Number(v);
+    const iva = Number(form.iva || 0);
+    const g = Number(margen || 0);
+    if (pf > 0) {
+      const divisor = (1 + iva / 100) * (1 + g / 100);
+      set('precio_costo', divisor > 0 ? String(Math.round(pf / divisor)) : String(pf));
     }
   };
 
@@ -187,22 +207,42 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
 
   return (
     <div className="space-y-4">
+      {/* Nombre | Código de barra */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className={labelCls}>Nombre *</label>
           <input className={inputCls} value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Cemento Portland" />
         </div>
         <div>
-          <label className={labelCls}>Categoría</label>
-          <input className={inputCls} value={form.categoria} onChange={e => set('categoria', e.target.value)} placeholder="Ej: Construcción" />
+          <label className={labelCls}>Código de barra</label>
+          <input className={inputCls} value={form.codigo_barra} onChange={e => set('codigo_barra', e.target.value)} placeholder="Ej: 7790001234567" />
         </div>
+      </div>
+
+      {/* Subrubro */}
+      <div>
+        <label className={labelCls}>Subrubro <span className="font-normal text-slate-400">(opcional)</span></label>
+        <SubrubroSelector
+          value={form.subrubro_id}
+          valueName={subrubroName}
+          onChange={(id, name) => { set('subrubro_id', id); setSubrubroName(name); }}
+          rubros={rubros}
+        />
+      </div>
+
+      {/* Stock */}
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={labelCls}>Unidad</label>
-          <select className={inputCls} value={form.unidad} onChange={e => set('unidad', e.target.value)}>
-            {UNIDADES.map(u => (
-              <option key={u.value} value={u.value}>{u.label}</option>
-            ))}
-          </select>
+          <label className={labelCls}>{inicial ? 'Stock actual' : 'Stock inicial'}</label>
+          <input
+            className={inputCls + (inicial ? ' bg-slate-100 dark:bg-slate-600 cursor-not-allowed text-slate-500 dark:text-slate-300' : '')}
+            type="number"
+            min="0"
+            readOnly={!!inicial}
+            value={form.stock_actual}
+            onChange={e => !inicial && set('stock_actual', e.target.value)}
+            placeholder="0"
+          />
         </div>
         <div>
           <label className={labelCls}>Stock mínimo</label>
@@ -210,57 +250,59 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Precios con margen */}
+      {/* Precios */}
       <div className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 space-y-3">
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Precios</p>
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className={labelCls}>Costo</label>
-            <input className={inputCls} type="number" min="0" value={form.precio_costo} onChange={e => handleCostoChange(e.target.value)} placeholder="0" />
-          </div>
-          <div>
-            <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-              <Percent size={11} /> Ganancia
-            </label>
-            <div className="relative">
-              <input
-                className={inputCls + ' pr-6'}
-                type="number"
-                min="0"
-                value={margen}
-                onChange={e => handleMargenChange(e.target.value)}
-                placeholder="0"
-              />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>Venta</label>
-            <input className={inputCls} type="number" min="0" value={form.precio_venta} onChange={e => handleVentaChange(e.target.value)} placeholder="0" />
-          </div>
-        </div>
-        {Number(form.precio_costo) > 0 && Number(form.precio_venta) > 0 && (
-          <p className="text-xs text-slate-400">
-            Ganancia: <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmt(Number(form.precio_venta) - Number(form.precio_costo))}</span> por unidad
-          </p>
-        )}
-      </div>
-
-      {!inicial && (
-        <div>
-          <label className={labelCls}>Stock inicial</label>
-          <input className={inputCls} type="number" min="0" value={form.stock_actual} onChange={e => set('stock_actual', e.target.value)} placeholder="0" />
-        </div>
-      )}
-
-      <div>
-        <label className={labelCls}>Vincular a subrubro <span className="font-normal text-slate-400">(opcional)</span></label>
-        <SubrubroSelector
-          value={form.subrubro_id}
-          valueName={subrubroName}
-          onChange={(id, name) => { set('subrubro_id', id); setSubrubroName(name); }}
-          rubros={rubros}
-        />
+        {(() => {
+          const costo = Number(form.precio_costo);
+          const iva = Number(form.iva || 0);
+          const precioConIva = costo > 0 ? Math.round(costo * (1 + iva / 100)) : 0;
+          const precioFinal = Number(form.precio_venta);
+          const readonlyCls = inputCls + ' bg-slate-100 dark:bg-slate-600 cursor-not-allowed text-slate-500 dark:text-slate-300';
+          return (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className={labelCls}>Costo</label>
+                  <input className={inputCls} type="number" min="0" value={form.precio_costo} onChange={e => handleCostoChange(e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    <Percent size={11} /> IVA
+                  </label>
+                  <div className="relative">
+                    <input className={inputCls + ' pr-6'} type="number" min="0" value={form.iva} onChange={e => handleIvaChange(e.target.value)} placeholder="0" />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Costo + IVA</label>
+                  <input className={readonlyCls} type="text" readOnly value={costo > 0 ? fmt(precioConIva) : ''} placeholder="—" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    <Percent size={11} /> Ganancia
+                  </label>
+                  <div className="relative">
+                    <input className={inputCls + ' pr-6'} type="number" min="0" value={margen} onChange={e => handleMargenChange(e.target.value)} placeholder="0" />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Precio final</label>
+                  <input className={inputCls} type="number" min="0" value={form.precio_venta} onChange={e => handlePrecioFinalChange(e.target.value)} placeholder="0" />
+                </div>
+              </div>
+              {precioConIva > 0 && precioFinal > 0 && (
+                <p className="text-xs text-slate-400">
+                  Ganancia: <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmt(precioFinal - precioConIva)}</span> por unidad
+                </p>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       <div className="flex gap-2 pt-2">
@@ -395,9 +437,8 @@ function PreciosTab({ productos, onActualizar }) {
             <label className={labelCls}>Aplicar a</label>
             <select value={ajusteCampo} onChange={e => setAjusteCampo(e.target.value)}
               className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="venta">Precio venta</option>
-              <option value="costo">Precio costo</option>
-              <option value="ambos">Ambos</option>
+              <option value="costo">Costo (recalcula precio final)</option>
+              <option value="venta">Precio final</option>
             </select>
           </div>
           <button
@@ -425,7 +466,7 @@ function PreciosTab({ productos, onActualizar }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Producto</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide hidden sm:table-cell">Subrubro / Cat.</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Costo</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Venta</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Precio final</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -537,6 +578,7 @@ export default function StockView({ role }) {
   const [movModal, setMovModal] = useState(null);
   const [historialId, setHistorialId] = useState(null);
   const [historial, setHistorial] = useState([]);
+  const [historialSearch, setHistorialSearch] = useState('');
   const [formKey, setFormKey] = useState(0);
   const [importing, setImporting] = useState(false);
   const importRef = useRef(null);
@@ -768,54 +810,82 @@ export default function StockView({ role }) {
       )}
 
       {/* Tab: Historial */}
-      {tab === 'historial' && (
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <select
-              value={historialId || ''}
-              onChange={e => e.target.value ? openHistorial({ id: Number(e.target.value) }) : setHistorialId(null)}
-              className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Seleccionar producto...</option>
-              {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-          </div>
-          {historialId && historial.length > 0 ? (
+      {tab === 'historial' && (() => {
+        const filtrados = productos.filter(p =>
+          !historialSearch.trim() || p.nombre.toLowerCase().includes(historialSearch.toLowerCase())
+        );
+        const selNombre = productos.find(p => p.id === historialId)?.nombre;
+        return (
+          <div className="space-y-3">
+            {/* Buscador + lista */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fecha</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tipo</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Cantidad</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Observación</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {historial.map(m => (
-                    <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{m.fecha}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${m.tipo === 'entrada' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : m.tipo === 'salida' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'}`}>
-                          {m.tipo}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-3 text-right font-semibold ${m.tipo === 'entrada' ? 'text-emerald-600' : m.tipo === 'salida' ? 'text-red-600' : 'text-blue-600'}`}>
-                        {m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : '='}{fmtNum(m.cantidad)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{m.observacion || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="p-2 border-b border-slate-100 dark:border-slate-700">
+                <input
+                  className={inputCls}
+                  placeholder="Buscar producto..."
+                  value={historialSearch}
+                  onChange={e => setHistorialSearch(e.target.value)}
+                />
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: '220px' }}>
+                {filtrados.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-slate-400">Sin resultados</p>
+                ) : filtrados.map(p => (
+                  <div
+                    key={p.id}
+                    onClick={() => openHistorial(p)}
+                    className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors text-sm border-b border-slate-50 dark:border-slate-700/50 last:border-0 ${historialId === p.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}`}
+                  >
+                    <span className="truncate">{p.nombre}</span>
+                    <span className="text-xs text-slate-400 shrink-0 ml-3">Stock: {fmtNum(p.stock_actual)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : historialId ? (
-            <div className="text-center py-12 text-slate-400">Sin movimientos registrados</div>
-          ) : (
-            <div className="text-center py-12 text-slate-400">Seleccioná un producto para ver su historial</div>
-          )}
-        </div>
-      )}
+
+            {/* Tabla de movimientos */}
+            {historialId && (
+              <>
+                {selNombre && (
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300 px-1">{selNombre}</p>
+                )}
+                {historial.length > 0 ? (
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fecha</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tipo</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Cantidad</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Observación</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                        {historial.map(m => (
+                          <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{m.fecha}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${m.tipo === 'entrada' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : m.tipo === 'salida' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'}`}>
+                                {m.tipo}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-3 text-right font-semibold ${m.tipo === 'entrada' ? 'text-emerald-600' : m.tipo === 'salida' ? 'text-red-600' : 'text-blue-600'}`}>
+                              {m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : '='}{fmtNum(m.cantidad)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{m.observacion || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-slate-400 text-sm">Sin movimientos registrados</div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {movModal && (
         <MovimientoModal
