@@ -482,8 +482,9 @@ function SugeridoRow({ s, onConfirmar, onDescartar }) {
   );
 }
 
-function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, vencimientos, labelDisponible }) {
+function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfirmar = 0, vencimientos, labelDisponible }) {
   const restante = disponible - gastos;
+  const restanteSiConfirma = disponible - gastos - sinConfirmar;
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2">
       <div className="flex items-center gap-2 mb-3">
@@ -498,10 +499,22 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, vencimien
         <div className="flex justify-between text-slate-600 dark:text-slate-300">
           <span>Gastos</span><span className="font-semibold text-red-500">{fmt(gastos)}</span>
         </div>
+        {sinConfirmar > 0 && (
+          <div className="flex justify-between text-slate-600 dark:text-slate-300">
+            <span>Sin confirmar</span>
+            <span className="font-semibold text-amber-500">{fmt(sinConfirmar)}</span>
+          </div>
+        )}
         <div className="border-t border-slate-100 dark:border-slate-700 pt-1.5 flex justify-between font-bold">
           <span className="text-slate-700 dark:text-slate-200">Resta</span>
           <span className={restante >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}>{fmt(restante)}</span>
         </div>
+        {sinConfirmar > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500 dark:text-slate-400">Si confirmás todo</span>
+            <span className={`font-semibold ${restanteSiConfirma >= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-red-500'}`}>{fmt(restanteSiConfirma)}</span>
+          </div>
+        )}
       </div>
       {vencimientos?.length > 0 && (
         <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
@@ -815,6 +828,8 @@ export default function CajaView({ rubros = [] }) {
   // Solo los gastos confirmados (confirmado !== false) descuentan de la caja
   const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo'       && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
   const gastosTrans = gastos.filter(m => m.metodo === 'transferencia'  && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
+  const sinConfirmarEfvo  = gastos.filter(m => m.metodo === 'efectivo'      && m.confirmado === false).reduce((s,m) => s+m.monto,0);
+  const sinConfirmarTrans = gastos.filter(m => m.metodo === 'transferencia' && m.confirmado === false).reduce((s,m) => s+m.monto,0);
   const vencEfvo    = vencimientos.filter(v => v.metodo !== 'transferencia');
   const vencTrans   = vencimientos.filter(v => v.metodo === 'transferencia');
 
@@ -846,11 +861,11 @@ export default function CajaView({ rubros = [] }) {
             <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline block mx-auto">Ir a hoy</button>
           )}
         </div>
-        <button onClick={() => setFecha(addDays(fecha, 1))} disabled={fecha >= todayStr()}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30 shrink-0">
+        <button onClick={() => setFecha(addDays(fecha, 1))}
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
           <ChevronRight size={18} />
         </button>
-        <input ref={dateInputRef} type="date" value={fecha} max={todayStr()}
+        <input ref={dateInputRef} type="date" value={fecha}
           onChange={e => setFecha(e.target.value)}
           className="sr-only" />
         <button onClick={() => setShowConfig(true)}
@@ -933,7 +948,7 @@ export default function CajaView({ rubros = [] }) {
                   </span>
                 ) : (
                   <span className="text-xs text-slate-400">
-                    {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy para ver el ingreso' : 'Sin datos de cuenta'}
+                    {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy.' : 'Sin datos de cuenta'}
                   </span>
                 )}
               </div>
@@ -1030,9 +1045,9 @@ export default function CajaView({ rubros = [] }) {
       {/* Resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600"
-          disponible={disponibleEfvo} gastos={gastosEfvo} vencimientos={vencEfvo} />
+          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
         <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600"
-          disponible={disponibleTrans} gastos={gastosTrans} vencimientos={vencTrans}
+          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
       </div>
 
