@@ -807,10 +807,10 @@ export default function CajaView({ rubros = [] }) {
     + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
     + ingresosExtra.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
 
-  const disponibleTrans = ingresoTransDia !== null
-    ? ingresoTransDia
-    : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
-      + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+  const disponibleTrans = saldoCuentaHoy !== null
+  ? saldoCuentaHoy
+  : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
+    + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
 
   // Solo los gastos confirmados (confirmado !== false) descuentan de la caja
   const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo'       && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
