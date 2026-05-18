@@ -201,7 +201,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               {saldoMov && (
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700">
                   <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Banknote size={12} className="text-slate-400" /> Saldo inicial efectivo
+                    <Banknote size={12} className="text-slate-400" /> Saldo efectivo
                   </span>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(saldoMov.monto)}</span>
                 </div>
@@ -209,7 +209,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               {saldoCuentaMov && (
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700">
                   <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <ArrowLeftRight size={12} className="text-slate-400" /> Saldo en cuenta
+                    <ArrowLeftRight size={12} className="text-slate-400" /> Saldo transferencia
                   </span>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(saldoCuentaMov.monto)}</span>
                 </div>
@@ -235,9 +235,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 </div>
               )}
               {gastosPendientes.length > 0 && (
-                <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 mt-1">
-                  <span className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                    <Clock size={11} /> {gastosPendientes.length} sin confirmar
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Clock size={11} className="text-amber-500" /> {gastosPendientes.length} sin confirmar
                   </span>
                   <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{fmt(totalPendientes)}</span>
                 </div>
