@@ -359,8 +359,8 @@ export default function App() {
         <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
           <button
             onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); cargarVencCount(); }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeView === 'inicio' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              activeView === 'inicio' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
             <Home size={15} />
@@ -374,8 +374,8 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('graficas'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeView === 'graficas' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              activeView === 'graficas' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
             <BarChart2 size={15} />
@@ -384,8 +384,8 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('caja'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeView === 'caja' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              activeView === 'caja' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
             <ClipboardList size={15} />
@@ -394,8 +394,8 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('stock'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeView === 'stock' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              activeView === 'stock' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
             <Package size={15} />
@@ -404,8 +404,8 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('config'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeView === 'config' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              activeView === 'config' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
             <Settings size={15} />

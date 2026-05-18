@@ -33,15 +33,49 @@ function vencInfo(dias) {
   return { label: `${dias}d`, dot: 'bg-blue-400', row: 'border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400' };
 }
 
-function StatCard({ label, value, sub, iconBg, iconText, icon, urgent }) {
+function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick }) {
+  const isInteractive = typeof onClick === 'function';
   return (
-    <div className={`bg-white dark:bg-slate-800 border rounded-2xl p-4 hover:shadow-md transition-shadow ${urgent ? 'border-red-300 dark:border-red-700' : 'border-slate-200 dark:border-slate-700'}`}>
-      <div className={`w-9 h-9 ${iconBg} rounded-xl flex items-center justify-center ${iconText} mb-3`}>
+    <div
+      onClick={onClick}
+      className={`group relative bg-white dark:bg-slate-800/60 border rounded-2xl p-4
+                  transition-all duration-200
+                  hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgb(15_23_42/0.12)]
+                  dark:hover:shadow-[0_8px_24px_-8px_rgb(0_0_0/0.5)]
+                  ${isInteractive ? 'cursor-pointer' : ''}
+                  ${urgent
+                    ? 'border-red-300/80 dark:border-red-800 ring-1 ring-red-200 dark:ring-red-900/40'
+                    : 'border-slate-200 dark:border-slate-700/80'}`}
+    >
+      {urgent && (
+        <span className="absolute top-3 right-3 flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+        </span>
+      )}
+      <div className={`w-9 h-9 ${iconBg} rounded-xl flex items-center justify-center ${iconText} mb-3
+                       shadow-sm ring-1 ring-inset ring-black/3 dark:ring-white/4`}>
         {icon}
       </div>
-      <p className={`text-2xl font-bold ${urgent ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{value}</p>
+      <p className={`text-2xl font-bold tracking-tight ${urgent ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{value}</p>
       <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">{sub}</p>}
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+      <div className="skeleton w-1.5 h-1.5 rounded-full shrink-0" />
+      <div className="flex-1 space-y-1.5">
+        <div className="skeleton h-3 w-2/3" />
+        <div className="skeleton h-2.5 w-1/3" />
+      </div>
+      <div className="space-y-1.5 text-right">
+        <div className="skeleton h-3 w-16 ml-auto" />
+        <div className="skeleton h-2.5 w-10 ml-auto" />
+      </div>
     </div>
   );
 }
@@ -225,7 +259,11 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           </div>
 
           {loadingVenc ? (
-            <div className="py-8 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+            <div className="space-y-1.5">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
           ) : vencimientos.length === 0 ? (
             <div className="py-8 text-center">
               <TrendingUp size={28} className="mx-auto mb-2 text-green-300 dark:text-green-700" />
@@ -267,9 +305,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               const localRubros = rubros.filter(r => r.local_id === local.id);
               if (localRubros.length === 0) return null;
               return (
-                <div key={local.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                <div key={local.id} className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 transition-shadow hover:shadow-card-hover">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-base">{local.icon || '🏠'}</span>
+                    <span className="emoji text-base">{local.icon || '🏠'}</span>
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{local.nombre}</span>
                     <span className="ml-auto text-xs text-slate-400">{localRubros.length} rubro{localRubros.length !== 1 ? 's' : ''}</span>
                   </div>
@@ -277,8 +315,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                     {localRubros.map(rubro => (
                       <button key={rubro.id}
                         onClick={() => onNavigate?.(rubro, null)}
-                        className="flex items-center gap-1.5 text-xs bg-slate-50 dark:bg-slate-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-700 rounded-lg px-2.5 py-1.5 transition-colors">
-                        <span>{getRubroIcon(rubro)}</span>
+                        className="press flex items-center gap-1.5 text-xs bg-slate-50 dark:bg-slate-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-700 rounded-lg px-2.5 py-1.5">
+                        <span className="emoji">{getRubroIcon(rubro)}</span>
                         <span>{rubro.nombre}</span>
                         {rubroStats[rubro.id] > 0 && (
                           <span className="text-slate-400 dark:text-slate-500 text-xs">{rubroStats[rubro.id]}</span>
