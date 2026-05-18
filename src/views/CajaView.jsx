@@ -117,35 +117,15 @@ function CampoMonto({ label, value, onChange, color = 'text-slate-800 dark:text-
 }
 
 // ── Panel de recaudación diaria (contenido del modal) ──────────────────────
-function RecaudacionPanel({ fecha, config, gastosConfirmados }) {
-  const [data, setData]           = useState({ qr: 0, debito: 0, credito: 0, prepagas: 0 });
-  const [historico, setHistorico] = useState({});
-  const [loading, setLoading]     = useState(true);
-
+function RecaudacionPanel({ fecha, config, gastosConfirmados, data, historico, onSave }) {
   const ret_d = config.retencion_debito   ?? 0;
   const ret_c = config.retencion_credito  ?? 0;
   const ret_p = config.retencion_prepagas ?? 0;
 
-  const cargar = async () => {
-    setLoading(true);
-    try {
-      const desde = addDays(fecha, -15); // margen suficiente para 8 días hábiles
-      const items = await recaudacionApi.getRango(desde, fecha);
-      const map = {};
-      items.forEach(r => { map[r._id] = r; });
-      setHistorico(map);
-      setData(map[fecha] || { qr: 0, debito: 0, credito: 0, prepagas: 0 });
-    } catch {}
-    setLoading(false);
-  };
-
-  useEffect(() => { cargar(); }, [fecha]);
-
   const save = async (field, val) => {
     const nuevo = { ...data, [field]: val };
-    setData(nuevo);
-    setHistorico(prev => ({ ...prev, [fecha]: nuevo }));
-    try { await recaudacionApi.save(fecha, nuevo); } catch { /* silent */ }
+    onSave(nuevo);
+    try { await recaudacionApi.save(fecha, nuevo); } catch {}
   };
 
   // Fuentes de acreditación para hoy
@@ -164,8 +144,6 @@ function RecaudacionPanel({ fecha, config, gastosConfirmados }) {
   const totalFinal      = totalAcreditado - gastosConfirmados;
 
   const labelSrc = (days) => days.length === 0 ? '—' : days.map(d => formatFechaCorta(d)).join(' + ');
-
-  if (loading) return <p className="text-xs text-slate-400 py-4 text-center">Cargando...</p>;
 
   return (
     <div className="px-4 pb-4 space-y-4">
@@ -778,6 +756,10 @@ export default function CajaView({ rubros = [] }) {
   // Modal recaudación
   const [showRecaudacion, setShowRecaudacion] = useState(false);
 
+  // Datos de recaudación (levantados aquí para alimentar el cálculo de transferencias)
+  const [recaudacion, setRecaudacion]     = useState({ qr: 0, debito: 0, credito: 0, prepagas: 0 });
+  const [historicoRec, setHistoricoRec]   = useState({});
+
   // Acordeón de secciones
   const [abierto, setAbierto] = useState({ ingresos: true, empleados: true, gastos: true });
   const toggleAcordeon = (k) => setAbierto(prev => ({ ...prev, [k]: !prev[k] }));
@@ -879,7 +861,23 @@ export default function CajaView({ rubros = [] }) {
     } catch {}
   };
 
-  useEffect(() => { cargar(); }, [fecha]);
+  const cargarRecaudacion = async () => {
+    try {
+      const desde = addDays(fecha, -15);
+      const items = await recaudacionApi.getRango(desde, fecha);
+      const map = {};
+      items.forEach(r => { map[r._id] = r; });
+      setHistoricoRec(map);
+      setRecaudacion(map[fecha] || { qr: 0, debito: 0, credito: 0, prepagas: 0 });
+    } catch {}
+  };
+
+  const handleSaveRecaudacion = (nuevo) => {
+    setRecaudacion(nuevo);
+    setHistoricoRec(prev => ({ ...prev, [fecha]: nuevo }));
+  };
+
+  useEffect(() => { cargar(); cargarRecaudacion(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
   useEffect(() => { cargarSugeridos(); }, [fecha, config.rubros_sync]);
 
@@ -1050,10 +1048,22 @@ export default function CajaView({ rubros = [] }) {
     + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
     + ingresosExtra.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
 
-  const disponibleTrans = saldoCuentaHoy !== null
-  ? saldoCuentaHoy
-  : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
-    + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+  // Acreditación de tarjetas del día (QR instantáneo + débito/crédito/prepagas neto de retenciones)
+  const recDebitoSrcs  = getDebitoSourceDays(fecha);
+  const recCreditSrcs  = getCreditSourceDays(fecha);
+  const recDebitoNeto  = recDebitoSrcs.reduce((s, d) => s + (historicoRec[d]?.debito   || 0), 0) * (1 - (config.retencion_debito   ?? 0) / 100);
+  const recPrepagasNeto= recDebitoSrcs.reduce((s, d) => s + (historicoRec[d]?.prepagas || 0), 0) * (1 - (config.retencion_prepagas ?? 0) / 100);
+  const recCreditoNeto = recCreditSrcs.reduce((s, d) => s + (historicoRec[d]?.credito  || 0), 0) * (1 - (config.retencion_credito  ?? 0) / 100);
+  const totalAcreditadoTarjetas = recaudacion.qr + recDebitoNeto + recPrepagasNeto + recCreditoNeto;
+
+  // Saldo en cuenta efectivo: base manual + tarjetas acreditadas hoy
+  const hayDatosCuenta     = saldoCuentaHoy !== null || totalAcreditadoTarjetas > 0;
+  const saldoCuentaEfectivo = (saldoCuentaHoy ?? 0) + totalAcreditadoTarjetas;
+
+  const disponibleTrans = hayDatosCuenta
+    ? saldoCuentaEfectivo
+    : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
+      + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
 
   // Solo los gastos confirmados (confirmado !== false) descuentan de la caja
   const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo'       && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
@@ -1179,19 +1189,23 @@ export default function CajaView({ rubros = [] }) {
             </div>
           ) : (
             <div className="mt-1">
-              <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
-                {saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—'}
+              <p className={`text-2xl font-bold ${hayDatosCuenta ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+                {hayDatosCuenta ? fmt(saldoCuentaEfectivo) : '—'}
               </p>
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>
-                {ingresoTransDia !== null ? (
+                {totalAcreditadoTarjetas > 0 && (
+                  <span className="text-xs text-blue-500 font-medium">
+                    {saldoCuentaHoy !== null ? `+ ${fmt(totalAcreditadoTarjetas)} tarjetas` : 'Tarjetas del día'}
+                  </span>
+                )}
+                {ingresoTransDia !== null && (
                   <span className={`text-xs font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-                    {ingresoTransDia >= 0 ? '↑' : '↓'} {fmt(Math.abs(ingresoTransDia))} ingreso del día bancario
+                    {ingresoTransDia >= 0 ? '↑' : '↓'} {fmt(Math.abs(ingresoTransDia))} bancario
                   </span>
-                ) : (
-                  <span className="text-xs text-slate-400">
-                    {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy.' : 'Sin datos de cuenta'}
-                  </span>
+                )}
+                {!hayDatosCuenta && (
+                  <span className="text-xs text-slate-400">Sin datos de cuenta</span>
                 )}
               </div>
             </div>
@@ -1350,6 +1364,9 @@ export default function CajaView({ rubros = [] }) {
               fecha={fecha}
               config={config}
               gastosConfirmados={gastos.filter(m => m.confirmado !== false).reduce((s, m) => s + m.monto, 0)}
+              data={recaudacion}
+              historico={historicoRec}
+              onSave={handleSaveRecaudacion}
             />
           </div>
         </div>
