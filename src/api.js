@@ -260,4 +260,10 @@ export const cajaApi = {
   saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
   getVencimientosSync: (fecha) => api.get('/caja/vencimientos-sync', { params: { fecha } }).then(r => r.data),
   getFacturasPendientes: (subrubro_id) => api.get('/caja/facturas-pendientes', { params: { subrubro_id } }).then(r => r.data),
+  getPendientesAnteriores: (hasta) => api.get('/caja/pendientes', { params: { hasta } }).then(r => r.data),
+};
+
+export const recaudacionApi = {
+  getRango: (desde, hasta) => api.get('/recaudacion/rango', { params: { desde, hasta } }).then(r => r.data),
+  save: (fecha, data) => api.put(`/recaudacion/${fecha}`, data).then(r => r.data),
 };

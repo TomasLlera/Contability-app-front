@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { cajaApi, movimientosApi, subrubrosApi } from '../api';
+import { cajaApi, movimientosApi, subrubrosApi, recaudacionApi } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
@@ -23,6 +23,38 @@ const formatFechaCorta = (dateStr) => {
   if (!dateStr) return '';
   const [, m, d] = dateStr.split('-');
   return `${d}/${m}`;
+};
+
+const addBusinessDays = (dateStr, n) => {
+  const d = new Date(dateStr + 'T00:00:00');
+  let count = 0;
+  const abs = Math.abs(n), dir = n > 0 ? 1 : -1;
+  while (count < abs) {
+    d.setDate(d.getDate() + dir);
+    if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
+  return d.toISOString().split('T')[0];
+};
+
+// Devuelve qué fechas pasadas acreditan débito/prepagas en targetFecha
+const getDebitoSourceDays = (fecha) => {
+  const dow = new Date(fecha + 'T00:00:00').getDay();
+  if (dow === 0 || dow === 6) return [];
+  if (dow === 1) return [addDays(fecha, -3)];                           // lunes  → viernes
+  if (dow === 2) return [addDays(fecha, -3), addDays(fecha, -2), addDays(fecha, -1)]; // martes → sáb + dom + lun
+  return [addDays(fecha, -1)];                                          // mié-vie → ayer
+};
+
+// Devuelve qué fechas pasadas acreditan crédito en targetFecha (8vo día hábil)
+const getCreditSourceDays = (fecha) => {
+  const dow = new Date(fecha + 'T00:00:00').getDay();
+  if (dow === 0 || dow === 6) return [];
+  const src = addBusinessDays(fecha, -8);
+  // Si la fuente cae en viernes, también incluye el sáb y dom siguientes
+  // (todos tienen el mismo +8 días hábiles)
+  if (new Date(src + 'T00:00:00').getDay() === 5)
+    return [src, addDays(src, 1), addDays(src, 2)];
+  return [src];
 };
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const selectCls = inputCls;
@@ -52,6 +84,154 @@ const InfoTooltip = ({ text }) => {
   );
 };
 
+// ── Campo numérico inline editable ─────────────────────────────────────────
+function CampoMonto({ label, value, onChange, color = 'text-slate-800 dark:text-slate-100' }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const ref = useRef(null);
+
+  const open = () => { setDraft(value || ''); setEditing(true); };
+  const commit = () => {
+    setEditing(false);
+    const n = Number(draft);
+    if (!isNaN(n)) onChange(n);
+  };
+
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-sm text-slate-600 dark:text-slate-300">{label}</span>
+      {editing ? (
+        <input
+          ref={ref} type="number" min="0" step="any" autoFocus
+          value={draft} onChange={e => setDraft(e.target.value)}
+          onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+          className="w-32 text-right border border-blue-400 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      ) : (
+        <button onClick={open} className={`text-sm font-semibold ${value ? color : 'text-slate-400'} hover:opacity-70 transition-opacity`}>
+          {value ? fmt(value) : '— Ingresar'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Panel de recaudación diaria (contenido del modal) ──────────────────────
+function RecaudacionPanel({ fecha, config, gastosConfirmados }) {
+  const [data, setData]           = useState({ qr: 0, debito: 0, credito: 0, prepagas: 0 });
+  const [historico, setHistorico] = useState({});
+  const [loading, setLoading]     = useState(true);
+
+  const ret_d = config.retencion_debito   ?? 0;
+  const ret_c = config.retencion_credito  ?? 0;
+  const ret_p = config.retencion_prepagas ?? 0;
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const desde = addDays(fecha, -15); // margen suficiente para 8 días hábiles
+      const items = await recaudacionApi.getRango(desde, fecha);
+      const map = {};
+      items.forEach(r => { map[r._id] = r; });
+      setHistorico(map);
+      setData(map[fecha] || { qr: 0, debito: 0, credito: 0, prepagas: 0 });
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { cargar(); }, [fecha]);
+
+  const save = async (field, val) => {
+    const nuevo = { ...data, [field]: val };
+    setData(nuevo);
+    setHistorico(prev => ({ ...prev, [fecha]: nuevo }));
+    try { await recaudacionApi.save(fecha, nuevo); } catch { /* silent */ }
+  };
+
+  // Fuentes de acreditación para hoy
+  const debitoSrcs  = getDebitoSourceDays(fecha);
+  const creditSrcs  = getCreditSourceDays(fecha);
+
+  const debitoBruto   = debitoSrcs.reduce((s, d) => s + (historico[d]?.debito   || 0), 0);
+  const prepagasBruto = debitoSrcs.reduce((s, d) => s + (historico[d]?.prepagas || 0), 0);
+  const creditoBruto  = creditSrcs.reduce((s, d) => s + (historico[d]?.credito  || 0), 0);
+
+  const debitoNeto   = debitoBruto   * (1 - ret_d / 100);
+  const prepagasNeto = prepagasBruto * (1 - ret_p / 100);
+  const creditoNeto  = creditoBruto  * (1 - ret_c / 100);
+
+  const totalAcreditado = data.qr + debitoNeto + prepagasNeto + creditoNeto;
+  const totalFinal      = totalAcreditado - gastosConfirmados;
+
+  const labelSrc = (days) => days.length === 0 ? '—' : days.map(d => formatFechaCorta(d)).join(' + ');
+
+  if (loading) return <p className="text-xs text-slate-400 py-4 text-center">Cargando...</p>;
+
+  return (
+    <div className="px-4 pb-4 space-y-4">
+      {/* ── Recaudado hoy ── */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Recaudado hoy</p>
+        <div className="bg-slate-50 dark:bg-slate-700/40 rounded-xl px-3 divide-y divide-slate-100 dark:divide-slate-700">
+          <CampoMonto label="QR" value={data.qr} onChange={v => save('qr', v)} color="text-blue-600" />
+          <CampoMonto label="Débito" value={data.debito} onChange={v => save('debito', v)} />
+          <CampoMonto label="Crédito" value={data.credito} onChange={v => save('credito', v)} />
+          <CampoMonto label="Prepagas" value={data.prepagas} onChange={v => save('prepagas', v)} />
+        </div>
+      </div>
+
+      {/* ── Acreditado hoy ── */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Acreditado hoy</p>
+        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl px-3 divide-y divide-green-100 dark:divide-green-900">
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-sm text-slate-600 dark:text-slate-300">QR <span className="text-xs text-slate-400">(hoy)</span></span>
+            <span className="text-sm font-semibold text-green-700 dark:text-green-400">{fmt(data.qr)}</span>
+          </div>
+          {[
+            ['Débito',   debitoNeto,   debitoBruto,   ret_d, debitoSrcs],
+            ['Prepagas', prepagasNeto, prepagasBruto, ret_p, debitoSrcs],
+            ['Crédito',  creditoNeto,  creditoBruto,  ret_c, creditSrcs],
+          ].map(([lbl, neto, bruto, ret, srcs]) => (
+            <div key={lbl} className="flex items-center justify-between py-1.5">
+              <div className="min-w-0">
+                <span className="text-sm text-slate-600 dark:text-slate-300">{lbl} </span>
+                <span className="text-xs text-slate-400">{labelSrc(srcs)}{ret > 0 ? ` − ${ret}%` : ''}</span>
+              </div>
+              <div className="text-right shrink-0 ml-2">
+                <span className="text-sm font-semibold text-green-700 dark:text-green-400">{fmt(neto)}</span>
+                {ret > 0 && bruto > 0 && <p className="text-xs text-slate-400">bruto {fmt(bruto)}</p>}
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Total acreditado</span>
+            <span className="text-base font-bold text-green-700 dark:text-green-400">{fmt(totalAcreditado)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Total final ── */}
+      <div className="bg-slate-100 dark:bg-slate-700 rounded-xl px-3 py-3 space-y-1.5">
+        <div className="flex justify-between text-sm text-slate-600 dark:text-slate-300">
+          <span>Acreditado</span>
+          <span className="font-medium text-green-600">+ {fmt(totalAcreditado)}</span>
+        </div>
+        <div className="flex justify-between text-sm text-slate-600 dark:text-slate-300">
+          <span>Gastos del día</span>
+          <span className="font-medium text-red-500">− {fmt(gastosConfirmados)}</span>
+        </div>
+        <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-600">
+          <span className="font-bold text-slate-800 dark:text-slate-100">Total final</span>
+          <span className={`text-lg font-bold ${totalFinal >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-500'}`}>
+            {fmt(totalFinal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Panel de configuración ──────────────────────────────────────────────────
 function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
   const [empleados, setEmpleados] = useState(config.empleados || []);
@@ -61,6 +241,9 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
   const [nuevoProvSub, setNuevoProvSub] = useState('');
   const [rubrosSync, setRubrosSync] = useState(config.rubros_sync || []);
   const [diasAnticipacion, setDiasAnticipacion] = useState(config.dias_anticipacion_caja ?? 3);
+  const [retDebito,   setRetDebito]   = useState(config.retencion_debito   ?? 0);
+  const [retCredito,  setRetCredito]  = useState(config.retencion_credito  ?? 0);
+  const [retPrepagas, setRetPrepagas] = useState(config.retencion_prepagas ?? 0);
 
   const addEmpleado = () => {
     if (!nuevoEmp.trim()) return;
@@ -88,7 +271,13 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
 
   const handleSave = async () => {
     try {
-      await onSave({ empleados, proveedores, rubros_sync: rubrosSync, dias_anticipacion_caja: Number(diasAnticipacion) });
+      await onSave({
+        empleados, proveedores, rubros_sync: rubrosSync,
+        dias_anticipacion_caja: Number(diasAnticipacion),
+        retencion_debito:   Number(retDebito),
+        retencion_credito:  Number(retCredito),
+        retencion_prepagas: Number(retPrepagas),
+      });
       onClose();
     } catch {
       // error ya mostrado por handleSaveConfig
@@ -184,6 +373,27 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
               <button onClick={addProveedor} disabled={!nuevoProv.trim()}
                 className="bg-red-500 text-white px-3 rounded-lg hover:bg-red-600 disabled:opacity-40"><Plus size={15} /></button>
             </div>
+          </div>
+        </div>
+
+        {/* Retenciones de tarjetas */}
+        <div className="mb-5">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+            <Banknote size={13} className="text-blue-500" /> Retenciones de tarjetas
+          </h3>
+          <p className="text-xs text-slate-400 mb-3">Porcentaje que descuenta el procesador al acreditar.</p>
+          <div className="space-y-2">
+            {[['Débito / Prepagas', retDebito, setRetDebito], ['Crédito', retCredito, setRetCredito], ['Prepagas (si difiere)', retPrepagas, setRetPrepagas]].map(([label, val, set]) => (
+              <div key={label} className="flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{label}</span>
+                <div className="flex items-center gap-1">
+                  <input type="number" min="0" max="100" step="0.01" value={val}
+                    onChange={e => set(e.target.value)}
+                    className="w-20 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <span className="text-sm text-slate-400">%</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -392,7 +602,7 @@ function MetodoBadge({ metodo }) {
     : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">Transf.</span>;
 }
 
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, dateBadge }) {
   const esPendiente  = m.tipo === 'gasto' && m.confirmado === false;
   const esConfirmado = m.tipo === 'gasto' && m.confirmado === true;
   const esGasto      = m.tipo === 'gasto';
@@ -409,6 +619,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
             {m.concepto}
           </p>
           {m.es_especial && <Star size={11} className="text-amber-500 shrink-0" />}
+          {dateBadge && <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shrink-0">{dateBadge}</span>}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <MetodoBadge metodo={m.metodo} />
@@ -561,6 +772,16 @@ export default function CajaView({ rubros = [] }) {
   // Vencimientos auto-sincronizados
   const [sugeridos, setSugeridos] = useState([]);
 
+  // Gastos pendientes (sin confirmar) de días anteriores
+  const [pendientesAnteriores, setPendientesAnteriores] = useState([]);
+
+  // Modal recaudación
+  const [showRecaudacion, setShowRecaudacion] = useState(false);
+
+  // Acordeón de secciones
+  const [abierto, setAbierto] = useState({ ingresos: true, empleados: true, gastos: true });
+  const toggleAcordeon = (k) => setAbierto(prev => ({ ...prev, [k]: !prev[k] }));
+
   const getDismissedKey = (f) => `caja_dismissed_${f}`;
   const getDismissed = (f) => {
     try { return JSON.parse(sessionStorage.getItem(getDismissedKey(f)) || '[]'); } catch { return []; }
@@ -572,6 +793,7 @@ export default function CajaView({ rubros = [] }) {
 
   const cargar = async () => {
     setLoading(true);
+    setPendientesAnteriores([]);
     try {
       const data = await cajaApi.getByFecha(fecha);
       setMovs(data);
@@ -618,7 +840,14 @@ export default function CajaView({ rubros = [] }) {
 
         setSaldoAutoCalculado(running);
       }
+
     } catch {}
+
+    try {
+      const anteriores = await cajaApi.getPendientesAnteriores(fecha);
+      setPendientesAnteriores(anteriores);
+    } catch {}
+
     setLoading(false);
   };
 
@@ -728,12 +957,13 @@ export default function CajaView({ rubros = [] }) {
   };
 
   const handleDelete = async (id) => {
-    const mov = movs.find(m => m.id === id);
+    const mov = movs.find(m => m.id === id) ?? pendientesAnteriores.find(m => m.id === id);
     if (mov?.pago_mov_id && mov?.confirmado === true) {
       try { await movimientosApi.delete(mov.pago_mov_id); } catch {}
     }
     await cajaApi.delete(id);
     setMovs(prev => prev.filter(m => m.id !== id));
+    setPendientesAnteriores(prev => prev.filter(m => m.id !== id));
     toast.success('Eliminado');
   };
 
@@ -874,6 +1104,18 @@ export default function CajaView({ rubros = [] }) {
         </button>
       </div>
 
+      {/* Recaudación diaria — botón compacto */}
+      <button
+        onClick={() => setShowRecaudacion(true)}
+        className="w-full flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Banknote size={15} className="text-blue-500" />
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Recaudación del día</span>
+        </div>
+        <ChevronRight size={15} className="text-slate-400" />
+      </button>
+
       {/* Saldos del día */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
@@ -976,70 +1218,104 @@ export default function CajaView({ rubros = [] }) {
         </div>
       )}
 
-      {/* Ingresos extra */}
+      {/* Ingresos extra — acordeón */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Plus size={14} className="text-amber-500" />
+          <button onClick={() => toggleAcordeon('ingresos')} className="flex items-center gap-2 flex-1 min-w-0">
+            <Plus size={14} className="text-amber-500 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ingresos extra</h3>
             {ingresosExtra.length > 0 && <span className="text-xs text-slate-400">{fmt(ingresosExtra.reduce((s,m) => s+m.monto,0))}</span>}
-          </div>
-          <button onClick={() => openForm('ingreso_extra')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
+            <ChevronLeft size={13} className={`text-slate-400 transition-transform ml-auto ${abierto.ingresos ? 'rotate-90' : '-rotate-90'}`} />
+          </button>
+          <button onClick={() => openForm('ingreso_extra')} className="text-xs text-blue-500 hover:underline flex items-center gap-1 ml-3 shrink-0"><Plus size={11} /> Agregar</button>
         </div>
-        {showForm && (tipoForm === 'ingreso_extra' || editingMov?.tipo === 'ingreso_extra') && (
-          <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'ingreso_extra'} /></div>
+        {abierto.ingresos && (
+          <>
+            {showForm && (tipoForm === 'ingreso_extra' || editingMov?.tipo === 'ingreso_extra') && (
+              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'ingreso_extra'} /></div>
+            )}
+            {ingresosExtra.map(m => (
+              <div key={m.id} className="mb-2">
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-amber-600" />}
+              </div>
+            ))}
+          </>
         )}
-        {ingresosExtra.map(m => (
-          <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-amber-600" />}
-          </div>
-        ))}
       </div>
 
-      {/* Empleados */}
+      {/* Empleados — acordeón */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Users size={14} className="text-green-600" />
+          <button onClick={() => toggleAcordeon('empleados')} className="flex items-center gap-2 flex-1 min-w-0">
+            <Users size={14} className="text-green-600 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Empleados</h3>
             {empleados.length > 0 && <span className="text-xs text-slate-400">{fmt(empleados.reduce((s,m) => s+m.monto,0))}</span>}
-          </div>
-          <button onClick={() => openForm('empleado')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
+            <ChevronLeft size={13} className={`text-slate-400 transition-transform ml-auto ${abierto.empleados ? 'rotate-90' : '-rotate-90'}`} />
+          </button>
+          <button onClick={() => openForm('empleado')} className="text-xs text-blue-500 hover:underline flex items-center gap-1 ml-3 shrink-0"><Plus size={11} /> Agregar</button>
         </div>
-        {showForm && (tipoForm === 'empleado' || editingMov?.tipo === 'empleado') && (
-          <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'} /></div>
+        {abierto.empleados && (
+          <>
+            {showForm && (tipoForm === 'empleado' || editingMov?.tipo === 'empleado') && (
+              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'} /></div>
+            )}
+            {empleados.length === 0 && !(showForm && tipoForm === 'empleado') && (
+              <p className="text-xs text-slate-400 py-2 text-center">Sin empleados cargados</p>
+            )}
+            {empleados.map(m => (
+              <div key={m.id} className="mb-2">
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-600" />}
+              </div>
+            ))}
+          </>
         )}
-        {empleados.length === 0 && !(showForm && tipoForm === 'empleado') && (
-          <p className="text-xs text-slate-400 py-2 text-center">Sin empleados cargados</p>
-        )}
-        {empleados.map(m => (
-          <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-600" />}
-          </div>
-        ))}
       </div>
 
-      {/* Gastos / Proveedores */}
+      {/* Gastos / Proveedores — acordeón */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <ShoppingCart size={14} className="text-red-500" />
+          <button onClick={() => toggleAcordeon('gastos')} className="flex items-center gap-2 flex-1 min-w-0">
+            <ShoppingCart size={14} className="text-red-500 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Gastos y proveedores</h3>
-            {gastos.length > 0 && <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
-          </div>
-          <button onClick={() => openForm('gasto')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
+            {(gastos.length > 0 || pendientesAnteriores.length > 0) && (
+              <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>
+            )}
+            {pendientesAnteriores.length > 0 && (
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full">{pendientesAnteriores.length} pendiente{pendientesAnteriores.length > 1 ? 's' : ''}</span>
+            )}
+            <ChevronLeft size={13} className={`text-slate-400 transition-transform ml-auto ${abierto.gastos ? 'rotate-90' : '-rotate-90'}`} />
+          </button>
+          <button onClick={() => openForm('gasto')} className="text-xs text-blue-500 hover:underline flex items-center gap-1 ml-3 shrink-0"><Plus size={11} /> Agregar</button>
         </div>
-        {showForm && (tipoForm === 'gasto' || editingMov?.tipo === 'gasto') && (
-          <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'gasto'} /></div>
+        {abierto.gastos && (
+          <>
+            {showForm && (tipoForm === 'gasto' || editingMov?.tipo === 'gasto') && (
+              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'gasto'} /></div>
+            )}
+            {pendientesAnteriores.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1.5 flex items-center gap-1">
+                  <Clock size={10} /> Pendientes de días anteriores
+                </p>
+                {pendientesAnteriores.map(m => (
+                  <div key={m.id} className="mb-2">
+                    {editingMov?.id === m.id && showForm ? null : (
+                      <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" dateBadge={formatFechaCorta(m.fecha)} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {gastos.length === 0 && pendientesAnteriores.length === 0 && !(showForm && tipoForm === 'gasto') && (
+              <p className="text-xs text-slate-400 py-2 text-center">Sin gastos cargados</p>
+            )}
+            {gastos.map(m => (
+              <div key={m.id} className="mb-2">
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" />}
+              </div>
+            ))}
+          </>
         )}
-        {gastos.length === 0 && !(showForm && tipoForm === 'gasto') && (
-          <p className="text-xs text-slate-400 py-2 text-center">Sin gastos cargados</p>
-        )}
-        {gastos.map(m => (
-          <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" />}
-          </div>
-        ))}
       </div>
 
       {/* Resumen */}
@@ -1053,6 +1329,30 @@ export default function CajaView({ rubros = [] }) {
 
       {showConfig && (
         <ConfigPanel config={config} rubros={allSubrubros} allRubros={rubros} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />
+      )}
+
+      {/* Modal de recaudación */}
+      {showRecaudacion && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          onClick={() => setShowRecaudacion(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto shadow-xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white dark:bg-slate-800 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700 z-10">
+              <div className="flex items-center gap-2">
+                <Banknote size={15} className="text-blue-500" />
+                <span className="font-semibold text-slate-800 dark:text-slate-100">Recaudación — {formatFecha(fecha)}</span>
+              </div>
+              <button onClick={() => setShowRecaudacion(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X size={18} />
+              </button>
+            </div>
+            <RecaudacionPanel
+              fecha={fecha}
+              config={config}
+              gastosConfirmados={gastos.filter(m => m.confirmado !== false).reduce((s, m) => s + m.monto, 0)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
