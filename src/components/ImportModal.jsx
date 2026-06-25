@@ -82,6 +82,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
   const [skipRows, setSkipRows] = useState(0);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [documento, setDocumento] = useState('factura');
   const inputRef = useRef();
   const wbRef = useRef(null);
   const savedConfigRef = useRef(null);
@@ -154,7 +155,7 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
     setError(null);
     try {
       await rubrosApi.saveImportConfig(rubro.id, colMapping, mode);
-      const res = await movimientosApi.importExcel(rubro.id, file, colMapping, mode, [...selectedSheets], skipRows, fechaDesde || null, fechaHasta || null);
+      const res = await movimientosApi.importExcel(rubro.id, file, colMapping, mode, [...selectedSheets], skipRows, fechaDesde || null, fechaHasta || null, documento);
       setResult(res);
       setStep('done');
     } catch (err) {
@@ -355,6 +356,21 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                   Necesitás asignar al menos: <strong>Fecha</strong> + <strong>Monto</strong> o <strong>Pago</strong>.
                 </p>
               )}
+
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Tipo de documento</p>
+                <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+                  <button type="button" onClick={() => setDocumento('factura')}
+                    className={`flex-1 py-2 transition-colors ${documento === 'factura' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                    Factura
+                  </button>
+                  <button type="button" onClick={() => setDocumento('remito')}
+                    className={`flex-1 py-2 transition-colors ${documento === 'remito' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                    Remito
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Todas las filas importadas se marcan con este tipo.</p>
+              </div>
 
               <div>
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Modo</p>

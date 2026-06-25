@@ -205,7 +205,7 @@ export const movimientosApi = {
     a.click();
     URL.revokeObjectURL(url);
   },
-  importExcel: (rubroId, file, mapping, mode = 'skip_duplicates', sheets = null, skipRows = 0, fechaDesde = null, fechaHasta = null) => {
+  importExcel: (rubroId, file, mapping, mode = 'skip_duplicates', sheets = null, skipRows = 0, fechaDesde = null, fechaHasta = null, documento = 'factura') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mapping', JSON.stringify(mapping));
@@ -214,6 +214,7 @@ export const movimientosApi = {
     if (sheets) formData.append('sheets', JSON.stringify(sheets));
     if (fechaDesde) formData.append('fechaDesde', fechaDesde);
     if (fechaHasta) formData.append('fechaHasta', fechaHasta);
+    formData.append('documento', documento);
     return api.post(`/movimientos/import/${rubroId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data);

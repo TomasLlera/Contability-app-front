@@ -317,6 +317,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide sticky left-0 z-10 bg-slate-50 dark:bg-slate-700/60">Fecha</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Doc.</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monto</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pago</th>
                 {camposNumericos.map(c => (
@@ -355,6 +356,20 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                         ? <span className="text-slate-600 dark:text-slate-300">{m.fecha}</span>
                         : <span className="text-amber-500 text-xs italic">Sin fecha</span>
                       }
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {esFactura && m.documento && (
+                        <span
+                          className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                            m.documento === 'remito'
+                              ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                          }`}
+                        >
+                          {m.documento === 'remito' ? 'Remito' : 'Factura'}
+                        </span>
+                      )}
                     </td>
 
                     <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">

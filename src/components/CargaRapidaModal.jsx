@@ -22,6 +22,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(today());
   const [metodoPago, setMetodoPago] = useState('efectivo');
+  const [documento, setDocumento] = useState('factura');
   const [saving, setSaving] = useState(false);
   const [loadingSubs, setLoadingSubs] = useState(false);
 
@@ -51,6 +52,8 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
         facturas_vinculadas_ids: [],
         // metodo_pago solo aplica al tipo 'pago'; backend lo rechaza para nota_credito/factura
         metodo_pago: tipo === 'pago' ? metodoPago : null,
+        // documento solo aplica al tipo 'factura'
+        documento: tipo === 'factura' ? documento : null,
       });
       toast.success('Movimiento guardado');
       onSaved?.();
@@ -104,6 +107,20 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
 
           {/* Fecha */}
           <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
+
+          {/* Documento — solo en Factura */}
+          {tipo === 'factura' && (
+            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+              <button type="button" onClick={() => setDocumento('factura')}
+                className={`flex-1 py-2 transition-colors ${documento === 'factura' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                Factura
+              </button>
+              <button type="button" onClick={() => setDocumento('remito')}
+                className={`flex-1 py-2 transition-colors ${documento === 'remito' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                Remito
+              </button>
+            </div>
+          )}
 
           {/* Método de pago — solo en Pago */}
           {tipo === 'pago' && (

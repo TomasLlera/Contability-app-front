@@ -26,6 +26,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const [conceptoDiferencia, setConceptoDiferencia] = useState('Diferencia');
   // Método de pago: solo aplica a pagos / notas de crédito
   const [metodoPago, setMetodoPago] = useState(movimiento?.metodo_pago ?? null);
+  // Tipo de documento: solo aplica a facturas. Default 'factura'.
+  const [documento, setDocumento] = useState(movimiento?.documento || 'factura');
 
   const setExtra = (nombre, val) => setCamposExtra(prev => ({ ...prev, [nombre]: val }));
 
@@ -105,6 +107,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         fecha_vencimiento: fechaVenc || null,
         campos_extra: camposExtra,
         facturas_vinculadas_ids: [],
+        documento,
       });
     }
   };
@@ -148,6 +151,23 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
       {/* ── FACTURA ── */}
       {tipo === 'factura' && (
         <>
+          <div>
+            <label className={labelCls}>Documento</label>
+            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+              {[
+                { value: 'factura', label: 'Factura' },
+                { value: 'remito',  label: 'Remito'  },
+              ].map(d => (
+                <button key={d.value} type="button" onClick={() => setDocumento(d.value)}
+                  className={`flex-1 py-2 transition-colors ${documento === d.value
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className={labelCls}>
               Monto <span className="text-slate-400">(boleta/importe)</span>
