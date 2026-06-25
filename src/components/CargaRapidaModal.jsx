@@ -21,6 +21,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [tipo, setTipo] = useState('factura');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(today());
+  const [metodoPago, setMetodoPago] = useState('efectivo');
   const [saving, setSaving] = useState(false);
   const [loadingSubs, setLoadingSubs] = useState(false);
 
@@ -48,6 +49,8 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
         fecha_vencimiento: null,
         campos_extra: {},
         facturas_vinculadas_ids: [],
+        // metodo_pago solo aplica al tipo 'pago'; backend lo rechaza para nota_credito/factura
+        metodo_pago: tipo === 'pago' ? metodoPago : null,
       });
       toast.success('Movimiento guardado');
       onSaved?.();
@@ -101,6 +104,20 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
 
           {/* Fecha */}
           <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
+
+          {/* Método de pago — solo en Pago */}
+          {tipo === 'pago' && (
+            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+              <button type="button" onClick={() => setMetodoPago('efectivo')}
+                className={`flex-1 py-2 transition-colors ${metodoPago === 'efectivo' ? 'bg-green-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                Efectivo
+              </button>
+              <button type="button" onClick={() => setMetodoPago('transferencia')}
+                className={`flex-1 py-2 transition-colors ${metodoPago === 'transferencia' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                Transferencia
+              </button>
+            </div>
+          )}
 
           {/* Monto */}
           <div className="relative">

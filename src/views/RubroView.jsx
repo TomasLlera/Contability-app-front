@@ -5,8 +5,9 @@ import CamposManager from '../components/CamposManager';
 import SubrubroView from './SubrubroView';
 import ImportModal from '../components/ImportModal';
 import ConfirmModal from '../components/ConfirmModal';
+import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
 import toast from 'react-hot-toast';
-import { Upload, Settings2, Trash2, ChevronRight, Plus } from 'lucide-react';
+import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -27,6 +28,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
   const [showImport, setShowImport] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [stats, setStats] = useState({});
+  const [editingMetadataSub, setEditingMetadataSub] = useState(null);
 
   const cargarStats = () => {
     dashboardApi.getComparacion(rubro.id)
@@ -96,6 +98,20 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
       setEditingId(null);
       setShowIconPicker(false);
       toast.success('Actualizado');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    }
+  };
+
+  const handleSaveMetadata = async (payload) => {
+    if (!editingMetadataSub) return;
+    try {
+      await subrubrosApi.update(editingMetadataSub.id, payload);
+      setSubrubros(prev =>
+        prev.map(s => s.id === editingMetadataSub.id ? { ...s, ...payload } : s)
+      );
+      setEditingMetadataSub(null);
+      toast.success('Datos guardados');
     } catch (err) {
       toast.error(getErrorMsg(err));
     }
@@ -244,9 +260,10 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                 {isAdmin && (
                   <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={e => { e.stopPropagation(); setEditingId(sub.id); setEditNombre(sub.nombre); setEditIcon(sub.icon || ''); setShowIconPicker(false); }}
-                      className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
-                    >Editar</button>
+                      onClick={e => { e.stopPropagation(); setEditingMetadataSub(sub); }}
+                      className="text-xs text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1"
+                      title="Editar nombre, ícono y datos fiscales"
+                    ><IdCard size={11} /> Editar</button>
                     <button
                       onClick={e => {
                         e.stopPropagation();
@@ -318,6 +335,14 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           message={confirmModal.message}
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(null)}
+        />
+      )}
+
+      {editingMetadataSub && (
+        <SubrubroMetadataModal
+          subrubro={editingMetadataSub}
+          onSave={handleSaveMetadata}
+          onClose={() => setEditingMetadataSub(null)}
         />
       )}
     </div>

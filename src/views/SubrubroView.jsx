@@ -5,7 +5,7 @@ import MovimientoForm from '../components/MovimientoForm';
 import CalendarioSubrubro from '../components/CalendarioSubrubro';
 import ConfirmModal from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet } from 'lucide-react';
+import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet, Banknote, ArrowLeftRight, Edit3 } from 'lucide-react';
 import ExportModal from '../components/ExportModal';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -365,11 +365,27 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                     </td>
 
                     <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
-                      {(m.pago || 0) > 0
-                        ? <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : 'text-blue-600'}>
+                      {(m.pago || 0) > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : 'text-blue-600'}>
                             −{fmt(m.pago)}
                           </span>
-                        : <span className="text-slate-300">—</span>
+                          {esPago && m.metodo_pago && (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                m.metodo_pago === 'efectivo'
+                                  ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                                  : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                              }`}
+                              title={m.metodo_pago === 'efectivo' ? 'Pago en efectivo' : 'Pago por transferencia'}
+                            >
+                              {m.metodo_pago === 'efectivo'
+                                ? <><Banknote size={10} /> Efvo</>
+                                : <><ArrowLeftRight size={10} /> Transf</>}
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-slate-300">—</span>
                       }
                     </td>
 

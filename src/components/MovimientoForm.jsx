@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, CreditCard, FileMinus, Check } from 'lucide-react';
+import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -24,6 +24,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     new Set(movimiento?.facturas_vinculadas_ids || [])
   );
   const [conceptoDiferencia, setConceptoDiferencia] = useState('Diferencia');
+  // Método de pago: solo aplica a pagos / notas de crédito
+  const [metodoPago, setMetodoPago] = useState(movimiento?.metodo_pago ?? null);
 
   const setExtra = (nombre, val) => setCamposExtra(prev => ({ ...prev, [nombre]: val }));
 
@@ -90,6 +92,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         campos_extra: camposExtra,
         facturas_vinculadas_ids: [...facturasSeleccionadas],
         concepto_diferencia: conceptoDiferencia,
+        metodo_pago: tipo === 'pago' ? metodoPago : null,
       });
     } else {
       const m = Number(monto) || 0;
@@ -201,6 +204,39 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
       {/* ── PAGO / NOTA DE CRÉDITO ── */}
       {esPagoONC && (
         <>
+          {tipo === 'pago' && (
+            <div>
+              <label className={labelCls}>Método de pago</label>
+              <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
+                {[
+                  { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
+                  { value: 'transferencia', label: 'Transferencia', Icon: ArrowLeftRight },
+                ].map(m => {
+                  const active = metodoPago === m.value;
+                  return (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => setMetodoPago(active ? null : m.value)}
+                      className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
+                        active
+                          ? (m.value === 'efectivo'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-blue-600 text-white')
+                          : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      <m.Icon size={14} />
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {!metodoPago && (
+                <p className="mt-1 text-xs text-slate-400">Sin definir — el pago queda registrado sin método.</p>
+              )}
+            </div>
+          )}
           <div>
             <label className={labelCls}>
               {tipo === 'nota_credito' ? 'Monto de la nota de crédito' : 'Monto del pago'}

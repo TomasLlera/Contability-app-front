@@ -3,7 +3,7 @@ import { cajaApi, movimientosApi, subrubrosApi } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
-  AlertCircle, Link2
+  AlertCircle, Link2, ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -61,6 +61,18 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
   const [nuevoProvSub, setNuevoProvSub] = useState('');
   const [rubrosSync, setRubrosSync] = useState(config.rubros_sync || []);
   const [diasAnticipacion, setDiasAnticipacion] = useState(config.dias_anticipacion_caja ?? 3);
+  const [syncOpen, setSyncOpen] = useState((config.rubros_sync || []).length === 0);
+  const [empleadosOpen, setEmpleadosOpen] = useState((config.empleados || []).length === 0);
+  const [proveedoresOpen, setProveedoresOpen] = useState((config.proveedores || []).length === 0);
+
+  // Subrubros cuyo rubro ya está sincronizado: sus proveedores aparecen solos.
+  const subrubrosSincronizadosIds = new Set(
+    rubros.filter(s => rubrosSync.includes(s.rubro_id)).map(s => s.id)
+  );
+  const proveedoresVisibles = proveedores
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => !p.subrubro_id || !subrubrosSincronizadosIds.has(p.subrubro_id));
+  const subrubrosVinculables = rubros.filter(s => !rubrosSync.includes(s.rubro_id));
 
   const addEmpleado = () => {
     if (!nuevoEmp.trim()) return;
@@ -104,87 +116,135 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
         </div>
 
         {/* Sincronización de rubros */}
-        <div className="mb-5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1.5"><Link2 size={13} /> Sincronizar vencimientos</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Las boletas de estos rubros aparecerán automáticamente en la caja cuando estén por vencer.</p>
-          {allRubros.length === 0
-            ? <p className="text-xs text-slate-400">No hay rubros disponibles.</p>
-            : allRubros.map(r => (
-              <label key={r.id} className="flex items-center gap-2 py-1.5 cursor-pointer">
-                <input type="checkbox" className="accent-blue-600"
-                  checked={rubrosSync.includes(r.id)}
-                  onChange={() => toggleRubroSync(r.id)} />
-                <span className="text-sm text-slate-700 dark:text-slate-200">{r.icon ? `${r.icon} ` : ''}{r.nombre}</span>
-              </label>
-            ))
-          }
-          {rubrosSync.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
-              <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Días de anticipación</label>
-              <div className="flex items-center gap-2">
-                <input type="number" min="0" max="30" value={diasAnticipacion}
-                  onChange={e => setDiasAnticipacion(e.target.value)}
-                  className="w-20 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <span className="text-xs text-slate-500">días antes del vencimiento</span>
-              </div>
+        <div className="mb-5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl overflow-hidden">
+          <button type="button" onClick={() => setSyncOpen(v => !v)}
+            className="w-full flex items-center justify-between gap-2 p-4 text-left hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5"><Link2 size={13} /> Sincronizar vencimientos</h3>
+              {!syncOpen && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                  {rubrosSync.length === 0
+                    ? 'Sin rubros sincronizados'
+                    : `${rubrosSync.length} ${rubrosSync.length === 1 ? 'rubro' : 'rubros'} · ${diasAnticipacion} ${Number(diasAnticipacion) === 1 ? 'día' : 'días'} de anticipación`}
+                </p>
+              )}
+            </div>
+            <ChevronDown size={16} className={`text-blue-600 dark:text-blue-400 shrink-0 transition-transform ${syncOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {syncOpen && (
+            <div className="px-4 pb-4 -mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Las boletas de estos rubros aparecerán automáticamente en la caja cuando estén por vencer.</p>
+              {allRubros.length === 0
+                ? <p className="text-xs text-slate-400">No hay rubros disponibles.</p>
+                : allRubros.map(r => (
+                  <label key={r.id} className="flex items-center gap-2 py-1.5 cursor-pointer">
+                    <input type="checkbox" className="accent-blue-600"
+                      checked={rubrosSync.includes(r.id)}
+                      onChange={() => toggleRubroSync(r.id)} />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">{r.icon ? `${r.icon} ` : ''}{r.nombre}</span>
+                  </label>
+                ))
+              }
+              {rubrosSync.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                  <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Días de anticipación</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min="0" max="30" value={diasAnticipacion}
+                      onChange={e => setDiasAnticipacion(e.target.value)}
+                      className="w-20 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <span className="text-xs text-slate-500">días antes del vencimiento</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Empleados */}
         <div className="mb-5">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Users size={13} className="text-green-600" /> Empleados</h3>
-          <div className="space-y-1.5 mb-2">
-            {empleados.map((e, i) => (
-              <div key={i} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-1.5">
-                <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{e.nombre}</span>
-                <button onClick={() => setEmpleados(prev => prev.filter((_, j) => j !== i))}
-                  className="text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+          <button type="button" onClick={() => setEmpleadosOpen(v => !v)}
+            className="w-full flex items-center justify-between gap-2 mb-2 text-left">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Users size={13} className="text-green-600" /> Empleados
+              {!empleadosOpen && empleados.length > 0 && (
+                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">· {empleados.length}</span>
+              )}
+            </h3>
+            <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {empleadosOpen && (
+            <>
+              <div className="space-y-1.5 mb-2">
+                {empleados.map((e, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-1.5">
+                    <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{e.nombre}</span>
+                    <button onClick={() => setEmpleados(prev => prev.filter((_, j) => j !== i))}
+                      className="text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input type="text" className={inputCls} placeholder="Nombre del empleado"
-              value={nuevoEmp} onChange={e => setNuevoEmp(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addEmpleado()} />
-            <button onClick={addEmpleado} className="bg-green-600 text-white px-3 rounded-lg hover:bg-green-700"><Plus size={15} /></button>
-          </div>
+              <div className="flex gap-2">
+                <input type="text" className={inputCls} placeholder="Nombre del empleado"
+                  value={nuevoEmp} onChange={e => setNuevoEmp(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addEmpleado()} />
+                <button onClick={addEmpleado} className="bg-green-600 text-white px-3 rounded-lg hover:bg-green-700"><Plus size={15} /></button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Proveedores */}
         <div className="mb-5">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><ShoppingCart size={13} className="text-red-500" /> Proveedores</h3>
-          <div className="space-y-1.5 mb-2">
-            {proveedores.map((p, i) => (
-              <div key={i} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-1.5">
-                <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{p.nombre}</span>
-                {p.subrubro_id && <span className="text-xs text-blue-500">vinculado</span>}
-                <button onClick={() => setProveedores(prev => prev.filter((_, j) => j !== i))}
-                  className="text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+          <button type="button" onClick={() => setProveedoresOpen(v => !v)}
+            className="w-full flex items-center justify-between gap-2 mb-2 text-left">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <ShoppingCart size={13} className="text-red-500" /> Proveedores
+              {!proveedoresOpen && proveedoresVisibles.length > 0 && (
+                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">· {proveedoresVisibles.length}</span>
+              )}
+            </h3>
+            <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${proveedoresOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {proveedoresOpen && (
+            <>
+              {proveedores.length > proveedoresVisibles.length && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 italic">
+                  {proveedores.length - proveedoresVisibles.length} oculto{proveedores.length - proveedoresVisibles.length === 1 ? '' : 's'} (ya sincronizado{proveedores.length - proveedoresVisibles.length === 1 ? '' : 's'} por rubro)
+                </p>
+              )}
+              <div className="space-y-1.5 mb-2">
+                {proveedoresVisibles.map(({ p, i }) => (
+                  <div key={i} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-1.5">
+                    <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{p.nombre}</span>
+                    {p.subrubro_id && <span className="text-xs text-blue-500">vinculado</span>}
+                    <button onClick={() => setProveedores(prev => prev.filter((_, j) => j !== i))}
+                      className="text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="mb-2">
-            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Vincular a un subrubro existente</label>
-            <div className="flex gap-2">
-              <select className={selectCls} value={nuevoProvSub} onChange={e => setNuevoProvSub(e.target.value)}>
-                <option value="">— Elegir subrubro —</option>
-                {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-              </select>
-              <button onClick={addProveedor} disabled={!nuevoProvSub}
-                className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700 disabled:opacity-40"><Plus size={15} /></button>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">O agregar manualmente</label>
-            <div className="flex gap-2">
-              <input type="text" className={inputCls} placeholder="Nombre del proveedor"
-                value={nuevoProv} onChange={e => setNuevoProv(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addProveedor()} />
-              <button onClick={addProveedor} disabled={!nuevoProv.trim()}
-                className="bg-red-500 text-white px-3 rounded-lg hover:bg-red-600 disabled:opacity-40"><Plus size={15} /></button>
-            </div>
-          </div>
+              <div className="mb-2">
+                <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Vincular a un subrubro existente</label>
+                <div className="flex gap-2">
+                  <select className={selectCls} value={nuevoProvSub} onChange={e => setNuevoProvSub(e.target.value)}>
+                    <option value="">— Elegir subrubro —</option>
+                    {subrubrosVinculables.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                  </select>
+                  <button onClick={addProveedor} disabled={!nuevoProvSub}
+                    className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700 disabled:opacity-40"><Plus size={15} /></button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">O agregar manualmente</label>
+                <div className="flex gap-2">
+                  <input type="text" className={inputCls} placeholder="Nombre del proveedor"
+                    value={nuevoProv} onChange={e => setNuevoProv(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addProveedor()} />
+                  <button onClick={addProveedor} disabled={!nuevoProv.trim()}
+                    className="bg-red-500 text-white px-3 rounded-lg hover:bg-red-600 disabled:opacity-40"><Plus size={15} /></button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <button onClick={handleSave}
@@ -202,7 +262,11 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
   const [monto, setMonto]       = useState(initial?.monto || '');
-  const [metodo, setMetodo]     = useState(initial?.metodo || 'efectivo');
+  // Si el initial trae metodo=null (gasto auto-sincronizado), preservar null para
+  // que el usuario lo elija explícitamente — sin defaultearlo a 'efectivo'.
+  const [metodo, setMetodo]     = useState(
+    initial && 'metodo' in initial ? initial.metodo : 'efectivo'
+  );
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
   const [seleccion, setSeleccion] = useState('');
 
@@ -387,9 +451,11 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
 }
 
 function MetodoBadge({ metodo }) {
-  return metodo === 'efectivo'
-    ? <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Efectivo</span>
-    : <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">Transf.</span>;
+  if (metodo === 'efectivo')
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Efectivo</span>;
+  if (metodo === 'transferencia')
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">Transf.</span>;
+  return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-dashed border-amber-300 dark:border-amber-700">Sin definir</span>;
 }
 
 function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
@@ -538,6 +604,7 @@ export default function CajaView({ rubros = [] }) {
   const [showForm, setShowForm]     = useState(false);
   const [tipoForm, setTipoForm]     = useState(null);
   const [editingMov, setEditingMov] = useState(null);
+  const [gastosOpen, setGastosOpen] = useState(true);
 
   const dateInputRef = useRef(null);
 
@@ -573,6 +640,9 @@ export default function CajaView({ rubros = [] }) {
   const cargar = async () => {
     setLoading(true);
     try {
+      // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
+      // como gastos pending sin método de pago. Idempotente — corre cada vez sin duplicar.
+      try { await cajaApi.autoSync(fecha); } catch {}
       const data = await cajaApi.getByFecha(fecha);
       setMovs(data);
 
@@ -703,21 +773,34 @@ export default function CajaView({ rubros = [] }) {
   const handleConfirmarGasto = async (m) => {
     try {
       if (m.confirmado === true) {
-        // Desconfirmar: eliminar el pago del subrubro si existe
+        // Desconfirmar: eliminar el pago del subrubro si existe.
+        // El backend también limpia el lado de caja por defensa (sync inverso),
+        // pero acá hacemos el toggle explícito porque el usuario lo pidió.
         if (m.pago_mov_id) {
-          await movimientosApi.delete(m.pago_mov_id);
+          try { await movimientosApi.delete(m.pago_mov_id); } catch {}
         }
         await cajaApi.update(m.id, { confirmado: false, pago_mov_id: null });
         cargar();
         toast.success('Confirmación revertida');
       } else {
-        await cajaApi.update(m.id, { confirmado: true });
+        // Bloqueo: no se puede confirmar sin método de pago definido.
+        if (!m.metodo) {
+          toast.error('Definí el método de pago antes de confirmar');
+          return;
+        }
+        // Si es un vencimiento de un día anterior, mover el caja item a la
+        // fecha actual para que el pago cuente en el saldo de hoy y no en el
+        // día original del vencimiento.
+        const fechaConfirm = m.fecha < fecha ? fecha : m.fecha;
+        await cajaApi.update(m.id, { confirmado: true, fecha: fechaConfirm });
         if (m.subrubro_id) {
           const pago = await movimientosApi.create(m.subrubro_id, {
             tipo: 'pago',
             pago: m.monto,
-            fecha: m.fecha,
+            fecha: fechaConfirm,
             concepto: `Pago caja: ${m.concepto}`,
+            metodo_pago: m.metodo,
+            caja_mov_id: m.id,
           });
           if (pago?.id) await cajaApi.update(m.id, { pago_mov_id: pago.id });
         }
@@ -773,13 +856,8 @@ export default function CajaView({ rubros = [] }) {
 
   const handleConfirmarSugerido = async (s, monto, metodo) => {
     try {
-      const pago = await movimientosApi.create(s.subrubro_id, {
-        tipo: 'pago',
-        pago: Number(monto),
-        fecha,
-        concepto: `Pago caja: ${s.subrubro_nombre}`,
-      });
-      await cajaApi.create({
+      // Crear la entrada de caja primero para tener su id y linkearlo al pago.
+      const caja = await cajaApi.create({
         fecha,
         tipo: 'gasto',
         concepto: s.subrubro_nombre + (s.concepto ? ` - ${s.concepto}` : ''),
@@ -787,10 +865,20 @@ export default function CajaView({ rubros = [] }) {
         metodo,
         subrubro_id: s.subrubro_id,
         movimiento_id: s.movimiento_id,
-        pago_mov_id: pago?.id || null,
         confirmado: true,
         es_especial: false,
       });
+      const pago = await movimientosApi.create(s.subrubro_id, {
+        tipo: 'pago',
+        pago: Number(monto),
+        fecha,
+        concepto: `Pago caja: ${s.subrubro_nombre}`,
+        metodo_pago: metodo,
+        caja_mov_id: caja?.id || null,
+      });
+      if (pago?.id && caja?.id) {
+        await cajaApi.update(caja.id, { pago_mov_id: pago.id });
+      }
       setSugeridos(prev => prev.filter(x => x.movimiento_id !== s.movimiento_id));
       cargar();
       toast.success(`Pago de ${s.subrubro_nombre} confirmado`);
@@ -1022,24 +1110,33 @@ export default function CajaView({ rubros = [] }) {
       {/* Gastos / Proveedores */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <ShoppingCart size={14} className="text-red-500" />
+          <button type="button" onClick={() => setGastosOpen(v => !v)}
+            className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
+            <ShoppingCart size={14} className="text-red-500 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Gastos y proveedores</h3>
             {gastos.length > 0 && <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
-          </div>
-          <button onClick={() => openForm('gasto')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
+            {!gastosOpen && gastos.length > 0 && (
+              <span className="text-xs text-slate-400 dark:text-slate-500">· {gastos.length}</span>
+            )}
+            <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${gastosOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={11} /> Agregar</button>
         </div>
-        {showForm && (tipoForm === 'gasto' || editingMov?.tipo === 'gasto') && (
-          <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'gasto'} /></div>
+        {gastosOpen && (
+          <>
+            {showForm && (tipoForm === 'gasto' || editingMov?.tipo === 'gasto') && (
+              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'gasto'} /></div>
+            )}
+            {gastos.length === 0 && !(showForm && tipoForm === 'gasto') && (
+              <p className="text-xs text-slate-400 py-2 text-center">Sin gastos cargados</p>
+            )}
+            {gastos.map(m => (
+              <div key={m.id} className="mb-2">
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" />}
+              </div>
+            ))}
+          </>
         )}
-        {gastos.length === 0 && !(showForm && tipoForm === 'gasto') && (
-          <p className="text-xs text-slate-400 py-2 text-center">Sin gastos cargados</p>
-        )}
-        {gastos.map(m => (
-          <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" />}
-          </div>
-        ))}
       </div>
 
       {/* Resumen */}

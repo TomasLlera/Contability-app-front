@@ -154,8 +154,19 @@ export const camposApi = {
 
 export const subrubrosApi = {
   getByRubro: (rubroId) => api.get(`/subrubros/${rubroId}`).then(r => r.data),
-  create: (rubroId, nombre) => api.post(`/subrubros/${rubroId}`, { nombre }).then(r => r.data),
-  update: (id, nombre, icon) => api.put(`/subrubros/${id}`, { nombre, icon }),
+  create: (rubroId, payload) =>
+    api.post(
+      `/subrubros/${rubroId}`,
+      typeof payload === 'string' ? { nombre: payload } : payload
+    ).then(r => r.data),
+  // Acepta objeto con cualquier subset: { nombre, icon, monto_base, cuit, cbu, alias, razon_social, notas, dia_vencimiento }
+  // Mantiene compat con la firma vieja: update(id, nombre, icon)
+  update: (id, payloadOrNombre, iconLegacy) => {
+    const payload = typeof payloadOrNombre === 'string'
+      ? { nombre: payloadOrNombre, icon: iconLegacy }
+      : payloadOrNombre;
+    return api.put(`/subrubros/${id}`, payload);
+  },
   delete: (id) => api.delete(`/subrubros/${id}`),
   clearMovimientos: (id) => api.delete(`/movimientos/${id}/movimientos`).then(r => r.data),
 };
@@ -259,5 +270,6 @@ export const cajaApi = {
   getConfig: () => api.get('/caja/config').then(r => r.data),
   saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
   getVencimientosSync: (fecha) => api.get('/caja/vencimientos-sync', { params: { fecha } }).then(r => r.data),
+  autoSync: (fecha) => api.post('/caja/auto-sync', null, { params: { fecha } }).then(r => r.data),
   getFacturasPendientes: (subrubro_id) => api.get('/caja/facturas-pendientes', { params: { subrubro_id } }).then(r => r.data),
 };

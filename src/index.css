@@ -97,6 +97,7 @@ body {
   transform: scale(0.97);
 }
 
+
 /* Slightly nicer scrollbars on desktop */
 @media (pointer: fine) {
   ::-webkit-scrollbar { width: 10px; height: 10px; }
