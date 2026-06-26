@@ -3,7 +3,7 @@ import { cajaApi, movimientosApi, subrubrosApi } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
-  AlertCircle, Link2, ChevronDown
+  Link2, ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -502,52 +502,6 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
   );
 }
 
-// ── Fila de vencimiento sugerido (auto-sync) ────────────────────────────────
-function SugeridoRow({ s, onConfirmar, onDescartar }) {
-  const [monto, setMonto]   = useState(s.monto);
-  const [metodo, setMetodo] = useState('efectivo');
-
-  const hoy = todayStr();
-  const esHoy = s.fecha_vencimiento === hoy;
-  const esMañana = s.fecha_vencimiento === addDays(hoy, 1);
-  const labelVenc = esHoy ? 'hoy' : esMañana ? 'mañana' : `${formatFechaCorta(s.fecha_vencimiento)}`;
-
-  return (
-    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 border-dashed rounded-xl px-3 py-3">
-      <AlertCircle size={14} className="text-amber-500 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{s.subrubro_nombre}</p>
-          {s.concepto && <p className="text-xs text-slate-400 truncate">{s.concepto}</p>}
-          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${esHoy ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'}`}>
-            vence {labelVenc}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden text-xs">
-            {[['efectivo', 'Efectivo'], ['transferencia', 'Transf.']].map(([v, l]) => (
-              <button key={v} type="button" onClick={() => setMetodo(v)}
-                className={`px-2.5 py-1 transition-colors ${metodo === v ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                {l}
-              </button>
-            ))}
-          </div>
-          <input type="number" min="0" step="any" value={monto} onChange={e => setMonto(Number(e.target.value))}
-            className="w-28 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-sm font-semibold text-right focus:outline-none focus:ring-1 focus:ring-blue-400" />
-        </div>
-      </div>
-      <button onClick={() => onConfirmar(s, monto, metodo)} title="Confirmar pago"
-        className="p-2 rounded-lg bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70 shrink-0">
-        <Check size={14} />
-      </button>
-      <button onClick={() => onDescartar(s.movimiento_id)} title="Ignorar hoy"
-        className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 shrink-0">
-        <X size={14} />
-      </button>
-    </div>
-  );
-}
-
 function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfirmar = 0, vencimientos, labelDisponible }) {
   const restante = disponible - gastos;
   const restanteSiConfirma = disponible - gastos - sinConfirmar;
@@ -625,18 +579,6 @@ export default function CajaView({ rubros = [] }) {
   const [showConfig, setShowConfig]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
 
-  // Vencimientos auto-sincronizados
-  const [sugeridos, setSugeridos] = useState([]);
-
-  const getDismissedKey = (f) => `caja_dismissed_${f}`;
-  const getDismissed = (f) => {
-    try { return JSON.parse(sessionStorage.getItem(getDismissedKey(f)) || '[]'); } catch { return []; }
-  };
-  const addDismissed = (f, movimientoId) => {
-    const prev = getDismissed(f);
-    sessionStorage.setItem(getDismissedKey(f), JSON.stringify([...new Set([...prev, movimientoId])]));
-  };
-
   const cargar = async () => {
     setLoading(true);
     try {
@@ -692,15 +634,6 @@ export default function CajaView({ rubros = [] }) {
     setLoading(false);
   };
 
-  const cargarSugeridos = async () => {
-    if (!config.rubros_sync?.length) { setSugeridos([]); return; }
-    try {
-      const data = await cajaApi.getVencimientosSync(fecha);
-      const dismissed = getDismissed(fecha);
-      setSugeridos(data.filter(s => !dismissed.includes(s.movimiento_id)));
-    } catch { setSugeridos([]); }
-  };
-
   const cargarConfig = async () => {
     const cfg = await cajaApi.getConfig();
     setConfig(cfg);
@@ -722,7 +655,6 @@ export default function CajaView({ rubros = [] }) {
 
   useEffect(() => { cargar(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
-  useEffect(() => { cargarSugeridos(); }, [fecha, config.rubros_sync]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -788,10 +720,11 @@ export default function CajaView({ rubros = [] }) {
           toast.error('Definí el método de pago antes de confirmar');
           return;
         }
-        // Si es un vencimiento de un día anterior, mover el caja item a la
-        // fecha actual para que el pago cuente en el saldo de hoy y no en el
-        // día original del vencimiento.
-        const fechaConfirm = m.fecha < fecha ? fecha : m.fecha;
+        // El pago se registra hoy (el backend no permite fechas futuras).
+        // Si el vencimiento es anterior a la fecha de caja activa, mover el item a esa fecha.
+        const hoy = todayStr();
+        const tentativa = m.fecha < fecha ? fecha : m.fecha;
+        const fechaConfirm = tentativa > hoy ? hoy : tentativa;
         await cajaApi.update(m.id, { confirmado: true, fecha: fechaConfirm });
         if (m.subrubro_id) {
           const pago = await movimientosApi.create(m.subrubro_id, {
@@ -852,42 +785,6 @@ export default function CajaView({ rubros = [] }) {
       toast.error('Error al guardar la configuración');
       throw e;
     }
-  };
-
-  const handleConfirmarSugerido = async (s, monto, metodo) => {
-    try {
-      // Crear la entrada de caja primero para tener su id y linkearlo al pago.
-      const caja = await cajaApi.create({
-        fecha,
-        tipo: 'gasto',
-        concepto: s.subrubro_nombre + (s.concepto ? ` - ${s.concepto}` : ''),
-        monto: Number(monto),
-        metodo,
-        subrubro_id: s.subrubro_id,
-        movimiento_id: s.movimiento_id,
-        confirmado: true,
-        es_especial: false,
-      });
-      const pago = await movimientosApi.create(s.subrubro_id, {
-        tipo: 'pago',
-        pago: Number(monto),
-        fecha,
-        concepto: `Pago caja: ${s.subrubro_nombre}`,
-        metodo_pago: metodo,
-        caja_mov_id: caja?.id || null,
-      });
-      if (pago?.id && caja?.id) {
-        await cajaApi.update(caja.id, { pago_mov_id: pago.id });
-      }
-      setSugeridos(prev => prev.filter(x => x.movimiento_id !== s.movimiento_id));
-      cargar();
-      toast.success(`Pago de ${s.subrubro_nombre} confirmado`);
-    } catch { toast.error('Error al confirmar pago'); }
-  };
-
-  const handleDescartarSugerido = (movimientoId) => {
-    addDismissed(fecha, movimientoId);
-    setSugeridos(prev => prev.filter(s => s.movimiento_id !== movimientoId));
   };
 
   // ── Cálculos ────────────────────────────────────────────────────────────────
@@ -1044,25 +941,6 @@ export default function CajaView({ rubros = [] }) {
           )}
         </div>
       </div>
-
-      {/* Vencimientos sincronizados (auto-sugeridos) */}
-      {sugeridos.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle size={14} className="text-amber-500" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Boletas por vencer</h3>
-            <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full">{sugeridos.length}</span>
-            <InfoTooltip text="Boletas de subrubros sincronizados próximas a vencer. Confirmá el pago para registrarlo en la caja y en el subrubro correspondiente." />
-          </div>
-          <div className="space-y-2">
-            {sugeridos.map(s => (
-              <SugeridoRow key={s.movimiento_id} s={s}
-                onConfirmar={handleConfirmarSugerido}
-                onDescartar={handleDescartarSugerido} />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Ingresos extra */}
       <div>

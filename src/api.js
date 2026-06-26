@@ -270,7 +270,6 @@ export const cajaApi = {
   delete: (id) => api.delete(`/caja/${id}`).then(r => r.data),
   getConfig: () => api.get('/caja/config').then(r => r.data),
   saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
-  getVencimientosSync: (fecha) => api.get('/caja/vencimientos-sync', { params: { fecha } }).then(r => r.data),
   autoSync: (fecha) => api.post('/caja/auto-sync', null, { params: { fecha } }).then(r => r.data),
   getFacturasPendientes: (subrubro_id) => api.get('/caja/facturas-pendientes', { params: { subrubro_id } }).then(r => r.data),
 };

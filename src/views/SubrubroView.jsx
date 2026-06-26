@@ -320,6 +320,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Doc.</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monto</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pago</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Método</th>
                 {camposNumericos.map(c => (
                   <th key={c.id} className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{c.nombre}</th>
                 ))}
@@ -381,27 +382,28 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
 
                     <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {(m.pago || 0) > 0 ? (
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : 'text-blue-600'}>
-                            −{fmt(m.pago)}
-                          </span>
-                          {esPago && m.metodo_pago && (
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                                m.metodo_pago === 'efectivo'
-                                  ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                                  : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                              }`}
-                              title={m.metodo_pago === 'efectivo' ? 'Pago en efectivo' : 'Pago por transferencia'}
-                            >
-                              {m.metodo_pago === 'efectivo'
-                                ? <><Banknote size={10} /> Efvo</>
-                                : <><ArrowLeftRight size={10} /> Transf</>}
-                            </span>
-                          )}
-                        </div>
+                        <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : 'text-blue-600'}>
+                          −{fmt(m.pago)}
+                        </span>
                       ) : <span className="text-slate-300">—</span>
                       }
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {esPago && m.metodo_pago ? (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                            m.metodo_pago === 'efectivo'
+                              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                              : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                          }`}
+                          title={m.metodo_pago === 'efectivo' ? 'Pago en efectivo' : 'Pago por transferencia'}
+                        >
+                          {m.metodo_pago === 'efectivo'
+                            ? <><Banknote size={10} /> Efvo</>
+                            : <><ArrowLeftRight size={10} /> Transf</>}
+                        </span>
+                      ) : <span className="text-slate-300">—</span>}
                     </td>
 
                     {camposNumericos.map(c => {
