@@ -65,6 +65,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('tabla');
   const [mostrarTodo, setMostrarTodo] = useState(false);
+  const [estadoFiltro, setEstadoFiltro] = useState('todos'); // 'todos' | 'pagadas' | 'pendientes'
   const [todosMovs, setTodosMovs] = useState([]);
   const [todasFacturasPendientes, setTodasFacturasPendientes] = useState([]);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -188,7 +189,15 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
 
   if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>;
 
-  const movsDetallados = movsConTotal();
+  const esFacturaPendiente = (m) =>
+    (m.tipo === 'factura' || (!m.tipo && (m.monto || 0) > 0)) && (m.saldo ?? m.monto ?? 0) > 0.005;
+
+  const movsDetallados = movsConTotal().filter(m => {
+    if (!mostrarTodo || estadoFiltro === 'todos') return true;
+    const esFact = m.tipo === 'factura' || (!m.tipo && (m.monto || 0) > 0);
+    if (!esFact) return false; // pagos/NC/ajustes no tienen estado pagada/pendiente
+    return estadoFiltro === 'pendientes' ? esFacturaPendiente(m) : !esFacturaPendiente(m);
+  });
 
   return (
     <div>
@@ -247,8 +256,8 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
           {/* Filtros rápidos */}
           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
             {[
-              { label: 'Mes ant.', action: () => { setMostrarTodo(false); setMesActual(mesAnterior(mesActualKey())); } },
-              { label: 'Este mes', action: () => { setMostrarTodo(false); setMesActual(mesActualKey()); } },
+              { label: 'Mes ant.', action: () => { setMostrarTodo(false); setEstadoFiltro('todos'); setMesActual(mesAnterior(mesActualKey())); } },
+              { label: 'Este mes', action: () => { setMostrarTodo(false); setEstadoFiltro('todos'); setMesActual(mesActualKey()); } },
               { label: 'Todo', action: () => setMostrarTodo(true) },
             ].map(f => {
               const active = f.label === 'Todo' ? mostrarTodo
@@ -262,6 +271,22 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
               );
             })}
           </div>
+          {/* Filtro de estado (solo en modo "Todo") */}
+          {mostrarTodo && (
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+              {[
+                { val: 'todos', label: 'Todas' },
+                { val: 'pagadas', label: 'Pagadas' },
+                { val: 'pendientes', label: 'Pendientes' },
+              ].map(f => (
+                <button
+                  key={f.val}
+                  onClick={() => setEstadoFiltro(f.val)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${estadoFiltro === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                >{f.label}</button>
+              ))}
+            </div>
+          )}
           {/* Navegación por mes (oculta en modo "Todo") */}
           {!mostrarTodo && (
             <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
@@ -303,10 +328,14 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
       {viewMode === 'calendario' && <CalendarioSubrubro movimientos={todosMovs} />}
 
       {/* Tabla */}
-      {viewMode === 'tabla' && (data.movimientos.length === 0 ? (
+      {viewMode === 'tabla' && (movsDetallados.length === 0 ? (
         <div className="text-center py-16 text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
           <Wallet size={40} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-          <p className="font-medium">Sin movimientos en {parseMes(mesActual)}</p>
+          <p className="font-medium">
+            {mostrarTodo && estadoFiltro !== 'todos'
+              ? `Sin facturas ${estadoFiltro}`
+              : `Sin movimientos en ${parseMes(mesActual)}`}
+          </p>
           <button onClick={() => setShowForm(true)} className="mt-3 text-blue-600 hover:underline text-sm">
             Agregar el primero
           </button>
@@ -320,6 +349,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Doc.</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monto</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pago</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Método</th>
                 {camposNumericos.map(c => (
                   <th key={c.id} className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{c.nombre}</th>
@@ -387,6 +417,17 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                         </span>
                       ) : <span className="text-slate-300">—</span>
                       }
+                    </td>
+
+                    {/* Saldo pendiente por factura (monto − NC/pagos vinculados) */}
+                    <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
+                      {esFactura ? (
+                        (m.saldo ?? m.monto) <= 0.005
+                          ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs"><CheckCircle2 size={12} /> Saldada</span>
+                          : <span className={m.saldo != null && m.saldo < m.monto - 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'}>
+                              {fmt(m.saldo ?? m.monto)}
+                            </span>
+                      ) : <span className="text-slate-300">—</span>}
                     </td>
 
                     <td className="px-4 py-3">

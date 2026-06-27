@@ -11,6 +11,19 @@ import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard } from 'lucide-re
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
+// '2026-08-15' → '15 Ago'. Devuelve '—' si no hay fecha.
+const MESES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const fmtFechaCorta = (iso) => {
+  if (!iso) return '—';
+  const [, m, d] = iso.split('-');
+  const mi = Number(m) - 1;
+  if (!d || mi < 0 || mi > 11) return '—';
+  return `${Number(d)} ${MESES_ABBR[mi]}`;
+};
+
+const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia' };
+const fmtMetodo = (m) => METODO_LABEL[m] || '—';
+
 const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
 
 export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight, role }) {
@@ -235,24 +248,32 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                     <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors ml-2 shrink-0" />
                   </div>
 
-                  {/* Datos financieros */}
+                  {/* Indicadores: próximo vencimiento → importe a vencer → saldo pendiente → forma de pago */}
                   {stats[sub.id] !== undefined && (
-                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-4 gap-1 text-center">
-                      <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Monto</p>
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{fmt(stats[sub.id].facturado)}</p>
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-2 text-center">
+                      <div className="min-w-0">
+                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Próx. vencimiento</p>
+                        <p className={`text-xs sm:text-sm font-semibold truncate ${stats[sub.id].vencido ? 'text-red-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                          {fmtFechaCorta(stats[sub.id].proximo_vencimiento)}
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Pago</p>
-                        <p className="text-xs font-semibold text-emerald-600 truncate">{fmt(stats[sub.id].pagado)}</p>
+                      <div className="min-w-0">
+                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Importe a vencer</p>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+                          {stats[sub.id].importe_proximo_vencimiento != null ? fmt(stats[sub.id].importe_proximo_vencimiento) : '—'}
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Pendiente</p>
-                        <p className={`text-xs font-semibold truncate ${stats[sub.id].pendiente > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{fmt(stats[sub.id].pendiente)}</p>
+                      <div className="min-w-0">
+                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Saldo pendiente</p>
+                        <p className={`text-xs sm:text-sm font-bold truncate ${stats[sub.id].saldo > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {fmt(stats[sub.id].saldo)}
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Saldo</p>
-                        <p className={`text-xs font-bold truncate ${stats[sub.id].saldo > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(stats[sub.id].saldo)}</p>
+                      <div className="min-w-0">
+                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Forma de pago</p>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+                          {fmtMetodo(stats[sub.id].metodo_habitual)}
+                        </p>
                       </div>
                     </div>
                   )}

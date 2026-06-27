@@ -44,13 +44,40 @@ function expandMergedCells(sheet) {
   return sheet;
 }
 
+// Palabras que delatan la fila de encabezado real (espejo del backend).
+const HEADER_TOKENS = ['fecha', 'importe', 'monto', 'debe', 'haber', 'pago', 'abono', 'cobrado', 'pagado', 'factura', 'comprobante', 'saldo', 'total', 'vencimiento', 'venc', 'vto', 'concepto', 'descripcion', 'detalle'];
+
+function scoreHeaderRow(row) {
+  let score = 0;
+  for (const v of (row || [])) {
+    if (v == null) continue;
+    const s = String(v).toLowerCase().trim();
+    if (!s) continue;
+    if (HEADER_TOKENS.some(t => s === t || s.includes(t))) score++;
+  }
+  return score;
+}
+
+// Detecta la fila de encabezado escaneando desde `desde`. Cada hoja se alinea
+// sola aunque tenga filas de título (nombre del subrubro) por encima.
+function detectHeaderRow(matrix, desde = 0, maxScan = 15) {
+  let bestIdx = desde, bestScore = -1;
+  const end = Math.min(matrix.length, desde + maxScan);
+  for (let i = desde; i < end; i++) {
+    const score = scoreHeaderRow(matrix[i]);
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  return bestScore >= 2 ? bestIdx : desde;
+}
+
 function parseWorkbook(wb, skip) {
   return wb.SheetNames.map(name => {
     expandMergedCells(wb.Sheets[name]);
     const raw = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: true });
-    const headerRow = raw[skip] || [];
+    const headerIdx = detectHeaderRow(raw, skip);
+    const headerRow = raw[headerIdx] || [];
     const headers = headerRow.map(v => (v == null ? '' : String(v).trim()));
-    const dataRows = raw.slice(skip + 1, skip + 4);
+    const dataRows = raw.slice(headerIdx + 1, headerIdx + 4);
     const samples = headers.map((_, ci) => dataRows.map(r => r[ci] ?? null));
     return { name, headers, samples };
   }).filter(s => s.headers.some(h => h.length > 0));
@@ -237,8 +264,8 @@ export default function ImportModal({ rubro, onClose, onSuccess }) {
                   <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Filas a saltear al inicio</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {skipRows === 0
-                      ? 'Los encabezados se leen desde la fila 1'
-                      : `Salteando ${skipRows} fila${skipRows > 1 ? 's' : ''} de título — encabezados desde la fila ${skipRows + 1}`}
+                      ? 'Cada hoja detecta su fila de encabezado automáticamente'
+                      : `Ignorando las primeras ${skipRows} fila${skipRows > 1 ? 's' : ''} antes de detectar el encabezado`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

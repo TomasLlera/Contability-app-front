@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, Zap } from 'lucide-react';
-import { subrubrosApi, movimientosApi, camposApi, getErrorMsg } from '../api';
+import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
 
 const today = () => new Date().toISOString().split('T')[0];
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
 const TIPOS = [
   { value: 'factura',      label: 'Factura',       color: 'bg-amber-500' },
@@ -25,6 +26,9 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [documento, setDocumento] = useState('factura');
   const [saving, setSaving] = useState(false);
   const [loadingSubs, setLoadingSubs] = useState(false);
+  const [facturas, setFacturas] = useState([]);
+  const [facturaSel, setFacturaSel] = useState('');
+  const [loadingFacturas, setLoadingFacturas] = useState(false);
 
   useEffect(() => {
     if (!rubroId) { setSubrubros([]); setSubrubroId(''); return; }
@@ -36,25 +40,54 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
 
   const esPago = tipo === 'pago' || tipo === 'nota_credito';
 
+  // Boletas pendientes del subrubro: permiten aplicar el pago/NC a una factura
+  // puntual (y dejar saldo si es parcial). Solo aplica a pago / nota de crédito.
+  useEffect(() => {
+    if (!subrubroId || !esPago) { setFacturas([]); setFacturaSel(''); return; }
+    setLoadingFacturas(true);
+    cajaApi.getFacturasPendientes(subrubroId)
+      .then(setFacturas)
+      .catch(() => setFacturas([]))
+      .finally(() => setLoadingFacturas(false));
+  }, [subrubroId, esPago]);
+
+  const handleFacturaSel = (id) => {
+    setFacturaSel(id);
+    const f = facturas.find(f => String(f.id) === String(id));
+    // Prefill con el SALDO restante (no el monto original), editable para parciales.
+    if (f) setMonto(String(f.saldo != null ? f.saldo : f.monto));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const n = Number(monto);
     if (!n || !subrubroId) return;
     setSaving(true);
     try {
-      await movimientosApi.create(subrubroId, {
-        tipo,
-        monto: esPago ? 0 : n,
-        pago: esPago ? n : 0,
-        fecha,
-        fecha_vencimiento: null,
-        campos_extra: {},
-        facturas_vinculadas_ids: [],
-        // metodo_pago solo aplica al tipo 'pago'; backend lo rechaza para nota_credito/factura
-        metodo_pago: tipo === 'pago' ? metodoPago : null,
-        // documento solo aplica al tipo 'factura'
-        documento: tipo === 'factura' ? documento : null,
-      });
+      if (esPago && facturaSel) {
+        // Pago / NC vinculado a una factura puntual → deja saldo si es parcial.
+        await movimientosApi.pagoVinculado(subrubroId, {
+          tipo,
+          monto_pago: n,
+          fecha,
+          facturas_vinculadas_ids: [Number(facturaSel)],
+          metodo_pago: tipo === 'pago' ? metodoPago : null,
+        });
+      } else {
+        await movimientosApi.create(subrubroId, {
+          tipo,
+          monto: esPago ? 0 : n,
+          pago: esPago ? n : 0,
+          fecha,
+          fecha_vencimiento: null,
+          campos_extra: {},
+          facturas_vinculadas_ids: [],
+          // metodo_pago solo aplica al tipo 'pago'; backend lo rechaza para nota_credito/factura
+          metodo_pago: tipo === 'pago' ? metodoPago : null,
+          // documento solo aplica al tipo 'factura'
+          documento: tipo === 'factura' ? documento : null,
+        });
+      }
       toast.success('Movimiento guardado');
       onSaved?.();
       onClose();
@@ -104,6 +137,28 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
               <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
           </select>
+
+          {/* Boleta a la que aplicar — solo Pago / Nota de crédito */}
+          {esPago && subrubroId && (
+            loadingFacturas
+              ? <p className="text-xs text-slate-400">Cargando boletas...</p>
+              : facturas.length === 0
+                ? <p className="text-xs text-slate-400">Sin boletas pendientes en este subrubro.</p>
+                : (
+                  <select className={selectCls} value={facturaSel} onChange={e => handleFacturaSel(e.target.value)}>
+                    <option value="">— Aplicar a boleta (opcional) —</option>
+                    {facturas.map(f => {
+                      const saldo = f.saldo != null ? f.saldo : f.monto;
+                      const parcial = f.saldo != null && f.saldo < f.monto - 0.005;
+                      return (
+                        <option key={f.id} value={f.id}>
+                          {(f.concepto || 'Factura')} — {fmt(saldo)}{parcial ? ' (saldo, ya tiene NC/pago)' : ''}{f.fecha ? ` — ${f.fecha}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )
+          )}
 
           {/* Fecha */}
           <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />

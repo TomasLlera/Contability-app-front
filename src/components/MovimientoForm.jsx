@@ -23,7 +23,9 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const [facturasSeleccionadas, setFacturasSeleccionadas] = useState(
     new Set(movimiento?.facturas_vinculadas_ids || [])
   );
-  const [conceptoDiferencia, setConceptoDiferencia] = useState('Diferencia');
+  // Ya no se genera ajuste por diferencia (modelo de saldo); se mantiene el valor
+  // por compatibilidad del payload, pero el backend lo ignora.
+  const conceptoDiferencia = 'Diferencia';
   // Método de pago: solo aplica a pagos / notas de crédito
   const [metodoPago, setMetodoPago] = useState(movimiento?.metodo_pago ?? null);
   // Tipo de documento: solo aplica a facturas. Default 'factura'.
@@ -42,9 +44,15 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     });
   };
 
+  // Saldo restante de la factura (monto original − NC/pagos ya aplicados). Si el
+  // backend no lo manda, cae al monto. Es lo que se debe vincular/mostrar para no
+  // pisar créditos previos: una 2da NC ve el saldo, no el monto original.
+  const saldoFactura = (f) => (f.saldo != null ? f.saldo : (f.monto || 0));
+  const tieneCreditoPrevio = (f) => f.saldo != null && f.saldo < (f.monto || 0) - 0.005;
+
   const totalSeleccionado = todasFacturasPendientes
     .filter(f => facturasSeleccionadas.has(f.id))
-    .reduce((s, f) => s + (f.monto || 0), 0);
+    .reduce((s, f) => s + saldoFactura(f), 0);
 
   useEffect(() => {
     if (facturasSeleccionadas.size > 0) setPago(String(totalSeleccionado));
@@ -264,11 +272,10 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 text-sm font-semibold">−</span>
               <input type="number" min="0" step="any"
-                className={`${inputNumCls} ${hayVinculacion ? 'bg-slate-50 dark:bg-slate-600 cursor-not-allowed' : ''}`}
+                className={inputNumCls}
                 placeholder="0"
                 value={pago}
-                onChange={e => setPago(e.target.value)}
-                readOnly={hayVinculacion} />
+                onChange={e => setPago(e.target.value)} />
             </div>
           </div>
 
@@ -299,7 +306,15 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                       <input type="checkbox" checked={sel} onChange={() => toggleFactura(f.id)}
                         className="shrink-0 accent-blue-600" />
                       <span className="text-xs text-slate-500 dark:text-slate-400 w-20 shrink-0">{f.fecha}</span>
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex-1">{fmt(f.monto)}</span>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex-1 flex items-center gap-1.5">
+                        {fmt(saldoFactura(f))}
+                        {tieneCreditoPrevio(f) && (
+                          <>
+                            <span className="text-[10px] font-normal text-slate-400 line-through">{fmt(f.monto)}</span>
+                            <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400">NC/pago aplicado</span>
+                          </>
+                        )}
+                      </span>
                       {f.campos_extra?.nro_factura && (
                         <span className="text-xs text-slate-400 truncate max-w-24">#{f.campos_extra.nro_factura}</span>
                       )}
@@ -310,8 +325,11 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
 
               {hayVinculacion && (
                 <div className="mt-2 space-y-1 text-xs">
+                  {todasFacturasPendientes.some(f => facturasSeleccionadas.has(f.id) && tieneCreditoPrevio(f)) && (
+                    <p className="text-amber-600 dark:text-amber-400">⚠ Esta factura ya tiene una NC/pago vinculado — se muestra el saldo restante.</p>
+                  )}
                   <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                    <span>Total facturas seleccionadas:</span>
+                    <span>Saldo de facturas seleccionadas:</span>
                     <span className="font-semibold">{fmt(totalSeleccionado)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600 dark:text-slate-300">
@@ -320,7 +338,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                   </div>
                   {diferencia > 0.005 && (
                     <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
-                      <span>Diferencia (se generará ajuste automático):</span>
+                      <span>Saldo que queda pendiente en la factura:</span>
                       <span>{fmt(diferencia)}</span>
                     </div>
                   )}
@@ -330,14 +348,6 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                       <span>{fmt(Math.abs(diferencia))}</span>
                     </div>
                   )}
-                </div>
-              )}
-
-              {hayVinculacion && diferencia > 0.005 && (
-                <div className="mt-2">
-                  <label className={labelCls}>Concepto del ajuste automático</label>
-                  <input type="text" className={inputCls} placeholder="Ej: Descuento, Retención, Ajuste..."
-                    value={conceptoDiferencia} onChange={e => setConceptoDiferencia(e.target.value)} />
                 </div>
               )}
             </div>

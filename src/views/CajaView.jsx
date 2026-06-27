@@ -720,11 +720,11 @@ export default function CajaView({ rubros = [] }) {
           toast.error('Definí el método de pago antes de confirmar');
           return;
         }
-        // El pago se registra hoy (el backend no permite fechas futuras).
-        // Si el vencimiento es anterior a la fecha de caja activa, mover el item a esa fecha.
-        const hoy = todayStr();
-        const tentativa = m.fecha < fecha ? fecha : m.fecha;
-        const fechaConfirm = tentativa > hoy ? hoy : tentativa;
+        // El pago se registra en la fecha del ítem de caja, que es la fecha de
+        // vencimiento de la factura. Así una factura que vence el 16/7 queda
+        // registrada en Caja y en el Subrubro el 16/7, aunque la confirmes antes.
+        // Vale para vencimientos futuros, de hoy o ya vencidos.
+        const fechaConfirm = m.fecha;
         await cajaApi.update(m.id, { confirmado: true, fecha: fechaConfirm });
         if (m.subrubro_id) {
           const pago = await movimientosApi.create(m.subrubro_id, {
@@ -734,6 +734,10 @@ export default function CajaView({ rubros = [] }) {
             concepto: `Pago caja: ${m.concepto}`,
             metodo_pago: m.metodo,
             caja_mov_id: m.id,
+            // Si la entrada de caja apunta a una factura puntual, vincular el pago
+            // a esa factura para que quede saldada exactamente esa (no la más vieja
+            // por FIFO) y sin afectar las facturas anteriores pendientes.
+            facturas_vinculadas_ids: m.movimiento_id ? [m.movimiento_id] : [],
           });
           if (pago?.id) await cajaApi.update(m.id, { pago_mov_id: pago.id });
         }

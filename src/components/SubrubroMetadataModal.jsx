@@ -4,6 +4,9 @@ import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock } from 'lu
 
 const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
 
+// Índice = Date.getDay() → 0=domingo … 6=sábado (debe coincidir con el backend).
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1';
 
@@ -19,8 +22,12 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
   const [cuit, setCuit] = useState(subrubro?.cuit || '');
   const [cbu, setCbu] = useState(subrubro?.cbu || '');
   const [alias, setAlias] = useState(subrubro?.alias || '');
+  const [modoVencimiento, setModoVencimiento] = useState(subrubro?.modo_vencimiento || 'dias');
   const [diaVencimiento, setDiaVencimiento] = useState(
     subrubro?.dia_vencimiento != null ? String(subrubro.dia_vencimiento) : ''
+  );
+  const [diaSemanaVencimiento, setDiaSemanaVencimiento] = useState(
+    subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : ''
   );
   const [notas, setNotas] = useState(subrubro?.notas || '');
   const [saving, setSaving] = useState(false);
@@ -33,7 +40,9 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
     setCuit(subrubro?.cuit || '');
     setCbu(subrubro?.cbu || '');
     setAlias(subrubro?.alias || '');
+    setModoVencimiento(subrubro?.modo_vencimiento || 'dias');
     setDiaVencimiento(subrubro?.dia_vencimiento != null ? String(subrubro.dia_vencimiento) : '');
+    setDiaSemanaVencimiento(subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : '');
     setNotas(subrubro?.notas || '');
   }, [subrubro?.id]);
 
@@ -43,15 +52,27 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
       alert('El nombre no puede estar vacío.');
       return;
     }
-    // Validación día de vencimiento
+    // Validación del vencimiento según el modo elegido
     let dia = null;
-    if (diaVencimiento.trim() !== '') {
-      const n = Number(diaVencimiento);
-      if (!Number.isInteger(n) || n < 1 || n > 31) {
-        alert('El día de vencimiento debe ser un número entero entre 1 y 31.');
-        return;
+    let diaSemana = null;
+    if (modoVencimiento === 'dia_semana') {
+      if (diaSemanaVencimiento !== '') {
+        const w = Number(diaSemanaVencimiento);
+        if (!Number.isInteger(w) || w < 0 || w > 6) {
+          alert('Elegí un día de la semana válido.');
+          return;
+        }
+        diaSemana = w;
       }
-      dia = n;
+    } else {
+      if (diaVencimiento.trim() !== '') {
+        const n = Number(diaVencimiento);
+        if (!Number.isInteger(n) || n < 1 || n > 365) {
+          alert('Los días de vencimiento deben ser un número entero entre 1 y 365.');
+          return;
+        }
+        dia = n;
+      }
     }
     setSaving(true);
     try {
@@ -62,7 +83,9 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
         cuit: cuit.trim(),
         cbu: cbu.trim(),
         alias: alias.trim(),
+        modo_vencimiento: modoVencimiento,
         dia_vencimiento: dia,
+        dia_semana_vencimiento: diaSemana,
         notas: notas.trim(),
       });
     } finally {
@@ -139,21 +162,50 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
           </div>
           <div>
             <label className={labelCls}>
-              <CalendarClock size={11} className="inline mr-1" /> Días de vencimiento
+              <CalendarClock size={11} className="inline mr-1" /> Modo de vencimiento
             </label>
-            <input
-              type="number"
-              min="1"
-              max="365"
-              step="1"
+            <select
               className={inputCls}
-              placeholder="Ej: 30 (sin valor = sin plazo)"
-              value={diaVencimiento}
-              onChange={e => setDiaVencimiento(e.target.value)}
-            />
-            <p className="mt-1 text-[11px] text-slate-400">
-              Cada factura vence N días después de su fecha (ej: 30 = vence 30 días después de emitida).
-            </p>
+              value={modoVencimiento}
+              onChange={e => setModoVencimiento(e.target.value)}
+            >
+              <option value="dias">Días desde emisión</option>
+              <option value="dia_semana">Día fijo de la semana</option>
+            </select>
+
+            {modoVencimiento === 'dias' ? (
+              <>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  step="1"
+                  className={`${inputCls} mt-2`}
+                  placeholder="Ej: 30 (sin valor = sin plazo)"
+                  value={diaVencimiento}
+                  onChange={e => setDiaVencimiento(e.target.value)}
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Cada factura vence N días después de su fecha (ej: 30 = vence 30 días después de emitida).
+                </p>
+              </>
+            ) : (
+              <>
+                <select
+                  className={`${inputCls} mt-2`}
+                  value={diaSemanaVencimiento}
+                  onChange={e => setDiaSemanaVencimiento(e.target.value)}
+                >
+                  <option value="">Sin día definido</option>
+                  {DIAS_SEMANA.map((d, i) => (
+                    <option key={i} value={i}>{d}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Cada factura vence el próximo día elegido. Si se emite ese mismo día, vence el de la semana siguiente.
+                </p>
+              </>
+            )}
           </div>
         </div>
 
