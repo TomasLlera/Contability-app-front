@@ -83,6 +83,7 @@ function SkeletonRow() {
 export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [loadingVenc, setLoadingVenc] = useState(true);
+  const [rangoVenc, setRangoVenc] = useState(30);
   const [cajaHoy, setCajaHoy] = useState([]);
 
   useEffect(() => {
@@ -96,6 +97,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const totalSubrubros = Object.values(rubroStats).reduce((a, b) => a + b, 0);
   const vencidos    = vencimientos.filter(v => v.dias_restantes <= 0);
   const proximos7d  = vencimientos.filter(v => v.dias_restantes > 0 && v.dias_restantes <= 7);
+  // Las vencidas (días < 0) se muestran siempre; el rango filtra solo lo que está por vencer.
+  const vencFiltrados = vencimientos.filter(v => v.dias_restantes < 0 || v.dias_restantes <= rangoVenc);
   const montoVencido = vencidos.reduce((s, v) => s + v.monto, 0);
 
   // Caja hoy
@@ -248,13 +251,30 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
 
         {/* Vencimientos */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
             <AlertTriangle size={15} className="text-amber-500" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Próximos vencimientos</h3>
             {!loadingVenc && vencimientos.length > 0 && (
-              <span className="ml-auto text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-                {vencimientos.length}
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                {vencFiltrados.length}
               </span>
+            )}
+            {!loadingVenc && vencimientos.length > 0 && (
+              <div className="flex items-center gap-1 ml-auto">
+                {[7, 14, 30].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setRangoVenc(d)}
+                    className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                      rangoVenc === d
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
@@ -269,9 +289,13 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               <TrendingUp size={28} className="mx-auto mb-2 text-green-300 dark:text-green-700" />
               <p className="text-sm text-slate-400">Sin vencimientos en 30 días</p>
             </div>
+          ) : vencFiltrados.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-slate-400">Sin vencimientos en los próximos {rangoVenc} días</p>
+            </div>
           ) : (
             <div className="space-y-1.5 overflow-y-auto max-h-64 pr-0.5">
-              {[...vencimientos].sort((a, b) => a.dias_restantes - b.dias_restantes).map(item => {
+              {[...vencFiltrados].sort((a, b) => a.dias_restantes - b.dias_restantes).map(item => {
                 const info = vencInfo(item.dias_restantes);
                 return (
                   <div

@@ -372,7 +372,10 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                 const esNC = m.tipo === 'nota_credito';
                 const esAjuste = m.tipo === 'ajuste';
                 const esAutoAjuste = esAjuste && m._ajuste_pago_id;
-                const venc = vencimientoLabel(m.fecha_vencimiento);
+                // Una factura saldada (sin saldo pendiente o marcada como pagada) ya no
+                // tiene vencimiento que mostrar, aunque conserve su fecha_vencimiento.
+                const saldada = esFactura && ((m.saldo ?? m.monto) <= 0.005 || m.pagado === true);
+                const venc = saldada ? null : vencimientoLabel(m.fecha_vencimiento);
 
                 const rowCls = esFactura && m.pagado
                   ? 'bg-green-50/50 dark:bg-green-900/10'

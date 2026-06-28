@@ -14,7 +14,7 @@ const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-300 m
  * Modal de edición completa de subrubro: nombre, ícono y metadata fiscal/bancaria.
  * onSave recibe el objeto con todos los campos editables.
  */
-export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
+export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title, submitLabel }) {
   const [nombre, setNombre] = useState(subrubro?.nombre || '');
   const [icon, setIcon] = useState(subrubro?.icon || '');
   const [showIconPicker, setShowIconPicker] = useState(false);
@@ -94,7 +94,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
   };
 
   return (
-    <Modal onClose={onClose} title={`Editar ${subrubro?.nombre || 'subrubro'}`}>
+    <Modal onClose={onClose} title={title || `Editar ${subrubro?.nombre || 'subrubro'}`}>
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Nombre + ícono */}
         <div>
@@ -263,7 +263,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose }) {
             disabled={saving}
             className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40"
           >
-            {saving ? 'Guardando…' : 'Guardar'}
+            {saving ? 'Guardando…' : (submitLabel || 'Guardar')}
           </button>
         </div>
       </form>

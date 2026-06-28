@@ -7,7 +7,7 @@ import ImportModal from '../components/ImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
 import toast from 'react-hot-toast';
-import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard } from 'lucide-react';
+import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, CalendarClock } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -42,6 +42,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
   const [confirmModal, setConfirmModal] = useState(null);
   const [stats, setStats] = useState({});
   const [editingMetadataSub, setEditingMetadataSub] = useState(null);
+  const [creatingSub, setCreatingSub] = useState(false);
 
   const cargarStats = () => {
     dashboardApi.getComparacion(rubro.id)
@@ -83,6 +84,17 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
       const sub = await subrubrosApi.create(rubro.id, nuevoNombre.trim());
       setSubrubros(prev => [...prev, sub].sort((a, b) => a.nombre.localeCompare(b.nombre)));
       setNuevoNombre('');
+      toast.success(`${sub.nombre} creado`);
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    }
+  };
+
+  const handleCreateMetadata = async (payload) => {
+    try {
+      const sub = await subrubrosApi.create(rubro.id, payload);
+      setSubrubros(prev => [...prev, sub].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setCreatingSub(false);
       toast.success(`${sub.nombre} creado`);
     } catch (err) {
       toast.error(getErrorMsg(err));
@@ -328,6 +340,13 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           >
             <Plus size={14} /> Agregar
           </button>
+          <button
+            onClick={() => setCreatingSub(true)}
+            className="w-full mt-2 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center justify-center gap-1"
+            title="Crear con vencimiento y datos fiscales"
+          >
+            <CalendarClock size={12} /> Más opciones (vencimiento, datos fiscales)
+          </button>
         </div>}
 
         {filtrados.length === 0 && search && (
@@ -364,6 +383,16 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
           subrubro={editingMetadataSub}
           onSave={handleSaveMetadata}
           onClose={() => setEditingMetadataSub(null)}
+        />
+      )}
+
+      {creatingSub && (
+        <SubrubroMetadataModal
+          subrubro={null}
+          title={`Nuevo ${rubro.nombre.toLowerCase()}`}
+          submitLabel="Crear"
+          onSave={handleCreateMetadata}
+          onClose={() => setCreatingSub(false)}
         />
       )}
     </div>
