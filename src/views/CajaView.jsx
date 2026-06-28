@@ -141,7 +141,7 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                     <input type="checkbox" className="accent-blue-600"
                       checked={rubrosSync.includes(r.id)}
                       onChange={() => toggleRubroSync(r.id)} />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">{r.icon ? `${r.icon} ` : ''}{r.nombre}</span>
+                    <span className="text-sm text-slate-700 dark:text-slate-200 inline-flex items-center gap-1"><EntityIcon value={r.icon} size={14} /> {r.nombre}</span>
                   </label>
                 ))
               }
@@ -381,7 +381,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
           <div className="flex gap-2">
             <select className={selectCls} value={rubroSel} onChange={e => { setRubroSel(e.target.value); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}>
               <option value="">— Rubro —</option>
-              {rubros.map(r => <option key={r.id} value={r.id}>{r.icon ? `${r.icon} ` : ''}{r.nombre}</option>)}
+              {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
             </select>
             <select className={selectCls} value={subrubroSel} onChange={e => {
               const id = e.target.value;

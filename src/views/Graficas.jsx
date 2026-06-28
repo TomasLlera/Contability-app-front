@@ -1,22 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
+import { EntityIcon } from '../icons';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
 
 const MESES = { '01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun',
                 '07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic' };
-
-const RUBRO_ICONS = ['📁','👥','🏭','🏪','🚚','💼','🏗️','📦'];
-function getRubroIcon(rubro) {
-  if (rubro.icon) return rubro.icon;
-  const n = rubro.nombre.toLowerCase();
-  if (n.includes('emple') || n.includes('person')) return '👥';
-  if (n.includes('provee') || n.includes('vendor')) return '🚚';
-  if (n.includes('client') || n.includes('venta')) return '🏪';
-  return RUBRO_ICONS[rubro.nombre.charCodeAt(0) % RUBRO_ICONS.length];
-}
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 const addDays = (dateStr, n) => {
@@ -96,7 +87,7 @@ function GraficoRanking({ comparacion, metrica, selectedId, onSelect }) {
           return (
             <button key={s.id} onClick={() => onSelect(isSelected ? null : s.id)}
               className={`w-full text-left flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
-              <span className="text-base shrink-0 w-6 text-center">{s.icon || '📁'}</span>
+              <span className="shrink-0 w-6 flex justify-center text-slate-600 dark:text-slate-300"><EntityIcon value={s.icon} size={18} /></span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-xs font-medium truncate ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>{s.nombre}</span>
@@ -373,7 +364,7 @@ export default function Graficas({ rubros = [] }) {
               <div className="flex flex-wrap items-center gap-2 mb-5">
                 <select value={selectedRubroId ?? ''} onChange={e => setSelectedRubroId(Number(e.target.value))}
                   className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                  {rubros.map(r => <option key={r.id} value={r.id}>{getRubroIcon(r)} {r.nombre}</option>)}
+                  {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
                 </select>
                 {subrubros.length > 0 && (
                   <>
@@ -381,7 +372,7 @@ export default function Graficas({ rubros = [] }) {
                     <select value={selectedSubrubroId ?? ''} onChange={e => setSelectedSubrubroId(e.target.value ? Number(e.target.value) : null)}
                       className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
                       <option value="">Todos los subrubros</option>
-                      {subrubros.map(s => <option key={s.id} value={s.id}>{s.icon ? `${s.icon} ` : ''}{s.nombre}</option>)}
+                      {subrubros.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                     </select>
                   </>
                 )}

@@ -7,7 +7,8 @@ import ImportModal from '../components/ImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
 import toast from 'react-hot-toast';
-import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, CalendarClock } from 'lucide-react';
+import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, CalendarClock, Eraser } from 'lucide-react';
+import { EntityIcon, ICON_LIST } from '../icons';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -24,7 +25,6 @@ const fmtFechaCorta = (iso) => {
 const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia' };
 const fmtMetodo = (m) => METODO_LABEL[m] || '—';
 
-const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
 
 export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight, role }) {
   const isAdmin = role !== 'viewer';
@@ -216,7 +216,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                     onClick={() => setShowIconPicker(o => !o)}
                     className="text-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg px-2 py-1 shrink-0"
                     title="Cambiar ícono"
-                  >{editIcon || '📁'}</button>
+                  ><EntityIcon value={editIcon} size={18} /></button>
                   <input
                     className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nombre"
@@ -233,8 +233,8 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                         key={ic}
                         type="button"
                         onClick={() => { setEditIcon(ic); setShowIconPicker(false); }}
-                        className={`text-lg p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors ${editIcon === ic ? 'bg-blue-100 dark:bg-blue-900/50' : ''}`}
-                      >{ic}</button>
+                        className={`flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors text-slate-600 dark:text-slate-300 ${editIcon === ic ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300' : ''}`}
+                      ><EntityIcon value={ic} size={18} /></button>
                     ))}
                   </div>
                 )}
@@ -250,14 +250,14 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                   className="w-full text-left p-4"
                 >
                   {/* Nombre + flecha */}
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="relative flex items-center justify-center mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {sub.icon && <span className="text-xl shrink-0">{sub.icon}</span>}
+                      {sub.icon && <span className="shrink-0 text-slate-700 dark:text-slate-200"><EntityIcon value={sub.icon} size={20} /></span>}
                       <p className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 transition-colors truncate">
                         {sub.nombre}
                       </p>
                     </div>
-                    <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors ml-2 shrink-0" />
+                    <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors absolute right-0 shrink-0" />
                   </div>
 
                   {/* Indicadores: próximo vencimiento → importe a vencer → saldo pendiente → forma de pago */}
@@ -291,7 +291,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                   )}
                 </button>
                 {isAdmin && (
-                  <div className="px-4 pb-3 flex gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="px-4 pb-3 flex justify-center gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={e => { e.stopPropagation(); setEditingMetadataSub(sub); }}
                       className="text-xs text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1"
@@ -309,12 +309,12 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                           },
                         });
                       }}
-                      className="text-xs text-slate-400 hover:text-orange-500 transition-colors"
-                    >Vaciar</button>
+                      className="text-xs text-slate-400 hover:text-orange-500 transition-colors inline-flex items-center gap-1"
+                    ><Eraser size={11} /> Vaciar</button>
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(sub.id); }}
-                      className="text-xs text-slate-400 hover:text-red-500 transition-colors"
-                    >Borrar</button>
+                      className="text-xs text-slate-400 hover:text-red-500 transition-colors inline-flex items-center gap-1"
+                    ><Trash2 size={11} /> Borrar</button>
                   </div>
                 )}
               </>

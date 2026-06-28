@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock } from 'lucide-react';
+import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban } from 'lucide-react';
+import { EntityIcon, ICON_LIST } from '../icons';
 
-const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
 
 // Índice = Date.getDay() → 0=domingo … 6=sábado (debe coincidir con el backend).
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -105,7 +105,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
               onClick={() => setShowIconPicker(o => !o)}
               className="text-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg px-2 py-1.5 shrink-0"
               title="Cambiar ícono"
-            >{icon || '📁'}</button>
+            ><EntityIcon value={icon} size={18} /></button>
             <input
               type="text"
               className={inputCls}
@@ -117,13 +117,19 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
           </div>
           {showIconPicker && (
             <div className="mt-2 grid grid-cols-10 gap-0.5 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 bg-white dark:bg-slate-700">
+              <button
+                type="button"
+                onClick={() => { setIcon(''); setShowIconPicker(false); }}
+                title="Sin ícono"
+                className={`flex items-center justify-center text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 ${icon === '' ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}
+              ><Ban size={16} /></button>
               {ICON_LIST.map(ic => (
                 <button
                   key={ic}
                   type="button"
                   onClick={() => { setIcon(ic); setShowIconPicker(false); }}
-                  className={`text-lg p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 ${ic === icon ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}
-                >{ic}</button>
+                  className={`flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 ${ic === icon ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300' : ''}`}
+                ><EntityIcon value={ic} size={18} /></button>
               ))}
             </div>
           )}

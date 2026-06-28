@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { stockApi, subrubrosApi, rubrosApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, ChevronDown, X, Check, Link2, Percent, Download, Upload } from 'lucide-react';
+import { EntityIcon } from '../icons';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
@@ -87,7 +88,7 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
                     onClick={() => handleOpenRubro(r)}
                     className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-300"
                   >
-                    <span className="text-base shrink-0">{r.icon || '📁'}</span>
+                    <span className="shrink-0 text-slate-600 dark:text-slate-300"><EntityIcon value={r.icon} size={16} /></span>
                     <span className="flex-1 font-medium truncate">{r.nombre}</span>
                     <ChevronRight size={13} className="text-slate-400 shrink-0" />
                   </div>
@@ -101,7 +102,7 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
                 className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 transition-colors shrink-0 text-left"
               >
                 <ChevronRight size={13} className="rotate-180 shrink-0" />
-                <span className="text-base shrink-0">{rubroActivo.icon || '📁'}</span>
+                <span className="shrink-0 text-slate-600 dark:text-slate-300"><EntityIcon value={rubroActivo.icon} size={16} /></span>
                 <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{rubroActivo.nombre}</span>
               </button>
               <div className="overflow-y-auto flex-1">
@@ -114,7 +115,7 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
                     onClick={() => handleSelect(s.id, s.nombre)}
                     className={`flex items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${value === s.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                   >
-                    {s.icon && <span className="text-sm shrink-0">{s.icon}</span>}
+                    {s.icon && <span className="shrink-0 text-slate-500 dark:text-slate-400"><EntityIcon value={s.icon} size={15} /></span>}
                     <span className="flex-1 truncate">{s.nombre}</span>
                     {value === s.id && <Check size={12} className="shrink-0" />}
                   </div>

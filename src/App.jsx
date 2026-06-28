@@ -11,20 +11,21 @@ import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
 import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2 } from 'lucide-react';
+import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
-const RUBRO_ICONS = ['📁', '👥', '🏭', '🏪', '🚚', '💼', '🏗️', '📦'];
-const ICON_LIST = ['📁','📂','👥','🏭','🏪','🚚','💼','🏗️','📦','💰','🧾','📊','🏦','⚡','🔧','🛠️','🏠','🌐','📮','🚗','🎯','📝','🔑','💡','🌿','🔒','⭐','✈️','🎨','🔋'];
+const RUBRO_ICONS = ['folder', 'users', 'factory', 'store', 'truck', 'briefcase', 'construction', 'package'];
 
+// Devuelve siempre una key del registro de iconos (resuelve emojis viejos).
 function getRubroIcon(rubro) {
-  if (rubro.icon) return rubro.icon;
+  if (rubro.icon) return resolveIconKey(rubro.icon) || rubro.icon;
   const n = rubro.nombre.toLowerCase();
-  if (n.includes('emple') || n.includes('person') || n.includes('staff')) return '👥';
-  if (n.includes('provee') || n.includes('vendor')) return '🚚';
-  if (n.includes('client') || n.includes('venta')) return '🏪';
-  if (n.includes('empresa') || n.includes('socio')) return '🏭';
-  if (n.includes('gasto') || n.includes('servicio')) return '💼';
+  if (n.includes('emple') || n.includes('person') || n.includes('staff')) return 'users';
+  if (n.includes('provee') || n.includes('vendor')) return 'truck';
+  if (n.includes('client') || n.includes('venta')) return 'store';
+  if (n.includes('empresa') || n.includes('socio')) return 'factory';
+  if (n.includes('gasto') || n.includes('servicio')) return 'briefcase';
   return RUBRO_ICONS[rubro.nombre.charCodeAt(0) % RUBRO_ICONS.length];
 }
 
@@ -447,8 +448,8 @@ export default function App() {
                           {ICON_LIST.map(ic => (
                             <button key={ic} type="button"
                               onClick={() => { setEditLocalIcon(ic); setShowLocalIconPicker(false); }}
-                              className={`text-sm p-1 rounded hover:bg-slate-600 transition-colors ${editLocalIcon === ic ? 'bg-slate-600' : ''}`}
-                            >{ic}</button>
+                              className={`flex items-center justify-center p-1 rounded hover:bg-slate-600 transition-colors ${editLocalIcon === ic ? 'bg-slate-600 text-white' : 'text-slate-300'}`}
+                            ><EntityIcon value={ic} size={16} /></button>
                           ))}
                         </div>
                       )}
@@ -460,12 +461,12 @@ export default function App() {
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-slate-300 hover:bg-slate-700/50 hover:text-slate-200"
                       >
                         {isExpanded ? <ChevronDown size={11} className="shrink-0" /> : <ChevronRight size={11} className="shrink-0" />}
-                        <span className="shrink-0">{local.icon || '🏠'}</span>
+                        <span className="shrink-0"><EntityIcon value={local.icon} fallback="home" size={14} /></span>
                         <span className="flex-1 text-left truncate text-xs font-medium">{local.nombre}</span>
                         <span className="text-xs text-slate-600 group-hover:hidden">{localRubros.length}</span>
                         <span className="hidden group-hover:flex items-center gap-0.5">
                           <span role="button"
-                            onClick={e => { e.stopPropagation(); setEditingLocal(local.id); setEditLocalNombre(local.nombre); setEditLocalIcon(local.icon || '🏠'); setShowLocalIconPicker(false); }}
+                            onClick={e => { e.stopPropagation(); setEditingLocal(local.id); setEditLocalNombre(local.nombre); setEditLocalIcon(resolveIconKey(local.icon) || 'home'); setShowLocalIconPicker(false); }}
                             className="text-slate-400 hover:text-blue-400 transition-colors p-0.5 rounded"
                           ><Pencil size={11} /></span>
                           <span role="button"
@@ -486,8 +487,8 @@ export default function App() {
                               <div className="flex items-center gap-1">
                                 <button type="button"
                                   onClick={() => setShowIconPicker(o => !o)}
-                                  className="text-base bg-slate-700 hover:bg-slate-600 rounded px-1.5 py-0.5 shrink-0"
-                                >{editIcon}</button>
+                                  className="bg-slate-700 hover:bg-slate-600 rounded px-1.5 py-1 shrink-0 text-slate-200"
+                                ><EntityIcon value={editIcon} size={16} /></button>
                                 <input
                                   className="flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={editNombre}
@@ -503,8 +504,8 @@ export default function App() {
                                   {ICON_LIST.map(ic => (
                                     <button key={ic} type="button"
                                       onClick={() => { setEditIcon(ic); setShowIconPicker(false); }}
-                                      className={`text-sm p-1 rounded hover:bg-slate-600 transition-colors ${editIcon === ic ? 'bg-slate-600' : ''}`}
-                                    >{ic}</button>
+                                      className={`flex items-center justify-center p-1 rounded hover:bg-slate-600 transition-colors ${editIcon === ic ? 'bg-slate-600 text-white' : 'text-slate-300'}`}
+                                    ><EntityIcon value={ic} size={16} /></button>
                                   ))}
                                 </div>
                               )}
@@ -518,7 +519,7 @@ export default function App() {
                                   : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
                               }`}
                             >
-                              <span className="text-sm shrink-0">{getRubroIcon(rubro)}</span>
+                              <span className="shrink-0"><EntityIcon value={getRubroIcon(rubro)} size={14} /></span>
                               <span className="flex-1 text-left truncate text-xs">{rubro.nombre}</span>
                               <span className="text-xs text-slate-600 group-hover:hidden">{rubroStats[rubro.id] ?? 0}</span>
                               <span className="hidden group-hover:flex items-center gap-0.5">
@@ -653,10 +654,10 @@ export default function App() {
               >
                 <ArrowLeft size={18} />
               </button>
-              <span className="text-xl">{getRubroIcon(activeView)}</span>
+              <span className="text-xl"><EntityIcon value={getRubroIcon(activeView)} size={20} /></span>
               <div>
                 {activeLocal && (
-                  <p className="text-xs text-slate-400 leading-none mb-0.5">{activeLocal.icon || '🏠'} {activeLocal.nombre}</p>
+                  <p className="text-xs text-slate-400 leading-none mb-0.5 flex items-center gap-1"><EntityIcon value={activeLocal.icon} fallback="home" size={12} /> {activeLocal.nombre}</p>
                 )}
                 <p className="font-semibold text-slate-800 dark:text-slate-100 leading-tight">{activeView.nombre}</p>
               </div>

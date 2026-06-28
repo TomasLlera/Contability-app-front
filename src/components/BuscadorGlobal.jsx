@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { movimientosApi } from '../api';
 import { Search, X } from 'lucide-react';
+import { EntityIcon } from '../icons';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
 
@@ -93,7 +94,7 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
                 i === activeIdx ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
               }`}
             >
-              <span className="text-xl mt-0.5 shrink-0">{mov.subrubro?.icon || '📄'}</span>
+              <span className="mt-0.5 shrink-0 text-slate-500 dark:text-slate-400"><EntityIcon value={mov.subrubro?.icon} fallback="note" size={18} /></span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">
