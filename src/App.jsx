@@ -191,7 +191,8 @@ export default function App() {
   const cargarVencCount = async () => {
     try {
       const data = await movimientosApi.getVencimientos(7);
-      setVencCount((data.vencimientos || []).length);
+      const lista = Array.isArray(data) ? data : (data?.vencimientos || []);
+      setVencCount(lista.length);
     } catch {}
   };
 
@@ -365,11 +366,6 @@ export default function App() {
           >
             <Home size={15} />
             <span className="flex-1 text-left">Inicio</span>
-            {vencCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1 leading-none">
-                {vencCount > 99 ? '99+' : vencCount}
-              </span>
-            )}
           </button>
 
           <button

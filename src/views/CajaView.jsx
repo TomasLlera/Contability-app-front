@@ -541,8 +541,8 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1"><Clock size={10} /> Próximos a vencer</p>
           {vencimientos.map((v, i) => (
             <div key={i} className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
-              <span className="truncate max-w-32">{v.subrubro_nombre}</span>
-              <span>{fmt(v.monto_pendiente)}</span>
+              <span className="truncate max-w-32">{v.subrubro?.nombre}</span>
+              <span>{fmt(v.monto)}</span>
             </div>
           ))}
         </div>
@@ -642,7 +642,7 @@ export default function CajaView({ rubros = [] }) {
   const cargarVencimientos = async () => {
     try {
       const data = await movimientosApi.getVencimientos(7);
-      setVencimientos(data.vencimientos || []);
+      setVencimientos(Array.isArray(data) ? data : (data?.vencimientos || []));
     } catch {}
   };
 
@@ -819,8 +819,8 @@ export default function CajaView({ rubros = [] }) {
   const gastosTrans = gastos.filter(m => m.metodo === 'transferencia'  && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
   const sinConfirmarEfvo  = gastos.filter(m => m.metodo === 'efectivo'      && m.confirmado === false).reduce((s,m) => s+m.monto,0);
   const sinConfirmarTrans = gastos.filter(m => m.metodo === 'transferencia' && m.confirmado === false).reduce((s,m) => s+m.monto,0);
-  const vencEfvo    = vencimientos.filter(v => v.metodo !== 'transferencia');
-  const vencTrans   = vencimientos.filter(v => v.metodo === 'transferencia');
+  const vencEfvo    = vencimientos.filter(v => v.metodo_pago !== 'transferencia');
+  const vencTrans   = vencimientos.filter(v => v.metodo_pago === 'transferencia');
 
   const formProps = {
     fecha, onSave: handleSave,

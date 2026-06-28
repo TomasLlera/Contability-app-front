@@ -101,6 +101,11 @@ export const authApi = {
     if (!token) return null;
     try { return JSON.parse(atob(token.split('.')[1])).role || 'admin'; } catch { return 'admin'; }
   },
+  getUsuario: () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try { return JSON.parse(atob(token.split('.')[1])).usuario || null; } catch { return null; }
+  },
   // Renueva el token si le quedan menos de 3 días de vida
   refreshIfNeeded: async () => {
     const token = localStorage.getItem('token');

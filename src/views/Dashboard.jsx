@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { movimientosApi, cajaApi } from '../api';
+import { movimientosApi, cajaApi, dashboardApi, authApi } from '../api';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
-  ChevronRight, Building2, CheckCircle2, AlertTriangle, Banknote,
-  ArrowLeftRight, Check
+  ChevronRight, ChevronLeft, Building2, CheckCircle2, AlertTriangle, Banknote,
+  ArrowLeftRight, Check, Truck
 } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -11,18 +11,11 @@ const todayStr = () => new Date().toISOString().split('T')[0];
 
 function greeting() {
   const h = new Date().getHours();
-  if (h < 12) return 'Buenos días';
-  if (h < 19) return 'Buenas tardes';
-  return 'Buenas noches';
-}
-
-function getRubroIcon(rubro) {
-  if (rubro.icon) return rubro.icon;
-  const n = rubro.nombre.toLowerCase();
-  if (n.includes('emple') || n.includes('person')) return '👥';
-  if (n.includes('provee') || n.includes('vendor')) return '🚚';
-  if (n.includes('cliente') || n.includes('venta')) return '🏪';
-  return '📁';
+  const base = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const usuario = authApi.getUsuario();
+  if (!usuario) return base;
+  const nombre = usuario.charAt(0).toUpperCase() + usuario.slice(1);
+  return `${base} ${nombre}`;
 }
 
 function vencInfo(dias) {
@@ -80,11 +73,20 @@ function SkeletonRow() {
   );
 }
 
+const mesActualStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [loadingVenc, setLoadingVenc] = useState(true);
   const [rangoVenc, setRangoVenc] = useState(30);
+  const [rangoVencOpen, setRangoVencOpen] = useState(false);
   const [cajaHoy, setCajaHoy] = useState([]);
+  const [provTendencia, setProvTendencia] = useState(null);
+
+  const proveedoresRubro = rubros.find(r => r.nombre.toLowerCase().includes('provee'));
 
   useEffect(() => {
     movimientosApi.getVencimientos(30).then(data => {
@@ -93,6 +95,25 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
     }).catch(() => setLoadingVenc(false));
     cajaApi.getByFecha(todayStr()).then(setCajaHoy).catch(() => {});
   }, []);
+
+  const proveedoresRubroId = proveedoresRubro?.id;
+  useEffect(() => {
+    if (!proveedoresRubroId) return;
+    dashboardApi.getTendencia(proveedoresRubroId, 6)
+      .then(d => setProvTendencia(d.tendencia ?? []))
+      .catch(() => setProvTendencia([]));
+  }, [proveedoresRubroId]);
+
+  // Totales de Proveedores del mes actual (mismas métricas que la gráfica)
+  const mesActual = mesActualStr();
+  const provMesEntry = provTendencia?.find(t => t.mes === mesActual);
+  const provUltima = provTendencia?.length ? provTendencia[provTendencia.length - 1] : null;
+  const provFacturas = provMesEntry?.facturado ?? 0;
+  const provPagos = provMesEntry?.pagado ?? 0;
+  // La deuda es acumulada: si no hubo movimientos este mes, se arrastra la del último mes con datos.
+  const provDeuda = provMesEntry?.diferencia ?? provUltima?.diferencia ?? 0;
+  const provFecha = new Date(mesActual + '-01T00:00:00');
+  const provNombreMes = `${provFecha.toLocaleDateString('es-AR', { month: 'long' })} ${provFecha.getFullYear()}`;
 
   const totalSubrubros = Object.values(rubroStats).reduce((a, b) => a + b, 0);
   const vencidos    = vencimientos.filter(v => v.dias_restantes <= 0);
@@ -124,7 +145,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
         <div>
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{greeting()}</h1>
           <p className="text-sm text-slate-400 mt-0.5 capitalize">
-            {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
           </p>
         </div>
         {tieneAlertas && (
@@ -261,19 +282,29 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
             )}
             {!loadingVenc && vencimientos.length > 0 && (
               <div className="flex items-center gap-1 ml-auto">
-                {[7, 14, 30].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setRangoVenc(d)}
-                    className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
-                      rangoVenc === d
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                    }`}
-                  >
-                    {d}d
-                  </button>
-                ))}
+                <button
+                  onClick={() => setRangoVencOpen(o => !o)}
+                  title="Cambiar rango"
+                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                >
+                  <ChevronLeft size={13} className={`transition-transform ${rangoVencOpen ? 'rotate-180' : ''}`} />
+                  {rangoVenc}d
+                </button>
+                <div className={`flex items-center gap-1 overflow-hidden transition-all duration-200 ${rangoVencOpen ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0'}`}>
+                  {[7, 14, 30].map(d => (
+                    <button
+                      key={d}
+                      onClick={() => { setRangoVenc(d); setRangoVencOpen(false); }}
+                      className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                        rangoVenc === d
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -320,37 +351,35 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
         </div>
       </div>
 
-      {/* Navegación rápida */}
-      {locales.length > 0 && rubros.length > 0 && (
+      {/* Proveedores — mes actual */}
+      {proveedoresRubro && (
         <div>
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Navegación rápida</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {locales.map(local => {
-              const localRubros = rubros.filter(r => r.local_id === local.id);
-              if (localRubros.length === 0) return null;
-              return (
-                <div key={local.id} className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 transition-shadow hover:shadow-card-hover">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="emoji text-base">{local.icon || '🏠'}</span>
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{local.nombre}</span>
-                    <span className="ml-auto text-xs text-slate-400">{localRubros.length} rubro{localRubros.length !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {localRubros.map(rubro => (
-                      <button key={rubro.id}
-                        onClick={() => onNavigate?.(rubro, null)}
-                        className="press flex items-center gap-1.5 text-xs bg-slate-50 dark:bg-slate-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-700 rounded-lg px-2.5 py-1.5">
-                        <span className="emoji">{getRubroIcon(rubro)}</span>
-                        <span>{rubro.nombre}</span>
-                        {rubroStats[rubro.id] > 0 && (
-                          <span className="text-slate-400 dark:text-slate-500 text-xs">{rubroStats[rubro.id]}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Saldos mensuales</p>
+          <div
+            onClick={() => onNavigate?.(proveedoresRubro, null)}
+            className="group bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
+                <Truck size={16} />
+              </span>
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{proveedoresRubro.nombre}</span>
+              <span className="ml-auto text-xs text-slate-400 capitalize">{provNombreMes}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3">
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Facturas</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums">{fmt(provFacturas)}</p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3">
+                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">Pagos</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums">{fmt(provPagos)}</p>
+              </div>
+              <div className={`rounded-xl p-3 ${provDeuda > 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-slate-50 dark:bg-slate-700/40'}`}>
+                <p className={`text-xs font-medium mb-1 ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>Deuda</p>
+                <p className={`text-lg font-bold tabular-nums ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(provDeuda)}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}

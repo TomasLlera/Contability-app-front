@@ -56,7 +56,8 @@ function TipoBadge({ mov }) {
   return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendiente</span>;
 }
 
-export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) {
+export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight, role }) {
+  const isAdmin = role !== 'viewer';
   const [data, setData] = useState({ movimientos: [], monto_base: 0, saldo_total: null, saldo_anterior: null });
   const [campos, setCampos] = useState([]);
   const [mesActual, setMesActual] = useState(mesActualKey);
@@ -305,23 +306,27 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
             onClick={() => setShowExportModal(true)}
             className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"
           ><Download size={14} /> Excel</button>
-          <button
-            onClick={() => setConfirmModal({
-              message: `¿Borrar TODOS los movimientos de "${subrubro.nombre}"? Esta acción no se puede deshacer.`,
-              onConfirm: async () => {
-                await subrubrosApi.clearMovimientos(subrubro.id);
-                setConfirmModal(null);
-                cargar(mesActual, mostrarTodo);
-                cargarTodos();
-                toast.success('Movimientos eliminados');
-              },
-            })}
-            className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
-          ><Trash2 size={14} /> Limpiar</button>
-          <button
-            onClick={() => { setEditingMov(null); setShowForm(true); }}
-            className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 shadow-sm"
-          >+ Movimiento</button>
+          {isAdmin && (
+            <button
+              onClick={() => setConfirmModal({
+                message: `¿Borrar TODOS los movimientos de "${subrubro.nombre}"? Esta acción no se puede deshacer.`,
+                onConfirm: async () => {
+                  await subrubrosApi.clearMovimientos(subrubro.id);
+                  setConfirmModal(null);
+                  cargar(mesActual, mostrarTodo);
+                  cargarTodos();
+                  toast.success('Movimientos eliminados');
+                },
+              })}
+              className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
+            ><Trash2 size={14} /> Limpiar</button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => { setEditingMov(null); setShowForm(true); }}
+              className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 shadow-sm"
+            >+ Movimiento</button>
+          )}
         </div>
       </div>
 
@@ -336,9 +341,11 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
               ? `Sin facturas ${estadoFiltro}`
               : `Sin movimientos en ${parseMes(mesActual)}`}
           </p>
-          <button onClick={() => setShowForm(true)} className="mt-3 text-blue-600 hover:underline text-sm">
-            Agregar el primero
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowForm(true)} className="mt-3 text-blue-600 hover:underline text-sm">
+              Agregar el primero
+            </button>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
@@ -489,10 +496,14 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight }) 
                     )}
 
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {!esAutoAjuste && (
-                        <button onClick={() => handleEdit(m)} className="text-blue-500 hover:text-blue-700 text-xs mr-3">Editar</button>
+                      {isAdmin && (
+                        <>
+                          {!esAutoAjuste && (
+                            <button onClick={() => handleEdit(m)} className="text-blue-500 hover:text-blue-700 text-xs mr-3">Editar</button>
+                          )}
+                          <button onClick={() => handleDelete(m)} className="text-red-400 hover:text-red-600 text-xs">Borrar</button>
+                        </>
                       )}
-                      <button onClick={() => handleDelete(m)} className="text-red-400 hover:text-red-600 text-xs">Borrar</button>
                     </td>
                   </tr>
                 );
