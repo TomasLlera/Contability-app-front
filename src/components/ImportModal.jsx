@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { movimientosApi, camposApi, rubrosApi } from '../api';
+import { parseWorkbook, isNumericCol, fmtSample } from '../utils/excel';
 import { Upload, FileSpreadsheet, Check, X, AlertCircle } from 'lucide-react';
 
 const META_ROLES = [
@@ -26,74 +27,6 @@ function autoDetectRole(headerName, camposRubro) {
     if (hl === campo.nombre.toLowerCase()) return `campo:${campo.nombre}`;
   }
   return 'ignore';
-}
-
-function expandMergedCells(sheet) {
-  const merges = sheet['!merges'] || [];
-  for (const merge of merges) {
-    const origin = XLSX.utils.encode_cell(merge.s);
-    const originVal = sheet[origin];
-    if (!originVal) continue;
-    for (let r = merge.s.r; r <= merge.e.r; r++) {
-      for (let c = merge.s.c; c <= merge.e.c; c++) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        if (!sheet[addr]) sheet[addr] = { ...originVal };
-      }
-    }
-  }
-  return sheet;
-}
-
-// Palabras que delatan la fila de encabezado real (espejo del backend).
-const HEADER_TOKENS = ['fecha', 'importe', 'monto', 'debe', 'haber', 'pago', 'abono', 'cobrado', 'pagado', 'factura', 'comprobante', 'saldo', 'total', 'vencimiento', 'venc', 'vto', 'concepto', 'descripcion', 'detalle'];
-
-function scoreHeaderRow(row) {
-  let score = 0;
-  for (const v of (row || [])) {
-    if (v == null) continue;
-    const s = String(v).toLowerCase().trim();
-    if (!s) continue;
-    if (HEADER_TOKENS.some(t => s === t || s.includes(t))) score++;
-  }
-  return score;
-}
-
-// Detecta la fila de encabezado escaneando desde `desde`. Cada hoja se alinea
-// sola aunque tenga filas de título (nombre del subrubro) por encima.
-function detectHeaderRow(matrix, desde = 0, maxScan = 15) {
-  let bestIdx = desde, bestScore = -1;
-  const end = Math.min(matrix.length, desde + maxScan);
-  for (let i = desde; i < end; i++) {
-    const score = scoreHeaderRow(matrix[i]);
-    if (score > bestScore) { bestScore = score; bestIdx = i; }
-  }
-  return bestScore >= 2 ? bestIdx : desde;
-}
-
-function parseWorkbook(wb, skip) {
-  return wb.SheetNames.map(name => {
-    expandMergedCells(wb.Sheets[name]);
-    const raw = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: true });
-    const headerIdx = detectHeaderRow(raw, skip);
-    const headerRow = raw[headerIdx] || [];
-    const headers = headerRow.map(v => (v == null ? '' : String(v).trim()));
-    const dataRows = raw.slice(headerIdx + 1, headerIdx + 4);
-    const samples = headers.map((_, ci) => dataRows.map(r => r[ci] ?? null));
-    return { name, headers, samples };
-  }).filter(s => s.headers.some(h => h.length > 0));
-}
-
-function isNumericCol(samples) {
-  const vals = samples.filter(v => v !== null && v !== undefined && v !== '');
-  if (vals.length === 0) return false;
-  return vals.some(v => typeof v === 'number' || !isNaN(parseFloat(String(v).replace(',', '.'))));
-}
-
-function fmtSample(v) {
-  if (v === null || v === undefined || v === '') return '—';
-  if (v instanceof Date) return v.toLocaleDateString('es-AR');
-  if (typeof v === 'number') return v.toLocaleString('es-AR');
-  return String(v).substring(0, 20);
 }
 
 export default function ImportModal({ rubro, onClose, onSuccess }) {

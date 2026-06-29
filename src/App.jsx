@@ -6,11 +6,12 @@ import Graficas from './views/Graficas';
 import CajaView from './views/CajaView';
 import SettingsView from './views/SettingsView';
 import StockView from './views/StockView';
+import IvaView from './views/IvaView';
 import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2 } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2, Receipt } from 'lucide-react';
 import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
@@ -45,6 +46,7 @@ export default function App() {
   const [confirmModal, setConfirmModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [localesSectionOpen, setLocalesSectionOpen] = useState(true);
+  const [ivaSectionOpen, setIvaSectionOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'dark';
@@ -399,6 +401,37 @@ export default function App() {
             Stock
           </button>
 
+          <div>
+            <button
+              onClick={() => setIvaSectionOpen(v => !v)}
+              className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                activeView === 'iva-compras' || activeView === 'iva-ventas'
+                  ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30'
+                  : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+              }`}
+            >
+              <Receipt size={15} />
+              <span className="flex-1 text-left">IVA</span>
+              {ivaSectionOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+            {ivaSectionOpen && (
+              <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-700/40 pl-2">
+                <button
+                  onClick={() => { setActiveView('iva-compras'); setInitialSubrubro(null); closeSidebar(); }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                    activeView === 'iva-compras' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                  }`}
+                >Compras</button>
+                <button
+                  onClick={() => { setActiveView('iva-ventas'); setInitialSubrubro(null); closeSidebar(); }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                    activeView === 'iva-ventas' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                  }`}
+                >Ventas</button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => { setActiveView('config'); setInitialSubrubro(null); closeSidebar(); }}
             className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
@@ -677,6 +710,11 @@ export default function App() {
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Stock</h1>
               <p className="text-xs text-slate-400">Gestión de productos e inventario</p>
             </div>
+          ) : activeView === 'iva-compras' || activeView === 'iva-ventas' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">IVA</h1>
+              <p className="text-xs text-slate-400">Compras, ventas y diferencia mensual</p>
+            </div>
           ) : activeView === 'config' ? (
             <div>
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Configuración</h1>
@@ -751,6 +789,8 @@ export default function App() {
             <CajaView rubros={rubros} />
           ) : activeView === 'stock' ? (
             <StockView role={role} />
+          ) : activeView === 'iva-compras' || activeView === 'iva-ventas' ? (
+            <IvaView key={activeView} initialTab={activeView === 'iva-ventas' ? 'ventas' : 'compras'} role={role} />
           ) : activeView === 'config' ? (
             <SettingsView />
           ) : (

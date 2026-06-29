@@ -257,6 +257,43 @@ export const stockApi = {
     api.get('/stock/graficas', { params: { vista, anio } }).then(r => r.data),
 };
 
+export const ivaApi = {
+  // Config de columnas
+  getConfig: () => api.get('/iva/config').then(r => r.data),
+  saveConfig: (mapping) => api.put('/iva/config', { mapping }).then(r => r.data),
+  // Compras
+  getCompras: () => api.get('/iva/compras').then(r => r.data),
+  getLotes: () => api.get('/iva/compras/lotes').then(r => r.data),
+  importCompras: (file, sheet = null, { dryRun = false, incluirDuplicados = false } = {}) => {
+    const fd = new FormData(); fd.append('file', file);
+    if (sheet) fd.append('sheet', sheet);
+    if (dryRun) fd.append('dryRun', 'true');
+    if (incluirDuplicados) fd.append('incluirDuplicados', 'true');
+    return api.post('/iva/compras/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+  },
+  deleteCompra: (id) => api.delete(`/iva/compras/${id}`).then(r => r.data),
+  clearCompras: (lote) => api.delete('/iva/compras', { params: lote ? { lote } : {} }).then(r => r.data),
+  // Ventas (carga manual)
+  getVentas: () => api.get('/iva/ventas').then(r => r.data),
+  createVenta: (data) => api.post('/iva/ventas', data).then(r => r.data),
+  updateVenta: (id, data) => api.put(`/iva/ventas/${id}`, data).then(r => r.data),
+  deleteVenta: (id) => api.delete(`/iva/ventas/${id}`).then(r => r.data),
+  // Cruce mensual
+  getResumen: () => api.get('/iva/resumen').then(r => r.data),
+  exportResumenExcel: async () => {
+    const res = await api.get('/iva/export-resumen', { responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a'); a.href = url; a.download = 'iva-cruce.xlsx'; a.click();
+    URL.revokeObjectURL(url);
+  },
+  exportResumenPdf: async () => {
+    const res = await api.get('/iva/export-resumen-pdf', { responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a'); a.href = url; a.download = 'iva-cruce.pdf'; a.click();
+    URL.revokeObjectURL(url);
+  },
+};
+
 export const appConfigApi = {
   get: () => api.get('/config').then(r => r.data),
   update: (data) => api.put('/config', data).then(r => r.data),
