@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban } from 'lucide-react';
+import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet } from 'lucide-react';
 import { EntityIcon, ICON_LIST } from '../icons';
 
 
@@ -30,6 +30,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : ''
   );
   const [notas, setNotas] = useState(subrubro?.notas || '');
+  const [metodoPagoDefault, setMetodoPagoDefault] = useState(subrubro?.metodo_pago_default || 'ambas');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     setDiaVencimiento(subrubro?.dia_vencimiento != null ? String(subrubro.dia_vencimiento) : '');
     setDiaSemanaVencimiento(subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : '');
     setNotas(subrubro?.notas || '');
+    setMetodoPagoDefault(subrubro?.metodo_pago_default || 'ambas');
   }, [subrubro?.id]);
 
   const handleSubmit = async (e) => {
@@ -86,6 +88,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         modo_vencimiento: modoVencimiento,
         dia_vencimiento: dia,
         dia_semana_vencimiento: diaSemana,
+        metodo_pago_default: metodoPagoDefault,
         notas: notas.trim(),
       });
     } finally {
@@ -241,6 +244,24 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
               onChange={e => setAlias(e.target.value)}
             />
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>
+            <Wallet size={11} className="inline mr-1" /> Método de pago predeterminado
+          </label>
+          <select
+            className={inputCls}
+            value={metodoPagoDefault}
+            onChange={e => setMetodoPagoDefault(e.target.value)}
+          >
+            <option value="ambas">Ambas (el usuario elige al cargar)</option>
+            <option value="transferencia">Transferencia (automático)</option>
+            <option value="efectivo">Efectivo (automático)</option>
+          </select>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Si elegís un método fijo, los pagos de este subrubro lo toman automáticamente y aparecen en esa sección de Caja del día. Con "Ambas" se elige al momento de cargar.
+          </p>
         </div>
 
         <div>

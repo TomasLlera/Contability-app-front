@@ -17,6 +17,9 @@ const IVA_FIELDS = [
   { key: 'otros_atributos', label: 'Otros Atributos', required: false, sum: false, syn: ['Otros Atributos', 'Otros', 'Otros Tributos'] },
   { key: 'total_iva',       label: 'Total IVA',       required: false, sum: true,  syn: ['Total IVA', 'Total I.V.A.', 'IVA Total'] },
   { key: 'imp_total',       label: 'Imp. Total',      required: true,  sum: true,  syn: ['Imp. Total', 'Imp Total', 'Importe Total', 'Total Comprobante', 'Total'] },
+  // Retenciones/percepciones: no se suman al Imp. Total; se acumulan aparte por mes.
+  { key: 'percepcion_iva',  label: 'Percepción IVA',  required: false, sum: false, syn: ['Percepción IVA', 'Percepcion IVA', 'Perc. IVA', 'Percepción de IVA', 'Percep IVA'] },
+  { key: 'ingresos_brutos', label: 'Ingresos Brutos', required: false, sum: false, syn: ['Ingresos Brutos', 'IIBB', 'Ing. Brutos', 'Percepción IIBB', 'Percepcion IIBB', 'Perc. IIBB'] },
 ];
 
 // Tokens para detectar la fila de encabezado (compras AFIP).

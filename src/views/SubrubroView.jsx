@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet, Banknote, ArrowLeftRight, Edit3 } from 'lucide-react';
 import ExportModal from '../components/ExportModal';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
 function vencimientoLabel(fechaVenc) {
   if (!fechaVenc) return null;
@@ -56,7 +56,7 @@ function TipoBadge({ mov }) {
   return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendiente</span>;
 }
 
-export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight, role }) {
+export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   const isAdmin = role !== 'viewer';
   const [data, setData] = useState({ movimientos: [], monto_base: 0, saldo_total: null, saldo_anterior: null });
   const [campos, setCampos] = useState([]);
@@ -112,6 +112,8 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight, ro
           facturas_vinculadas_ids,
           concepto_diferencia,
           campos_extra: rest.campos_extra,
+          metodo_pago: rest.metodo_pago,
+          idempotency_key: rest.idempotency_key,
         };
         if (editingMov) {
           await movimientosApi.actualizarPagoVinculado(editingMov.id, payload);
@@ -131,6 +133,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight, ro
       toast.success(editingMov ? 'Movimiento actualizado' : 'Movimiento guardado');
     } catch (err) {
       toast.error(getErrorMsg(err));
+      throw err; // que el form vuelva a habilitar el botón para reintentar
     }
   };
 
@@ -513,15 +516,6 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight, ro
         </div>
       ))}
 
-      {/* Botón flotante de volver */}
-      <button
-        onClick={onBack}
-        className={`fixed bottom-6 z-40 flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:shadow-xl ${sidebarRight ? 'left-6' : 'right-6'}`}
-      >
-        <ArrowLeft size={15} />
-        Volver
-      </button>
-
       {confirmModal && (
         <ConfirmModal
           message={confirmModal.message}
@@ -542,6 +536,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, sidebarRight, ro
           <MovimientoForm
             campos={campos}
             movimiento={editingMov}
+            metodoDefault={subrubro.metodo_pago_default || 'ambas'}
             todasFacturasPendientes={(() => {
               // Al editar un pago vinculado, incluir también las facturas ya pagadas
               // por ese pago (que no aparecerían en la lista de pendientes)

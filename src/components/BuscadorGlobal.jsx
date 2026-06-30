@@ -3,7 +3,7 @@ import { movimientosApi } from '../api';
 import { Search, X } from 'lucide-react';
 import { EntityIcon } from '../icons';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
 export default function BuscadorGlobal({ onNavigate, onClose }) {
   const [query, setQuery] = useState('');

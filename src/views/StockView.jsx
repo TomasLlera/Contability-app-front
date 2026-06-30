@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, ChevronDown, X, Check, Link2, Percent, Download, Upload } from 'lucide-react';
 import { EntityIcon } from '../icons';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
 
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400';

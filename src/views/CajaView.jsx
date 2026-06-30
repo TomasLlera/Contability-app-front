@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { cajaApi, movimientosApi, subrubrosApi } from '../api';
+import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
-  Link2, ChevronDown
+  Link2, ChevronDown, RefreshCw, Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { EntityIcon } from '../icons';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
 const addDays = (dateStr, n) => {
   const d = new Date(dateStr + 'T00:00:00');
@@ -270,6 +271,13 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
   const [seleccion, setSeleccion] = useState('');
 
+  // Anti doble-clic: bloqueo síncrono (ref) + estado para deshabilitar/spinner.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  // Clave de idempotencia estable por apertura del formulario.
+  const idemKeyRef = useRef(null);
+  if (idemKeyRef.current === null) idemKeyRef.current = newIdemKey();
+
   // Vinculación a subrubro (solo para gastos nuevos)
   const [rubroSel, setRubroSel]       = useState('');
   const [subrubroSel, setSubrubroSel] = useState('');
@@ -315,7 +323,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     setFacturaSel(id);
     if (id) {
       const f = facturasSub.find(f => String(f.id) === id);
-      if (f) setMonto(f.monto);
+      if (f) setMonto(f.saldo ?? f.monto);
     }
   };
 
@@ -326,17 +334,27 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     if (val && val !== '__otro__') setConcepto(val);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (savingRef.current) return;
     if (!concepto.trim() || !Number(monto)) return;
     const data = {
       fecha, tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial,
+      idempotency_key: idemKeyRef.current,
     };
     if (subrubroSel) {
       data.subrubro_id = Number(subrubroSel);
       if (facturaSel) data.movimiento_id = Number(facturaSel);
     }
-    onSave(data);
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await onSave(data);
+      // Éxito: el padre cierra el formulario (se desmonta).
+    } catch {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const TIPOS_FORM = [
@@ -405,7 +423,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
                     <option value="">— Boleta pendiente (opcional) —</option>
                     {facturasSub.map(f => (
                       <option key={f.id} value={f.id}>
-                        {f.concepto || 'Sin concepto'} — {fmt(f.monto)}{f.fecha_vencimiento ? ` — vence ${formatFechaCorta(f.fecha_vencimiento)}` : ''}
+                        {f.concepto || 'Sin concepto'} — {fmt(f.saldo ?? f.monto)}{f.fecha_vencimiento ? ` — vence ${formatFechaCorta(f.fecha_vencimiento)}` : ''}
                       </option>
                     ))}
                   </select>
@@ -437,13 +455,14 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
       )}
 
       <div className="flex gap-2">
-        <button type="button" onClick={onCancel}
-          className="flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm">
+        <button type="button" onClick={onCancel} disabled={saving}
+          className="flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm disabled:opacity-40">
           Cancelar
         </button>
-        <button type="submit" disabled={!concepto.trim() || !Number(monto)}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">
-          Guardar
+        <button type="submit" disabled={saving || !concepto.trim() || !Number(monto)}
+          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+          {saving && <Loader2 size={14} className="animate-spin" />}
+          {saving ? 'Guardando...' : 'Guardar'}
         </button>
       </div>
     </form>
@@ -458,10 +477,13 @@ function MetodoBadge({ metodo }) {
   return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-dashed border-amber-300 dark:border-amber-700">Sin definir</span>;
 }
 
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false }) {
   const esPendiente  = m.tipo === 'gasto' && m.confirmado === false;
   const esConfirmado = m.tipo === 'gasto' && m.confirmado === true;
   const esGasto      = m.tipo === 'gasto';
+  // Gastos: verde si el pago está confirmado, rojo mientras está sin pagar.
+  // El resto de los tipos (empleados, ingresos) conservan su color de origen.
+  const montoColor = esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600') : colorMonto;
 
   return (
     <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${
@@ -479,21 +501,21 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <MetodoBadge metodo={m.metodo} />
           {esPendiente && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">Sin confirmar</span>}
-          {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> Registrado en subrubro</span>}
+          {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> Pago confirmado</span>}
         </div>
       </div>
-      <p className={`text-base font-bold whitespace-nowrap ${esPendiente ? 'text-slate-400 dark:text-slate-500' : colorMonto}`}>
+      <p className={`text-base font-bold whitespace-nowrap ${montoColor}`}>
         {fmt(m.monto)}
       </p>
       {esGasto && (
-        <button onClick={() => onConfirmar(m)}
+        <button onClick={() => onConfirmar(m)} disabled={confirming}
           title={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
-          className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+          className={`p-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
             esConfirmado
               ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
               : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
           }`}>
-          <Check size={14} />
+          {confirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
         </button>
       )}
       <button onClick={() => onEdit(m)} className="text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
@@ -505,6 +527,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto }) {
 function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfirmar = 0, vencimientos, labelDisponible }) {
   const restante = disponible - gastos;
   const restanteSiConfirma = disponible - gastos - sinConfirmar;
+  const [vencAbierto, setVencAbierto] = useState(false);
+  const totalVenc = (vencimientos || []).reduce((s, v) => s + (v.monto || 0), 0);
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2">
       <div className="flex items-center gap-2 mb-3">
@@ -538,13 +562,27 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
       </div>
       {vencimientos?.length > 0 && (
         <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1"><Clock size={10} /> Próximos a vencer</p>
-          {vencimientos.map((v, i) => (
-            <div key={i} className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
-              <span className="truncate max-w-32">{v.subrubro?.nombre}</span>
-              <span>{fmt(v.monto)}</span>
+          <button type="button" onClick={() => setVencAbierto(v => !v)}
+            className="w-full flex items-center justify-between gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+            <span className="flex items-center gap-1">
+              <Clock size={10} /> Próximos a vencer
+              <span className="text-slate-400 dark:text-slate-500">({vencimientos.length})</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              {!vencAbierto && <span className="text-amber-700 dark:text-amber-400">{fmt(totalVenc)}</span>}
+              <ChevronDown size={13} className={`transition-transform ${vencAbierto ? 'rotate-180' : ''}`} />
+            </span>
+          </button>
+          {vencAbierto && (
+            <div className="mt-1.5 space-y-0.5">
+              {vencimientos.map((v, i) => (
+                <div key={i} className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
+                  <span className="truncate max-w-32">{v.subrubro?.nombre}</span>
+                  <span>{fmt(v.monto)}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
@@ -555,12 +593,21 @@ export default function CajaView({ rubros = [] }) {
   const [fecha, setFecha]           = useState(todayStr());
   const [movs, setMovs]             = useState([]);
   const [loading, setLoading]       = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm]     = useState(false);
   const [tipoForm, setTipoForm]     = useState(null);
   const [editingMov, setEditingMov] = useState(null);
+  // ID del gasto cuya confirmación/reversión está en curso (bloquea doble clic en
+  // el botón de confirmar, que de otro modo crearía dos pagos en el subrubro).
+  const [confirmingId, setConfirmingId] = useState(null);
   const [gastosOpen, setGastosOpen] = useState(true);
+  const [empleadosOpen, setEmpleadosOpen] = useState(true);
 
   const dateInputRef = useRef(null);
+  // Bloqueo síncrono de confirmaciones en vuelo (por id de gasto). El estado
+  // confirmingId es para la UI; este ref evita la carrera de dos clics en el mismo
+  // tick, donde el estado todavía no se actualizó.
+  const confirmingRef = useRef(new Set());
 
   // Saldo efectivo
   const [saldoInput, setSaldoInput]         = useState('');
@@ -653,8 +700,35 @@ export default function CajaView({ rubros = [] }) {
     } catch {}
   };
 
+  // Refresca todo lo que depende de datos del servidor (movimientos del día +
+  // reconciliación auto-sync, vencimientos, config y subrubros). Lo usa el botón
+  // "Refrescar" y los disparos automáticos al volver el foco a la ventana.
+  const refrescarTodo = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([cargar(), cargarVencimientos(), cargarConfig(), cargarSubrubros()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => { cargar(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
+
+  // Auto-refresh: al volver el foco a la ventana o reactivar la pestaña, recarga
+  // datos frescos. Así un pago/baja hecho en otra vista (o pestaña) se refleja sin
+  // tener que recargar la página a mano. Se omite si hay un formulario abierto para
+  // no descartar lo que el usuario está escribiendo.
+  useEffect(() => {
+    const onFocus = () => { if (!showForm && !editandoSaldo && !editandoSaldoCuenta) refrescarTodo(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') onFocus(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fecha, showForm, editandoSaldo, editandoSaldoCuenta]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -699,10 +773,16 @@ export default function CajaView({ rubros = [] }) {
       }
       setShowForm(false); setEditingMov(null); setTipoForm(null);
       cargar();
-    } catch { toast.error('Error al guardar'); }
+    } catch (err) { toast.error('Error al guardar'); throw err; }
   };
 
   const handleConfirmarGasto = async (m) => {
+    // Bloqueo anti doble-clic: si ya hay una operación en curso para este gasto,
+    // ignorar. Sin esto, dos clics rápidos entran ambos a la rama de confirmar
+    // (m.confirmado sigue siendo false en el render viejo) y crean dos pagos.
+    if (confirmingRef.current.has(m.id)) return;
+    confirmingRef.current.add(m.id);
+    setConfirmingId(m.id);
     try {
       if (m.confirmado === true) {
         // Desconfirmar: eliminar el pago del subrubro si existe.
@@ -738,6 +818,11 @@ export default function CajaView({ rubros = [] }) {
             // a esa factura para que quede saldada exactamente esa (no la más vieja
             // por FIFO) y sin afectar las facturas anteriores pendientes.
             facturas_vinculadas_ids: m.movimiento_id ? [m.movimiento_id] : [],
+            // Clave de idempotencia determinística: una entrada de caja genera como
+            // mucho UN pago. Si por una carrera llegan dos confirmaciones, el backend
+            // devuelve el mismo pago en vez de duplicarlo. Tras revertir (se borra el
+            // pago) la clave queda libre y se puede volver a confirmar.
+            idempotency_key: `caja-confirm-${m.id}`,
           });
           if (pago?.id) await cajaApi.update(m.id, { pago_mov_id: pago.id });
         }
@@ -745,6 +830,7 @@ export default function CajaView({ rubros = [] }) {
         toast.success('Pago confirmado');
       }
     } catch { toast.error('Error al confirmar'); }
+    finally { confirmingRef.current.delete(m.id); setConfirmingId(null); }
   };
 
   const handleDelete = async (id) => {
@@ -857,6 +943,10 @@ export default function CajaView({ rubros = [] }) {
         <input ref={dateInputRef} type="date" value={fecha}
           onChange={e => setFecha(e.target.value)}
           className="sr-only" />
+        <button onClick={refrescarTodo} disabled={refreshing}
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 disabled:opacity-50" title="Refrescar ahora (sincroniza pagos y vencimientos)">
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+        </button>
         <button onClick={() => setShowConfig(true)}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0" title="Configurar empleados y proveedores">
           <Settings size={16} />
@@ -969,24 +1059,33 @@ export default function CajaView({ rubros = [] }) {
       {/* Empleados */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Users size={14} className="text-green-600" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Empleados</h3>
+          <button type="button" onClick={() => setEmpleadosOpen(v => !v)}
+            className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
+            <Users size={14} className="text-green-600 shrink-0" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cajas empleados</h3>
             {empleados.length > 0 && <span className="text-xs text-slate-400">{fmt(empleados.reduce((s,m) => s+m.monto,0))}</span>}
-          </div>
-          <button onClick={() => openForm('empleado')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
+            {!empleadosOpen && empleados.length > 0 && (
+              <span className="text-xs text-slate-400 dark:text-slate-500">· {empleados.length}</span>
+            )}
+            <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <button onClick={() => { setEmpleadosOpen(true); openForm('empleado'); }} className="text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={11} /> Agregar</button>
         </div>
-        {showForm && (tipoForm === 'empleado' || editingMov?.tipo === 'empleado') && (
-          <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'} /></div>
+        {empleadosOpen && (
+          <>
+            {showForm && (tipoForm === 'empleado' || editingMov?.tipo === 'empleado') && (
+              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'} /></div>
+            )}
+            {empleados.length === 0 && !(showForm && tipoForm === 'empleado') && (
+              <p className="text-xs text-slate-400 py-2 text-center">Sin empleados cargados</p>
+            )}
+            {empleados.map(m => (
+              <div key={m.id} className="mb-2">
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-600" />}
+              </div>
+            ))}
+          </>
         )}
-        {empleados.length === 0 && !(showForm && tipoForm === 'empleado') && (
-          <p className="text-xs text-slate-400 py-2 text-center">Sin empleados cargados</p>
-        )}
-        {empleados.map(m => (
-          <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-600" />}
-          </div>
-        ))}
       </div>
 
       {/* Gastos / Proveedores */}
@@ -1014,7 +1113,7 @@ export default function CajaView({ rubros = [] }) {
             )}
             {gastos.map(m => (
               <div key={m.id} className="mb-2">
-                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" />}
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} />}
               </div>
             ))}
           </>

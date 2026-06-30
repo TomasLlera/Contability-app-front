@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ivaApi, getErrorMsg } from '../api';
 import ComprasImportModal from '../components/ComprasImportModal';
+import Modal from '../components/Modal';
 import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -86,6 +87,13 @@ export default function IvaView({ initialTab = 'compras', role }) {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
+  const handleAddCompra = async (payload) => {
+    const compra = await ivaApi.createCompra(payload);
+    setCompras(prev => [compra, ...prev]);
+    refrescarDerivados();
+    toast.success('Comprobante cargado');
+  };
+
   const handleAddVenta = async (e) => {
     e.preventDefault();
     if (!vTotal || Number(vTotal) <= 0) { toast.error('Ingresá un monto válido'); return; }
@@ -130,6 +138,7 @@ export default function IvaView({ initialTab = 'compras', role }) {
           isViewer={isViewer} onOpenWizard={openWizard}
           compras={compras} lotes={lotes}
           onDeleteCompra={handleDeleteCompra} onDeleteLote={handleDeleteLote}
+          onAddCompra={handleAddCompra}
         />
       ) : (
         <VentasTab
@@ -273,7 +282,8 @@ function CrucePanel({ resumen }) {
   );
 }
 
-function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, onDeleteLote }) {
+function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, onDeleteLote, onAddCompra }) {
+  const [showManual, setShowManual] = useState(false);
   const [tipoSel, setTipoSel] = useState(''); // '' = todas las boletas
   const [busqueda, setBusqueda] = useState('');
   const [mesSel, setMesSel] = useState('');   // '' = todos los meses
@@ -341,6 +351,12 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
             </select>
           )}
           {!isViewer && (
+            <button onClick={() => setShowManual(v => !v)} title="Cargar un comprobante a mano"
+              className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-xs">
+              <Plus size={13} /> <span className="hidden sm:inline">Cargar manual</span>
+            </button>
+          )}
+          {!isViewer && (
             <button onClick={() => onOpenWizard([])} title="Importar Excel y mapear columnas"
               className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-xs">
               <Upload size={13} /> <span className="hidden sm:inline">Importar</span>
@@ -348,6 +364,16 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           )}
         </div>
       </div>
+
+      {/* Formulario de carga manual (modal) */}
+      {showManual && !isViewer && (
+        <Modal title="Cargar comprobante manual" onClose={() => setShowManual(false)} size="2xl">
+          <CompraManualForm
+            onSubmit={async (payload) => { await onAddCompra(payload); setShowManual(false); }}
+            onCancel={() => setShowManual(false)}
+          />
+        </Modal>
+      )}
 
       {/* Navegación por mes + filtro por fecha */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -421,12 +447,15 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
         const filas = porMes[mes];
         return (
           <div key={mes} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
-              <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">{labelMes(mes)} <span className="text-xs font-normal text-slate-400">({filas.length})</span></span>
-              <span className="text-xs text-slate-500">IVA 21%: <strong className="text-slate-700 dark:text-slate-200">{fmt(subtotal(filas, 'iva_21'))}</strong></span>
-              <span className="text-xs text-slate-500">Neto Grav.: <strong className="text-slate-700 dark:text-slate-200">{fmt(subtotal(filas, 'neto_gravado'))}</strong></span>
-              <span className="text-xs text-slate-500">Total IVA: <strong className="text-slate-700 dark:text-slate-200">{fmt(subtotal(filas, 'total_iva'))}</strong></span>
-              <span className="text-xs text-slate-500">Imp. Total: <strong className="text-amber-600 dark:text-amber-400">{fmt(subtotal(filas, 'imp_total'))}</strong></span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
+              <span className="font-semibold text-sm text-slate-700 dark:text-slate-200 mr-1 min-w-32">{labelMes(mes)} <span className="text-xs font-normal text-slate-400">({filas.length})</span></span>
+              <span className="text-xs text-slate-500">Neto Grav. <strong className="text-slate-700 dark:text-slate-200">{fmt(subtotal(filas, 'neto_gravado'))}</strong></span>
+              <span className="text-xs text-slate-500">IVA 21% <strong className="text-slate-700 dark:text-slate-200">{fmt(subtotal(filas, 'iva_21'))}</strong></span>
+              <span className="text-xs text-slate-500">Total IVA <strong className="text-slate-700 dark:text-slate-200">{fmt(subtotal(filas, 'total_iva'))}</strong></span>
+              <span className="text-xs text-slate-500">Imp. Total <strong className="text-amber-600 dark:text-amber-400">{fmt(subtotal(filas, 'imp_total'))}</strong></span>
+              {/* Retenciones/Percepciones del mes — acumuladas aparte, no afectan los totales de arriba */}
+              <span className="text-xs text-slate-500 pl-3 border-l border-slate-200 dark:border-slate-700">Percep. IVA <strong className="text-violet-600 dark:text-violet-400">{fmt(subtotal(filas, 'percepcion_iva'))}</strong></span>
+              <span className="text-xs text-slate-500">Ing. Brutos <strong className="text-violet-600 dark:text-violet-400">{fmt(subtotal(filas, 'ingresos_brutos'))}</strong></span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs whitespace-nowrap">
@@ -443,6 +472,8 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                     <th className="text-left px-3 py-1.5 font-medium">Otros Atrib.</th>
                     <th className="text-right px-3 py-1.5 font-medium">Total IVA</th>
                     <th className="text-right px-3 py-1.5 font-medium">Imp. Total</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-violet-500">Percep. IVA</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-violet-500">Ing. Brutos</th>
                     <th className="w-8"></th>
                   </tr>
                 </thead>
@@ -460,6 +491,8 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                       <td className="px-3 py-1.5 max-w-30 truncate" title={c.otros_atributos}>{c.otros_atributos || '—'}</td>
                       <td className="px-3 py-1.5 text-right">{fmtNum(c.total_iva)}</td>
                       <td className="px-3 py-1.5 text-right font-medium text-amber-600 dark:text-amber-400">{fmtNum(c.imp_total)}</td>
+                      <td className="px-3 py-1.5 text-right text-violet-600 dark:text-violet-400">{(c.percepcion_iva || 0) ? fmtNum(c.percepcion_iva) : '—'}</td>
+                      <td className="px-3 py-1.5 text-right text-violet-600 dark:text-violet-400">{(c.ingresos_brutos || 0) ? fmtNum(c.ingresos_brutos) : '—'}</td>
                       <td className="px-2 py-1.5 text-right">
                         {!isViewer && (
                           <button onClick={() => onDeleteCompra(c.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={12} /></button>
@@ -478,6 +511,88 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
 }
 
 // ---------------------------------------------------------------------------
+
+// Carga manual de un comprobante de compra. Percepción IVA e Ingresos Brutos se
+// guardan aparte y NO se suman al Imp. Total ni a ningún otro total del comprobante.
+function CompraManualForm({ onSubmit, onCancel }) {
+  const [f, setF] = useState({
+    fecha: hoy(), tipo: '', documento: '', nro_doc: '', razon_social: '',
+    neto_gravado: '', iva_21: '', total_iva: '', imp_total: '',
+    percepcion_iva: '', ingresos_brutos: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (saving) return;
+    if (!f.fecha) { toast.error('La fecha es obligatoria'); return; }
+    setSaving(true);
+    try {
+      await onSubmit({ ...f });
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500';
+  const labelCls = 'block text-[11px] text-slate-400 mb-0.5';
+  const num = (k, label, extraCls = '') => (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <input type="number" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} ${extraCls}`} />
+    </div>
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div>
+          <label className={labelCls}>Fecha *</label>
+          <input type="date" value={f.fecha} onChange={e => set('fecha', e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Tipo</label>
+          <input type="text" value={f.tipo} onChange={e => set('tipo', e.target.value)} placeholder="Factura A…" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Documento</label>
+          <input type="text" value={f.documento} onChange={e => set('documento', e.target.value)} placeholder="CUIT…" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Nro Doc Emisor</label>
+          <input type="text" value={f.nro_doc} onChange={e => set('nro_doc', e.target.value)} className={inputCls} />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Razón Social</label>
+          <input type="text" value={f.razon_social} onChange={e => set('razon_social', e.target.value)} placeholder="Proveedor" className={inputCls} />
+        </div>
+        {num('neto_gravado', 'Neto Gravado')}
+        {num('iva_21', 'IVA 21%')}
+        {num('total_iva', 'Total IVA')}
+        {num('imp_total', 'Imp. Total')}
+      </div>
+
+      {/* Retenciones/percepciones — se guardan aparte y no afectan el Imp. Total */}
+      <div className="rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-900/10 px-3 py-2.5">
+        <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300 mb-1.5">Retenciones / Percepciones <span className="font-normal text-violet-500/80">(no suman al Imp. Total)</span></p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {num('percepcion_iva', 'Percepción IVA')}
+          {num('ingresos_brutos', 'Ingresos Brutos')}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="px-3.5 py-1.5 rounded-lg text-sm border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Cancelar</button>
+        <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-3.5 py-1.5 disabled:opacity-40">
+          <Plus size={15} /> {saving ? 'Guardando…' : 'Guardar comprobante'}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, setVConcepto, onAdd, mesesVentas, ventasPorMes, onDelete, totalVentas }) {
   return (

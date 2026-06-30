@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2 } from 'lucide-react';
+import { newIdemKey } from '../api';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
 const TIPOS = [
   { value: 'factura',      label: 'Factura',          Icon: FileText,   hint: 'Boleta o importe a cobrar/pagar' },
@@ -9,7 +10,7 @@ const TIPOS = [
   { value: 'nota_credito', label: 'Nota de Crédito',  Icon: FileMinus,  hint: 'Crédito emitido por el proveedor' },
 ];
 
-export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel }) {
+export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel, metodoDefault = 'ambas' }) {
   const today = new Date().toISOString().split('T')[0];
 
   const tipoInicial = movimiento?.tipo || 'factura';
@@ -26,10 +27,25 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // Ya no se genera ajuste por diferencia (modelo de saldo); se mantiene el valor
   // por compatibilidad del payload, pero el backend lo ignora.
   const conceptoDiferencia = 'Diferencia';
-  // Método de pago: solo aplica a pagos / notas de crédito
-  const [metodoPago, setMetodoPago] = useState(movimiento?.metodo_pago ?? null);
+  // Método de pago: solo aplica a pagos / notas de crédito.
+  // Si el subrubro tiene un método fijo ('efectivo'/'transferencia'), se preselecciona
+  // y se bloquea el selector. Con 'ambas' el usuario elige libremente.
+  const metodoFijo = metodoDefault === 'efectivo' || metodoDefault === 'transferencia';
+  const [metodoPago, setMetodoPago] = useState(
+    movimiento?.metodo_pago ?? (metodoFijo ? metodoDefault : null)
+  );
   // Tipo de documento: solo aplica a facturas. Default 'factura'.
   const [documento, setDocumento] = useState(movimiento?.documento || 'factura');
+
+  // Estado de guardado: deshabilita el botón y bloquea reenvíos mientras la alta
+  // está en vuelo (defensa contra el doble clic). El ref bloquea de forma síncrona
+  // incluso antes de que React re-renderice el botón deshabilitado.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  // Clave de idempotencia estable por cada apertura del formulario (una alta lógica).
+  // Si el alta se reintenta con la misma clave, el backend no la duplica.
+  const idemKeyRef = useRef(null);
+  if (idemKeyRef.current === null) idemKeyRef.current = newIdemKey();
 
   const setExtra = (nombre, val) => setCamposExtra(prev => ({ ...prev, [nombre]: val }));
 
@@ -88,12 +104,16 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    // Guarda síncrona anti doble-clic: si ya hay un alta en vuelo, ignorar.
+    if (savingRef.current) return;
+
+    let payload;
     if (esPagoONC) {
       const p = Number(pago) || 0;
       if (!p) return;
-      onSave({
+      payload = {
         tipo,
         pago: p,
         monto: 0,
@@ -103,11 +123,12 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         facturas_vinculadas_ids: [...facturasSeleccionadas],
         concepto_diferencia: conceptoDiferencia,
         metodo_pago: tipo === 'pago' ? metodoPago : null,
-      });
+        idempotency_key: idemKeyRef.current,
+      };
     } else {
       const m = Number(monto) || 0;
       if (!m) return;
-      onSave({
+      payload = {
         tipo: 'factura',
         monto: m,
         pago: 0,
@@ -116,7 +137,19 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         campos_extra: camposExtra,
         facturas_vinculadas_ids: [],
         documento,
-      });
+        idempotency_key: idemKeyRef.current,
+      };
+    }
+
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await onSave(payload);
+      // Éxito: el padre cierra el formulario (se desmonta), no hace falta resetear.
+    } catch {
+      // Error: rehabilitar para permitir reintento (con la MISMA clave → sin duplicar).
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -235,7 +268,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
           {tipo === 'pago' && (
             <div>
               <label className={labelCls}>Método de pago</label>
-              <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
+              <div className={`flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium ${metodoFijo ? 'opacity-90' : ''}`}>
                 {[
                   { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
                   { value: 'transferencia', label: 'Transferencia', Icon: ArrowLeftRight },
@@ -245,14 +278,15 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                     <button
                       key={m.value}
                       type="button"
-                      onClick={() => setMetodoPago(active ? null : m.value)}
+                      disabled={metodoFijo}
+                      onClick={() => { if (!metodoFijo) setMetodoPago(active ? null : m.value); }}
                       className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
                         active
                           ? (m.value === 'efectivo'
                               ? 'bg-green-600 text-white'
                               : 'bg-blue-600 text-white')
                           : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
-                      }`}
+                      } ${metodoFijo ? 'cursor-not-allowed' : ''}`}
                     >
                       <m.Icon size={14} />
                       {m.label}
@@ -260,7 +294,9 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                   );
                 })}
               </div>
-              {!metodoPago && (
+              {metodoFijo ? (
+                <p className="mt-1 text-xs text-slate-400">Predeterminado del subrubro — no editable.</p>
+              ) : !metodoPago && (
                 <p className="mt-1 text-xs text-slate-400">Sin definir — el pago queda registrado sin método.</p>
               )}
             </div>
@@ -402,15 +438,16 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
       )}
 
       <div className="flex gap-2 pt-1">
-        <button type="button" onClick={onCancel}
-          className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600">
+        <button type="button" onClick={onCancel} disabled={saving}
+          className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40">
           Cancelar
         </button>
         <button
           type="submit"
-          disabled={esPagoONC ? !Number(pago) : !Number(monto)}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">
-          Guardar
+          disabled={saving || (esPagoONC ? !Number(pago) : !Number(monto))}
+          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+          {saving && <Loader2 size={14} className="animate-spin" />}
+          {saving ? 'Guardando...' : 'Guardar'}
         </button>
       </div>
     </form>

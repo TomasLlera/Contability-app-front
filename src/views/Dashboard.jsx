@@ -6,7 +6,7 @@ import {
   ArrowLeftRight, Check, Truck
 } from 'lucide-react';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
 
 function greeting() {

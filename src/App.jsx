@@ -348,9 +348,9 @@ export default function App() {
         <div className="px-4 py-4 border-b border-slate-700/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">C</div>
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">K</div>
               <div>
-                <p className="text-white font-bold text-sm leading-tight">Contabilidad</p>
+                <p className="text-white font-bold text-sm leading-tight">Kontia</p>
                 <p className="text-slate-400 text-xs">Gestión de cuentas</p>
               </div>
             </div>

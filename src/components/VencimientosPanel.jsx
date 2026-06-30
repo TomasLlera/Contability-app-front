@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { movimientosApi } from '../api';
 import { AlertTriangle } from 'lucide-react';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
 function diasInfo(dias) {
   if (dias < 0) return { label: `Vencida hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`, cls: 'bg-red-500', textCls: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800' };

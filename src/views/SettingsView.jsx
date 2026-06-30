@@ -96,7 +96,7 @@ function AuditoriaSection() {
               ) : items.map(it => (
                 <tr key={it._id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
                   <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    {new Date(it.fecha).toLocaleString('es-AR')}
+                    {new Date(it.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}
                   </td>
                   <td className="px-3 py-1.5 text-slate-700 dark:text-slate-200">{it.usuario}</td>
                   <td className={`px-3 py-1.5 font-medium ${accionColor(it.accion)}`}>{it.accion}</td>

@@ -3,7 +3,7 @@ import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
 import { EntityIcon } from '../icons';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
 
 const MESES = { '01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun',

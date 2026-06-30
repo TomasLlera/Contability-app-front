@@ -64,6 +64,13 @@ api.interceptors.response.use(r => r, async err => {
   return Promise.reject(err);
 });
 
+// Genera una clave de idempotencia única para una operación de alta. Se envía al
+// backend (campo idempotency_key) para que reintentos de la MISMA alta —doble clic,
+// reenvío de red, doble disparo de efectos— devuelvan el registro ya creado en lugar
+// de duplicarlo. Generá una clave nueva por cada alta lógica distinta.
+export const newIdemKey = () =>
+  globalThis.crypto?.randomUUID?.() ?? `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 // Extrae el mensaje de error legible de cualquier respuesta de Axios
 export const getErrorMsg = (err) => {
   if (!err.response) return 'Sin conexión con el servidor';
@@ -271,6 +278,7 @@ export const ivaApi = {
     if (incluirDuplicados) fd.append('incluirDuplicados', 'true');
     return api.post('/iva/compras/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
   },
+  createCompra: (data) => api.post('/iva/compras', data).then(r => r.data),
   deleteCompra: (id) => api.delete(`/iva/compras/${id}`).then(r => r.data),
   clearCompras: (lote) => api.delete('/iva/compras', { params: lote ? { lote } : {} }).then(r => r.data),
   // Ventas (carga manual)

@@ -40,8 +40,8 @@ export default function Login({ onLogin }) {
                           flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4">
             <Wallet size={28} className="text-white" strokeWidth={2.25} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Contability</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Ingresá para continuar</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Kontia</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Aplicación contable</p>
         </div>
 
         <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl
@@ -82,7 +82,8 @@ export default function Login({ onLogin }) {
                              text-slate-900 dark:text-white placeholder:text-slate-400
                              rounded-lg pl-3.5 pr-10 py-2.5 text-sm
                              outline-none transition
-                             focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                             focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+                             [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                   autoComplete="current-password"
                 />
                 <button
@@ -128,7 +129,7 @@ export default function Login({ onLogin }) {
         </div>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-6">
-          © {new Date().getFullYear()} Contability
+          © {new Date().getFullYear()} Kontia
         </p>
       </div>
 

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Zap } from 'lucide-react';
-import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg } from '../api';
+import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg, newIdemKey } from '../api';
 import toast from 'react-hot-toast';
 
 const today = () => new Date().toISOString().split('T')[0];
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
 const TIPOS = [
   { value: 'factura',      label: 'Factura',       color: 'bg-amber-500' },
@@ -29,6 +29,9 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [facturas, setFacturas] = useState([]);
   const [facturaSel, setFacturaSel] = useState('');
   const [loadingFacturas, setLoadingFacturas] = useState(false);
+  // Clave de idempotencia estable por apertura del modal (una alta lógica).
+  const idemKeyRef = useRef(null);
+  if (idemKeyRef.current === null) idemKeyRef.current = newIdemKey();
 
   useEffect(() => {
     if (!rubroId) { setSubrubros([]); setSubrubroId(''); return; }
@@ -72,6 +75,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           fecha,
           facturas_vinculadas_ids: [Number(facturaSel)],
           metodo_pago: tipo === 'pago' ? metodoPago : null,
+          idempotency_key: idemKeyRef.current,
         });
       } else {
         await movimientosApi.create(subrubroId, {
@@ -86,6 +90,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           metodo_pago: tipo === 'pago' ? metodoPago : null,
           // documento solo aplica al tipo 'factura'
           documento: tipo === 'factura' ? documento : null,
+          idempotency_key: idemKeyRef.current,
         });
       }
       toast.success('Movimiento guardado');

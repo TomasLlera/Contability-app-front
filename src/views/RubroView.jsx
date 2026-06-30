@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, CalendarClock, Eraser } from 'lucide-react';
 import { EntityIcon, ICON_LIST } from '../icons';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
 // '2026-08-15' → '15 Ago'. Devuelve '—' si no hay fecha.
 const MESES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -22,11 +22,11 @@ const fmtFechaCorta = (iso) => {
   return `${Number(d)} ${MESES_ABBR[mi]}`;
 };
 
-const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia' };
+const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', ambas: 'Ambas' };
 const fmtMetodo = (m) => METODO_LABEL[m] || '—';
 
 
-export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight, role }) {
+export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
   const isAdmin = role !== 'viewer';
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubro, setSelectedSubrubro] = useState(initialSubrubro ?? null);
@@ -149,7 +149,6 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
         rubro={rubro}
         subrubro={sub}
         onBack={() => { setSelectedSubrubro(null); cargar(); }}
-        sidebarRight={sidebarRight}
         role={role}
       />
     );
@@ -284,7 +283,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, sidebarRight
                       <div className="min-w-0">
                         <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Forma de pago</p>
                         <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
-                          {fmtMetodo(stats[sub.id].metodo_habitual)}
+                          {fmtMetodo(sub.metodo_pago_default || 'ambas')}
                         </p>
                       </div>
                     </div>
