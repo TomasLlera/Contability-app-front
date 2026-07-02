@@ -113,6 +113,9 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           concepto_diferencia,
           campos_extra: rest.campos_extra,
           metodo_pago: rest.metodo_pago,
+          // Percepciones de la NC (el backend las ignora si el tipo es 'pago').
+          percepcion_iva: rest.percepcion_iva,
+          ingresos_brutos: rest.ingresos_brutos,
           idempotency_key: rest.idempotency_key,
         };
         if (editingMov) {

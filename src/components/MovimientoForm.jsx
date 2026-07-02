@@ -37,6 +37,11 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // Tipo de documento: solo aplica a facturas. Default 'factura'.
   const [documento, setDocumento] = useState(movimiento?.documento || 'factura');
 
+  // Percepción IVA / Ingresos Brutos: aplican a facturas y notas de crédito. NO suman
+  // al total del comprobante; se acumulan aparte por mes en la sección IVA.
+  const [percepcionIva, setPercepcionIva] = useState(movimiento?.percepcion_iva > 0 ? movimiento.percepcion_iva : '');
+  const [ingresosBrutos, setIngresosBrutos] = useState(movimiento?.ingresos_brutos > 0 ? movimiento.ingresos_brutos : '');
+
   // Estado de guardado: deshabilita el botón y bloquea reenvíos mientras la alta
   // está en vuelo (defensa contra el doble clic). El ref bloquea de forma síncrona
   // incluso antes de que React re-renderice el botón deshabilitado.
@@ -123,6 +128,9 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         facturas_vinculadas_ids: [...facturasSeleccionadas],
         concepto_diferencia: conceptoDiferencia,
         metodo_pago: tipo === 'pago' ? metodoPago : null,
+        // Percepciones: solo aplican a la NC (no al pago). No suman al monto.
+        percepcion_iva: tipo === 'nota_credito' ? (Number(percepcionIva) || 0) : 0,
+        ingresos_brutos: tipo === 'nota_credito' ? (Number(ingresosBrutos) || 0) : 0,
         idempotency_key: idemKeyRef.current,
       };
     } else {
@@ -137,6 +145,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         campos_extra: camposExtra,
         facturas_vinculadas_ids: [],
         documento,
+        percepcion_iva: Number(percepcionIva) || 0,
+        ingresos_brutos: Number(ingresosBrutos) || 0,
         idempotency_key: idemKeyRef.current,
       };
     }
@@ -160,6 +170,29 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const inputCls    = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
   const inputNumCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
   const labelCls    = 'block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1';
+  const inputVioletCls = 'w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500';
+
+  // Bloque Percepción IVA / Ingresos Brutos — aplica a facturas y notas de crédito.
+  // No suman al total; el backend las acumula por mes en la sección IVA.
+  const percepcionesBlock = (
+    <div className="rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-900/10 px-3 py-2.5">
+      <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-2">
+        Retenciones / Percepciones <span className="font-normal text-violet-500/80">(no suman al total)</span>
+      </p>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div>
+          <label className="block text-[11px] text-violet-600/80 dark:text-violet-300/80 mb-1">Percepción IVA</label>
+          <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
+            value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-[11px] text-violet-600/80 dark:text-violet-300/80 mb-1">Ingresos Brutos</label>
+          <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
+            value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -259,6 +292,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
             </div>
           ))}
+
+          {percepcionesBlock}
         </>
       )}
 
@@ -314,6 +349,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 onChange={e => setPago(e.target.value)} />
             </div>
           </div>
+
+          {tipo === 'nota_credito' && percepcionesBlock}
 
           {todasFacturasPendientes.length > 0 && (
             <div>
