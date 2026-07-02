@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ivaApi, getErrorMsg } from '../api';
 import ComprasImportModal from '../components/ComprasImportModal';
 import Modal from '../components/Modal';
-import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react';
+import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, CalendarDays, X, ArrowUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -324,8 +324,29 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
   const impAcum = subtotal(visibles, 'imp_total');
   const ivaAcum = subtotal(visibles, 'total_iva');
 
+  const topRef = useRef(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => setShowScrollTop(!e.isIntersecting));
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <div className="space-y-5">
+      <div ref={topRef} aria-hidden />
+      {showScrollTop && (
+        <button
+          onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          title="Volver arriba"
+          aria-label="Volver arriba"
+          className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-[fadeIn_150ms_ease-out]"
+        >
+          <ArrowUp size={18} strokeWidth={2.5} />
+        </button>
+      )}
       {/* Resumen + filtro por tipo */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">

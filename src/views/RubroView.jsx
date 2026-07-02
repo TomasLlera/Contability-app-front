@@ -7,7 +7,7 @@ import ImportModal from '../components/ImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
 import toast from 'react-hot-toast';
-import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, CalendarClock, Eraser } from 'lucide-react';
+import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, Eraser, ArrowUp } from 'lucide-react';
 import { EntityIcon, ICON_LIST } from '../icons';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
@@ -31,7 +31,6 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubro, setSelectedSubrubro] = useState(initialSubrubro ?? null);
   const [showCampos, setShowCampos] = useState(false);
-  const [nuevoNombre, setNuevoNombre] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editNombre, setEditNombre] = useState('');
   const [editIcon, setEditIcon] = useState('');
@@ -43,6 +42,15 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
   const [stats, setStats] = useState({});
   const [editingMetadataSub, setEditingMetadataSub] = useState(null);
   const [creatingSub, setCreatingSub] = useState(false);
+  const topRef = useRef(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => setShowScrollTop(!e.isIntersecting));
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const cargarStats = () => {
     dashboardApi.getComparacion(rubro.id)
@@ -78,17 +86,6 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [editingId]);
 
-  const handleAdd = async () => {
-    if (!nuevoNombre.trim()) return;
-    try {
-      const sub = await subrubrosApi.create(rubro.id, nuevoNombre.trim());
-      setSubrubros(prev => [...prev, sub].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-      setNuevoNombre('');
-      toast.success(`${sub.nombre} creado`);
-    } catch (err) {
-      toast.error(getErrorMsg(err));
-    }
-  };
 
   const handleCreateMetadata = async (payload) => {
     try {
@@ -160,6 +157,17 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
 
   return (
     <div>
+      <div ref={topRef} aria-hidden />
+      {showScrollTop && (
+        <button
+          onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          title="Volver arriba"
+          aria-label="Volver arriba"
+          className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-[fadeIn_150ms_ease-out]"
+        >
+          <ArrowUp size={18} strokeWidth={2.5} />
+        </button>
+      )}
       {/* Barra de herramientas */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <input
@@ -170,17 +178,27 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
         />
         {isAdmin && (
           <button
-            onClick={() => setShowImport(true)}
-            className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+            onClick={() => setCreatingSub(true)}
+            className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5"
           >
-            <Upload size={14} /> Importar Excel
+            <Plus size={14} /> Nuevo subrubro
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => setShowImport(true)}
+            title="Importar Excel"
+            className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+          >
+            <Upload size={14} /> <span className="hidden sm:inline">Importar Excel</span>
           </button>
         )}
         <button
           onClick={() => setShowCampos(true)}
-          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+          title="Columnas"
+          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
-          <Settings2 size={14} /> Columnas
+          <Settings2 size={14} /> <span className="hidden sm:inline">Columnas</span>
         </button>
         {isAdmin && (
           <button
@@ -193,9 +211,10 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
                 toast.success('Movimientos eliminados');
               },
             })}
-            className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
+            title="Vaciar todo"
+            className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-2.5 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
           >
-            <Trash2 size={14} /> Vaciar todo
+            <Trash2 size={14} /> <span className="hidden sm:inline">Vaciar todo</span>
           </button>
         )}
       </div>
@@ -320,33 +339,6 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
             )}
           </div>
         ))}
-
-        {/* Nueva tarjeta — solo admin */}
-        {isAdmin && <div className="border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-500 transition-colors">
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">
-            Nuevo {rubro.nombre.toLowerCase()}
-          </p>
-          <input
-            className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Nombre (ej: Juan Pérez)"
-            value={nuevoNombre}
-            onChange={e => setNuevoNombre(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          />
-          <button
-            onClick={handleAdd}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 font-medium flex items-center justify-center gap-1.5"
-          >
-            <Plus size={14} /> Agregar
-          </button>
-          <button
-            onClick={() => setCreatingSub(true)}
-            className="w-full mt-2 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center justify-center gap-1"
-            title="Crear con vencimiento y datos fiscales"
-          >
-            <CalendarClock size={12} /> Más opciones (vencimiento, datos fiscales)
-          </button>
-        </div>}
 
         {filtrados.length === 0 && search && (
           <div className="col-span-full text-center py-8 text-slate-400">
