@@ -171,25 +171,22 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const inputNumCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
   const labelCls    = 'block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1';
   const inputVioletCls = 'w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500';
+  const labelVioletCls = 'block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1';
 
-  // Bloque Percepción IVA / Ingresos Brutos — aplica a facturas y notas de crédito.
-  // No suman al total; el backend las acumula por mes en la sección IVA.
+  // Percepción IVA / Ingresos Brutos — aplican a facturas y notas de crédito.
+  // No suman al total; el backend las acumula por mes en la sección IVA. Se muestran
+  // como dos inputs simétricos con el resto (sin caja), justo arriba del monto.
   const percepcionesBlock = (
-    <div className="rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-900/10 px-3 py-2.5">
-      <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-2">
-        Retenciones / Percepciones <span className="font-normal text-violet-500/80">(no suman al total)</span>
-      </p>
-      <div className="grid grid-cols-2 gap-2.5">
-        <div>
-          <label className="block text-[11px] text-violet-600/80 dark:text-violet-300/80 mb-1">Percepción IVA</label>
-          <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
-            value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
-        </div>
-        <div>
-          <label className="block text-[11px] text-violet-600/80 dark:text-violet-300/80 mb-1">Ingresos Brutos</label>
-          <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
-            value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
-        </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className={labelVioletCls}>Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>
+        <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
+          value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
+      </div>
+      <div>
+        <label className={labelVioletCls}>Ingresos Brutos <span className="font-normal text-violet-400/70">(no suma)</span></label>
+        <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
+          value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
       </div>
     </div>
   );
@@ -242,6 +239,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             </div>
           </div>
 
+          {percepcionesBlock}
+
           <div>
             <label className={labelCls}>
               Monto <span className="text-slate-400">(boleta/importe)</span>
@@ -292,8 +291,6 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
             </div>
           ))}
-
-          {percepcionesBlock}
         </>
       )}
 
@@ -336,6 +333,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               )}
             </div>
           )}
+          {tipo === 'nota_credito' && percepcionesBlock}
+
           <div>
             <label className={labelCls}>
               {tipo === 'nota_credito' ? 'Monto de la nota de crédito' : 'Monto del pago'}
@@ -349,8 +348,6 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 onChange={e => setPago(e.target.value)} />
             </div>
           </div>
-
-          {tipo === 'nota_credito' && percepcionesBlock}
 
           {todasFacturasPendientes.length > 0 && (
             <div>

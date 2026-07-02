@@ -566,6 +566,14 @@ function CompraManualForm({ onSubmit, onCancel }) {
       <input type="number" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} ${extraCls}`} />
     </div>
   );
+  // Percepciones/IIBB: mismo input que el resto (simétrico), con label violeta que
+  // aclara que no suman al Imp. Total. Van arriba del Imp. Total (que se carga último).
+  const numV = (k, label) => (
+    <div>
+      <label className="block text-[11px] text-violet-500 dark:text-violet-400 mb-0.5">{label} <span className="text-violet-400/70">(no suma)</span></label>
+      <input type="number" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} border-violet-200 dark:border-violet-800 focus:ring-violet-500`} />
+    </div>
+  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2.5">
@@ -593,16 +601,10 @@ function CompraManualForm({ onSubmit, onCancel }) {
         {num('neto_gravado', 'Neto Gravado')}
         {num('iva_21', 'IVA 21%')}
         {num('total_iva', 'Total IVA')}
+        {/* Percepciones/IIBB simétricas con el resto y arriba del Imp. Total (que va último) */}
+        {numV('percepcion_iva', 'Percepción IVA')}
+        {numV('ingresos_brutos', 'Ingresos Brutos')}
         {num('imp_total', 'Imp. Total')}
-      </div>
-
-      {/* Retenciones/percepciones — se guardan aparte y no afectan el Imp. Total */}
-      <div className="rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-900/10 px-3 py-2.5">
-        <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300 mb-1.5">Retenciones / Percepciones <span className="font-normal text-violet-500/80">(no suman al Imp. Total)</span></p>
-        <div className="grid grid-cols-2 gap-2.5">
-          {num('percepcion_iva', 'Percepción IVA')}
-          {num('ingresos_brutos', 'Ingresos Brutos')}
-        </div>
       </div>
 
       <div className="flex justify-end gap-2">

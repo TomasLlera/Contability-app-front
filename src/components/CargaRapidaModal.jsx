@@ -205,6 +205,25 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
             </div>
           )}
 
+          {/* Percepciones — solo Factura / Nota de Crédito. No suman al monto.
+              Se ubican arriba del monto (el monto es lo último que se carga). */}
+          {(tipo === 'factura' || tipo === 'nota_credito') && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>
+                <input type="number" min="0" step="any" placeholder="0"
+                  className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Ingresos Brutos <span className="font-normal text-violet-400/70">(no suma)</span></label>
+                <input type="number" min="0" step="any" placeholder="0"
+                  className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
+              </div>
+            </div>
+          )}
+
           {/* Monto */}
           <div className="relative">
             <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esPago ? 'text-blue-500' : 'text-green-600'}`}>
@@ -214,29 +233,6 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
               className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={monto} onChange={e => setMonto(e.target.value)} required />
           </div>
-
-          {/* Percepciones — solo Factura / Nota de Crédito. No suman al monto. */}
-          {(tipo === 'factura' || tipo === 'nota_credito') && (
-            <div className="rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-900/10 px-3 py-2.5">
-              <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300 mb-1.5">
-                Retenciones / Percepciones <span className="font-normal text-violet-500/80">(no suman al total)</span>
-              </p>
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-[11px] text-violet-600/80 dark:text-violet-300/80 mb-1">Percepción IVA</label>
-                  <input type="number" min="0" step="any" placeholder="0"
-                    className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-violet-600/80 dark:text-violet-300/80 mb-1">Ingresos Brutos</label>
-                  <input type="number" min="0" step="any" placeholder="0"
-                    className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose}
