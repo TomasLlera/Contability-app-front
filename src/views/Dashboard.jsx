@@ -121,6 +121,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   // Las vencidas (días < 0) se muestran siempre; el rango filtra solo lo que está por vencer.
   const vencFiltrados = vencimientos.filter(v => v.dias_restantes < 0 || v.dias_restantes <= rangoVenc);
   const montoVencido = vencidos.reduce((s, v) => s + v.monto, 0);
+  // Total (saldo) de las boletas mostradas en el rango elegido (7/14/30d).
+  const totalVencFiltrados = vencFiltrados.reduce((s, v) => s + (v.monto || 0), 0);
 
   // Caja hoy
   const gastosHoy          = cajaHoy.filter(m => m.tipo === 'gasto');
@@ -165,7 +167,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           label="Locales"
           value={locales.length}
@@ -281,7 +283,10 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               </span>
             )}
             {!loadingVenc && vencimientos.length > 0 && (
-              <div className="flex items-center gap-1 ml-auto">
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-200" title={`Total de las boletas en ${rangoVenc} días`}>
+                  {fmt(totalVencFiltrados)}
+                </span>
                 <button
                   onClick={() => setRangoVencOpen(o => !o)}
                   title="Cambiar rango"
@@ -366,18 +371,18 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{proveedoresRubro.nombre}</span>
               <span className="ml-auto text-xs text-slate-400 capitalize">{provNombreMes}</span>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3">
                 <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Facturas</p>
-                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums">{fmt(provFacturas)}</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(provFacturas)}</p>
               </div>
               <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3">
                 <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">Pagos</p>
-                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums">{fmt(provPagos)}</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(provPagos)}</p>
               </div>
               <div className={`rounded-xl p-3 ${provDeuda > 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-slate-50 dark:bg-slate-700/40'}`}>
                 <p className={`text-xs font-medium mb-1 ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>Deuda</p>
-                <p className={`text-lg font-bold tabular-nums ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(provDeuda)}</p>
+                <p className={`text-lg font-bold tabular-nums truncate ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(provDeuda)}</p>
               </div>
             </div>
           </div>

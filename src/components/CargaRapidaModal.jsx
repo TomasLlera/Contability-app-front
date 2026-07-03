@@ -24,6 +24,9 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [fecha, setFecha] = useState(today());
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [documento, setDocumento] = useState('factura');
+  // Método de pago de la factura (opcional): viaja a la Caja del Día al vencer.
+  // Independiente de metodoPago (que es para el tipo 'pago'). Remito = efectivo.
+  const [metodoFactura, setMetodoFactura] = useState(null);
   // Percepción IVA / Ingresos Brutos: aplican a facturas y NC. No suman al monto.
   const [percepcionIva, setPercepcionIva] = useState('');
   const [ingresosBrutos, setIngresosBrutos] = useState('');
@@ -45,6 +48,8 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   }, [rubroId]);
 
   const esPago = tipo === 'pago' || tipo === 'nota_credito';
+  // Remito: no lleva percepciones y se paga siempre en efectivo (automático).
+  const esRemito = tipo === 'factura' && documento === 'remito';
 
   // Boletas pendientes del subrubro: permiten aplicar el pago/NC a una factura
   // puntual (y dejar saldo si es parcial). Solo aplica a pago / nota de crédito.
@@ -92,13 +97,14 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           fecha_vencimiento: null,
           campos_extra: {},
           facturas_vinculadas_ids: [],
-          // metodo_pago solo aplica al tipo 'pago'; backend lo rechaza para nota_credito/factura
-          metodo_pago: tipo === 'pago' ? metodoPago : null,
+          // metodo_pago: en 'pago' es el método del pago; en 'factura' es el método que
+          // viajará a la Caja del Día al vencer (remito = efectivo). En NC no aplica.
+          metodo_pago: tipo === 'pago' ? metodoPago : (esRemito ? 'efectivo' : (tipo === 'factura' ? metodoFactura : null)),
           // documento solo aplica al tipo 'factura'
           documento: tipo === 'factura' ? documento : null,
-          // Percepciones para factura / NC (el backend guarda 0 en pago).
-          percepcion_iva: tipo === 'pago' ? 0 : (Number(percepcionIva) || 0),
-          ingresos_brutos: tipo === 'pago' ? 0 : (Number(ingresosBrutos) || 0),
+          // Percepciones para factura / NC (el backend guarda 0 en pago y en remito).
+          percepcion_iva: (tipo === 'pago' || esRemito) ? 0 : (Number(percepcionIva) || 0),
+          ingresos_brutos: (tipo === 'pago' || esRemito) ? 0 : (Number(ingresosBrutos) || 0),
           idempotency_key: idemKeyRef.current,
         });
       }
@@ -205,9 +211,32 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
             </div>
           )}
 
-          {/* Percepciones — solo Factura / Nota de Crédito. No suman al monto.
-              Se ubican arriba del monto (el monto es lo último que se carga). */}
-          {(tipo === 'factura' || tipo === 'nota_credito') && (
+          {/* Método de pago de la factura — viaja a la Caja del Día al vencer. Remito = efectivo. */}
+          {tipo === 'factura' && (
+            <div>
+              <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+                {[['efectivo', 'Efectivo', 'bg-green-600'], ['transferencia', 'Transferencia', 'bg-blue-600']].map(([v, l, bg]) => {
+                  const active = (esRemito ? 'efectivo' : metodoFactura) === v;
+                  return (
+                    <button key={v} type="button" disabled={esRemito}
+                      onClick={() => { if (!esRemito) setMetodoFactura(active ? null : v); }}
+                      className={`flex-1 py-2 transition-colors ${active ? `${bg} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'} ${esRemito ? 'cursor-not-allowed opacity-90' : ''}`}>
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {esRemito
+                  ? 'Remito — siempre efectivo. Aparece en la Caja del Día.'
+                  : 'Opcional. Al vencer, aparece con este método en la Caja del Día.'}
+              </p>
+            </div>
+          )}
+
+          {/* Percepciones — solo Factura (no remito) / Nota de Crédito. No suman al
+              monto. Se ubican arriba del monto (el monto es lo último que se carga). */}
+          {((tipo === 'factura' && !esRemito) || tipo === 'nota_credito') && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>

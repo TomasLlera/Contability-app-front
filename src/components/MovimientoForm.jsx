@@ -55,6 +55,12 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const setExtra = (nombre, val) => setCamposExtra(prev => ({ ...prev, [nombre]: val }));
 
   const esPagoONC = tipo === 'pago' || tipo === 'nota_credito';
+  // Remito: no lleva percepciones y se paga siempre en efectivo (automático).
+  const esRemito = tipo === 'factura' && documento === 'remito';
+  // Método de pago de la factura: viaja a la Caja del Día cuando vence. El remito
+  // queda fijo en efectivo; si el subrubro tiene método fijo, tampoco es editable.
+  const metodoBloqueado = esRemito || metodoFijo;
+  const metodoFacturaActivo = esRemito ? 'efectivo' : metodoPago;
 
   const toggleFactura = (id) => {
     setFacturasSeleccionadas(prev => {
@@ -145,8 +151,11 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         campos_extra: camposExtra,
         facturas_vinculadas_ids: [],
         documento,
-        percepcion_iva: Number(percepcionIva) || 0,
-        ingresos_brutos: Number(ingresosBrutos) || 0,
+        // Método de pago de la factura: viaja a la Caja del Día al vencer. Remito = efectivo.
+        metodo_pago: esRemito ? 'efectivo' : (metodoPago || null),
+        // Un remito nunca lleva percepciones (el backend también las fuerza a 0).
+        percepcion_iva: esRemito ? 0 : (Number(percepcionIva) || 0),
+        ingresos_brutos: esRemito ? 0 : (Number(ingresosBrutos) || 0),
         idempotency_key: idemKeyRef.current,
       };
     }
@@ -239,7 +248,47 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             </div>
           </div>
 
-          {percepcionesBlock}
+          {/* Método de pago de la factura — viaja a la Caja del Día cuando vence.
+              Remito: fijo en efectivo. Si el subrubro tiene método fijo, tampoco es editable. */}
+          <div>
+            <label className={labelCls}>
+              Método de pago <span className="text-slate-400">(al vencer, aparece así en la Caja del Día)</span>
+            </label>
+            <div className={`flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium ${metodoBloqueado ? 'opacity-90' : ''}`}>
+              {[
+                { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
+                { value: 'transferencia', label: 'Transferencia', Icon: ArrowLeftRight },
+              ].map(m => {
+                const active = metodoFacturaActivo === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    disabled={metodoBloqueado}
+                    onClick={() => { if (!metodoBloqueado) setMetodoPago(active ? null : m.value); }}
+                    className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
+                      active
+                        ? (m.value === 'efectivo' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white')
+                        : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
+                    } ${metodoBloqueado ? 'cursor-not-allowed' : ''}`}
+                  >
+                    <m.Icon size={14} />
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+            {esRemito ? (
+              <p className="mt-1 text-xs text-green-600 dark:text-green-400">Remito — siempre en efectivo. Aparece en la Caja del Día pendiente de confirmar.</p>
+            ) : metodoFijo ? (
+              <p className="mt-1 text-xs text-slate-400">Predeterminado del subrubro — no editable.</p>
+            ) : !metodoPago && (
+              <p className="mt-1 text-xs text-slate-400">Sin definir — al vencer aparece en la Caja sin método asignado.</p>
+            )}
+          </div>
+
+          {/* Percepciones — no aplican al remito. */}
+          {!esRemito && percepcionesBlock}
 
           <div>
             <label className={labelCls}>

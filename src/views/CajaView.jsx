@@ -3,7 +3,7 @@ import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
-  Link2, ChevronDown, RefreshCw, Loader2
+  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
@@ -591,6 +591,8 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
 
 export default function CajaView({ rubros = [] }) {
   const [fecha, setFecha]           = useState(todayStr());
+  // Ocultar los montos de "Saldo del día" y "Saldo en cuenta" (privacidad). Persiste.
+  const [ocultarSaldos, setOcultarSaldos] = useState(() => localStorage.getItem('cajaOcultarSaldos') === '1');
   const [movs, setMovs]             = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -600,8 +602,11 @@ export default function CajaView({ rubros = [] }) {
   // ID del gasto cuya confirmación/reversión está en curso (bloquea doble clic en
   // el botón de confirmar, que de otro modo crearía dos pagos en el subrubro).
   const [confirmingId, setConfirmingId] = useState(null);
-  const [gastosOpen, setGastosOpen] = useState(true);
-  const [empleadosOpen, setEmpleadosOpen] = useState(true);
+  // Acordeones con memoria: recuerdan si quedaron abiertos/cerrados entre recargas.
+  const [gastosOpen, setGastosOpen] = useState(() => localStorage.getItem('cajaGastosOpen') !== '0');
+  const [empleadosOpen, setEmpleadosOpen] = useState(() => localStorage.getItem('cajaEmpleadosOpen') !== '0');
+  useEffect(() => { localStorage.setItem('cajaGastosOpen', gastosOpen ? '1' : '0'); }, [gastosOpen]);
+  useEffect(() => { localStorage.setItem('cajaEmpleadosOpen', empleadosOpen ? '1' : '0'); }, [empleadosOpen]);
 
   const dateInputRef = useRef(null);
   // Bloqueo síncrono de confirmaciones en vuelo (por id de gasto). El estado
@@ -943,6 +948,12 @@ export default function CajaView({ rubros = [] }) {
         <input ref={dateInputRef} type="date" value={fecha}
           onChange={e => setFecha(e.target.value)}
           className="sr-only" />
+        <button
+          onClick={() => setOcultarSaldos(v => { localStorage.setItem('cajaOcultarSaldos', v ? '0' : '1'); return !v; })}
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+          title={ocultarSaldos ? 'Mostrar saldos' : 'Ocultar saldos'}>
+          {ocultarSaldos ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
         <button onClick={refrescarTodo} disabled={refreshing}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 disabled:opacity-50" title="Refrescar ahora (sincroniza pagos y vencimientos)">
           <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
@@ -980,7 +991,7 @@ export default function CajaView({ rubros = [] }) {
           ) : (
             <div className="mt-1">
               <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
-                {saldoInicial ? fmt(saldoInicial) : '—'}
+                {ocultarSaldos ? '••••••' : (saldoInicial ? fmt(saldoInicial) : '—')}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">💵 Efectivo</span>
@@ -1017,7 +1028,7 @@ export default function CajaView({ rubros = [] }) {
           ) : (
             <div className="mt-1">
               <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
-                {saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—'}
+                {ocultarSaldos ? '••••••' : (saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—')}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>

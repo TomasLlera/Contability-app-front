@@ -307,7 +307,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
             </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowExportModal(true)}
             className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"

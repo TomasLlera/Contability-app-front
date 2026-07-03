@@ -43,6 +43,9 @@ export default function IvaView({ initialTab = 'compras', role }) {
         ivaApi.getCompras(), ivaApi.getLotes(), ivaApi.getVentas(), ivaApi.getResumen(),
       ]);
       setCompras(c); setLotes(l); setVentas(v); setResumen(r);
+      // Debug: percepciones/IIBB acumuladas por mes (combina IvaCompra + facturas de subrubro).
+      console.debug('[IVA] percepciones acumuladas por mes:',
+        (r.meses || []).map(m => ({ mes: m.mes, percepcion_iva: m.compras?.percepcion_iva, ingresos_brutos: m.compras?.ingresos_brutos })));
     } catch (err) {
       toast.error(getErrorMsg(err));
     } finally {
@@ -184,7 +187,13 @@ function CrucePanel({ resumen }) {
     return { imp, iva, diferencia: (m.ventas || 0) - iva };
   };
 
-  const vista = meses.map(m => ({ mes: m.mes, ventas: m.ventas || 0, ...netoMes(m) }));
+  const vista = meses.map(m => ({
+    mes: m.mes, ventas: m.ventas || 0, ...netoMes(m),
+    // Retenciones/percepciones acumuladas del mes (IvaCompra + facturas de subrubro).
+    // El backend ya las netea por NC; no dependen del filtro por tipo de comprobante.
+    percepcion_iva: m.compras?.percepcion_iva || 0,
+    ingresos_brutos: m.compras?.ingresos_brutos || 0,
+  }));
   const filtrando = tiposSel.length > 0;
 
   const exportExcel = async () => {
@@ -248,6 +257,8 @@ function CrucePanel({ resumen }) {
                 <th className="text-left px-4 py-2.5 font-medium">Mes</th>
                 <th className="text-right px-4 py-2.5 font-medium">Compras (Imp.Total)</th>
                 <th className="text-right px-4 py-2.5 font-medium">IVA compras</th>
+                <th className="text-right px-4 py-2.5 font-medium text-violet-500">Percep. IVA</th>
+                <th className="text-right px-4 py-2.5 font-medium text-violet-500">Ing. Brutos</th>
                 <th className="text-right px-4 py-2.5 font-medium">Ventas</th>
                 <th className="text-right px-4 py-2.5 font-medium">Diferencia</th>
                 <th className="text-right px-4 py-2.5 font-medium w-28">Saldo</th>
@@ -261,6 +272,8 @@ function CrucePanel({ resumen }) {
                     <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-200">{labelMes(m.mes)}</td>
                     <td className="px-4 py-2.5 text-right text-amber-600 dark:text-amber-400">{fmt(m.imp)}</td>
                     <td className="px-4 py-2.5 text-right text-slate-500">{fmt(m.iva)}</td>
+                    <td className="px-4 py-2.5 text-right text-violet-600 dark:text-violet-400">{m.percepcion_iva ? fmt(m.percepcion_iva) : '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-violet-600 dark:text-violet-400">{m.ingresos_brutos ? fmt(m.ingresos_brutos) : '—'}</td>
                     <td className="px-4 py-2.5 text-right text-blue-600 dark:text-blue-400">{fmt(m.ventas)}</td>
                     <td className={`px-4 py-2.5 text-right font-semibold ${positivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{fmt(m.diferencia)}</td>
                     <td className="px-4 py-2.5 text-right">
@@ -353,12 +366,12 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           Imp. Total {tipoSel ? `(${tipoSel})` : 'acumulado'}: <strong className="text-amber-600 dark:text-amber-400">{fmt(impAcum)}</strong>
           {' · '}IVA total: <strong className="text-slate-600 dark:text-slate-300">{fmt(ivaAcum)}</strong>
         </p>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 min-w-36 sm:flex-none">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
               placeholder="Buscar monto, razón social o factura…"
-              className="w-56 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 rounded-lg pl-7 pr-7 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              className="w-full sm:w-56 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 rounded-lg pl-7 pr-7 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
             {busqueda && (
               <button onClick={() => setBusqueda('')} title="Limpiar"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">×</button>
@@ -658,30 +671,32 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
               <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">{labelMes(mes)}</span>
               <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{fmt(sub)} <span className="text-xs font-normal text-slate-400">({filas.length})</span></span>
             </div>
-            <table className="w-full text-sm">
-              <thead className="text-slate-400 text-xs">
-                <tr>
-                  <th className="text-left px-4 py-1.5 font-medium w-28">Fecha</th>
-                  <th className="text-left px-4 py-1.5 font-medium">Concepto</th>
-                  <th className="text-right px-4 py-1.5 font-medium w-32">Total</th>
-                  <th className="w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                {filas.map(v => (
-                  <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
-                    <td className="px-4 py-2 text-slate-500">{v.fecha}</td>
-                    <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{v.concepto || <span className="text-slate-400">—</span>}</td>
-                    <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-200">{fmt(v.total)}</td>
-                    <td className="px-2 py-2 text-right">
-                      {!isViewer && (
-                        <button onClick={() => onDelete(v.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={13} /></button>
-                      )}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-slate-400 text-xs">
+                  <tr>
+                    <th className="text-left px-4 py-1.5 font-medium w-28">Fecha</th>
+                    <th className="text-left px-4 py-1.5 font-medium">Concepto</th>
+                    <th className="text-right px-4 py-1.5 font-medium w-32">Total</th>
+                    <th className="w-10"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                  {filas.map(v => (
+                    <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
+                      <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{v.fecha}</td>
+                      <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{v.concepto || <span className="text-slate-400">—</span>}</td>
+                      <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-200 whitespace-nowrap">{fmt(v.total)}</td>
+                      <td className="px-2 py-2 text-right">
+                        {!isViewer && (
+                          <button onClick={() => onDelete(v.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><Trash2 size={13} /></button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       })}
