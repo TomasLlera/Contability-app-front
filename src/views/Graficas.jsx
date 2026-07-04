@@ -197,12 +197,12 @@ function CajaBarChart({ datos, chartCfg }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Graficas({ rubros = [] }) {
+export default function Graficas({ rubros = [], initialRubroId = null, initialMetrica = null }) {
   const [tab, setTab] = useState(() => sessionStorage.getItem('graficas_tab') || 'rubros');
   const [showResumen, setShowResumen] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [resumen, setResumen] = useState(null);
-  const [selectedRubroId, setSelectedRubroId] = useState(null);
+  const [selectedRubroId, setSelectedRubroId] = useState(initialRubroId);
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubroId, setSelectedSubrubroId] = useState(null);
   const [metrica, setMetrica] = useState('facturado');
@@ -225,6 +225,10 @@ export default function Graficas({ rubros = [] }) {
 
   useEffect(() => { dashboardApi.getResumen().then(setResumen); }, []);
   useEffect(() => { if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id); }, [rubros]);
+  // Al abrir Gráficas apuntando a un rubro (ej. desde la card de Proveedores del dashboard).
+  useEffect(() => { if (initialRubroId) { setSelectedRubroId(initialRubroId); setTab('rubros'); } }, [initialRubroId]);
+  // Métrica a mostrar (Facturas / Pagos / Deuda) cuando se abre desde un tile del dashboard.
+  useEffect(() => { if (initialMetrica) setMetrica(initialMetrica); }, [initialMetrica]);
 
   useEffect(() => {
     if (!selectedRubroId) return;

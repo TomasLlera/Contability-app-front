@@ -65,6 +65,7 @@ export default function App() {
   const touchStartY = useRef(null);
   const editingRubroRef = useRef(null);
   const editingLocalRef = useRef(null);
+  const newRubroRef = useRef(null);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -103,6 +104,8 @@ export default function App() {
   // Rubro CRUD
   const [showNewRubro, setShowNewRubro] = useState(null);
   const [nuevoRubro, setNuevoRubro] = useState('');
+  const [graficaRubroId, setGraficaRubroId] = useState(null); // rubro a preseleccionar al abrir Gráficas
+  const [graficaMetrica, setGraficaMetrica] = useState(null); // métrica (facturado/pagado/diferencia) a mostrar
   const [editingRubro, setEditingRubro] = useState(null);
   const [editNombre, setEditNombre] = useState('');
   const [editIcon, setEditIcon] = useState('');
@@ -118,6 +121,17 @@ export default function App() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [editingRubro]);
+
+  useEffect(() => {
+    if (showNewRubro === null) return;
+    const handler = (e) => {
+      if (newRubroRef.current && !newRubroRef.current.contains(e.target)) {
+        setShowNewRubro(null); setNuevoRubro('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showNewRubro]);
 
   useEffect(() => {
     if (!editingLocal) return;
@@ -571,7 +585,7 @@ export default function App() {
                       ))}
 
                       {showNewRubro === local.id ? (
-                        <div className="py-2 space-y-1.5">
+                        <div ref={newRubroRef} className="py-2 space-y-1.5">
                           <input
                             className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                             placeholder="Nombre del rubro"
@@ -784,7 +798,7 @@ export default function App() {
               role={role}
             />
           ) : activeView === 'graficas' ? (
-            <Graficas rubros={rubros} />
+            <Graficas rubros={rubros} initialRubroId={graficaRubroId} initialMetrica={graficaMetrica} />
           ) : activeView === 'caja' ? (
             <CajaView rubros={rubros} />
           ) : activeView === 'stock' ? (
@@ -800,6 +814,7 @@ export default function App() {
               rubroStats={rubroStats}
               onNavigate={handleNavigateFromVenc}
               onViewChange={(view) => { setActiveView(view); closeSidebar(); }}
+              onOpenGrafica={(rubroId, metrica = 'facturado') => { setGraficaRubroId(rubroId); setGraficaMetrica(metrica); setActiveView('graficas'); closeSidebar(); }}
             />
           )}
         </main>

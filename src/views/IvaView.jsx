@@ -299,7 +299,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
   const [showManual, setShowManual] = useState(false);
   const [tipoSel, setTipoSel] = useState(''); // '' = todas las boletas
   const [busqueda, setBusqueda] = useState('');
-  const [mesSel, setMesSel] = useState('');   // '' = todos los meses
+  const [mesSel, setMesSel] = useState(new Date().toISOString().slice(0, 7)); // arranca en el mes actual; '' = todos
   const [desde, setDesde] = useState('');     // YYYY-MM-DD
   const [hasta, setHasta] = useState('');     // YYYY-MM-DD
   const tipoDe = (c) => (c.tipo || '').trim() || 'Sin tipo';
@@ -438,6 +438,14 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} title="Hasta"
             className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none" />
         </div>
+        {/* Mostrar todos los meses */}
+        <button onClick={() => { setMesSel(''); setDesde(''); setHasta(''); }} title="Ver todos los meses"
+          className={`inline-flex items-center h-8 px-2.5 rounded-lg border transition-colors ${
+            mesSel === '' && !desde && !hasta
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+          Mostrar todos
+        </button>
         {hayFiltroFecha && (
           <button onClick={limpiarFechas} title="Quitar filtros"
             className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">

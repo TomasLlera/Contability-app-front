@@ -891,6 +891,10 @@ export default function CajaView({ rubros = [] }) {
   const ingresoTransDia = (saldoCuentaHoy !== null && saldoCuentaAyer !== null)
     ? saldoCuentaHoy - saldoCuentaAyer
     : null;
+  // % de variación respecto al saldo del día anterior. null si ayer era 0 (no hay base).
+  const pctTransDia = (ingresoTransDia !== null && saldoCuentaAyer)
+    ? (ingresoTransDia / Math.abs(saldoCuentaAyer)) * 100
+    : null;
 
   const empleados     = movs.filter(m => m.tipo === 'empleado');
   const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra');
@@ -1034,7 +1038,7 @@ export default function CajaView({ rubros = [] }) {
                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>
                 {ingresoTransDia !== null ? (
                   <span className={`text-xs font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-                    {ingresoTransDia >= 0 ? '↑' : '↓'} {fmt(Math.abs(ingresoTransDia))} ingreso del día bancario
+                    {ingresoTransDia >= 0 ? '↑' : '↓'} {ocultarSaldos ? '••••' : (pctTransDia !== null ? `${Math.abs(pctTransDia).toFixed(1)}%` : fmt(Math.abs(ingresoTransDia)))} vs. día anterior
                   </span>
                 ) : (
                   <span className="text-xs text-slate-400">

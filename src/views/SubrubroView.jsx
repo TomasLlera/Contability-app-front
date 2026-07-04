@@ -190,6 +190,14 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   const saldoFinal = data.saldo_total ?? (data.monto_base || 0);
   const saldoPositivo = saldoFinal >= 0;
 
+  // Factura pendiente cuyo vencimiento es el más próximo. Se muestra su saldo
+  // ACTUAL (monto original − pagos − NC aplicadas), no el monto original.
+  const proximaAVencer = todasFacturasPendientes
+    .filter(m => m.fecha_vencimiento)
+    .sort((a, b) => a.fecha_vencimiento.localeCompare(b.fecha_vencimiento))[0] || null;
+  const saldoAVencer = proximaAVencer ? (proximaAVencer.saldo ?? proximaAVencer.monto ?? 0) : 0;
+  const vencProxima = vencimientoLabel(proximaAVencer?.fecha_vencimiento);
+
   const camposTexto = campos.filter(c => c.tipo === 'texto');
   const camposNumericos = campos.filter(c => c.tipo === 'suma' || c.tipo === 'resta');
   const hayVencimientos = data.movimientos.some(m => m.fecha_vencimiento);
@@ -234,15 +242,16 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pendiente</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo a vencer</p>
           <p className="text-xl font-bold text-amber-600 mt-1">
-            {fmt(todasFacturasPendientes.reduce((s, m) => s + m.monto, 0))}
+            {fmt(saldoAVencer)}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{vencProxima ? vencProxima.label : 'Sin vencimientos'}</p>
         </div>
         <div className={`rounded-xl p-4 border ${saldoPositivo ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'}`}>
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo total</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo pendiente</p>
           <p className={`text-xl font-bold mt-1 ${saldoPositivo ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(saldoFinal)}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
 

@@ -210,12 +210,30 @@ export const movimientosApi = {
     if (desde) params.desde = desde;
     if (hasta) params.hasta = hasta;
     const res = await api.get(`/movimientos/export/${subrubroId}`, { params, responseType: 'blob' });
+    // Si el backend devolvió un error como blob (p. ej. JSON de error), lo detectamos
+    // acá en vez de descargar un .xlsx corrupto.
+    const ct = res.data?.type || '';
+    if (ct.includes('application/json')) {
+      const txt = await res.data.text();
+      let msg = 'No se pudo generar el Excel';
+      try { msg = JSON.parse(txt).error || msg; } catch { /* usa msg por defecto */ }
+      throw new Error(msg);
+    }
     const url = URL.createObjectURL(res.data);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${nombre}.xlsx`;
+    // El ancla debe estar en el DOM para que .click() dispare la descarga en Firefox
+    // y en algunos builds de Chromium.
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    // Revocar en el próximo tick: hacerlo de forma síncrona puede abortar la descarga
+    // antes de que el navegador la inicie.
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 0);
   },
   importExcel: (rubroId, file, mapping, mode = 'skip_duplicates', sheets = null, skipRows = 0, fechaDesde = null, fechaHasta = null, documento = 'factura') => {
     const formData = new FormData();

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Download, X } from 'lucide-react';
-import { movimientosApi } from '../api';
+import { movimientosApi, getErrorMsg } from '../api';
 
 const hoy = () => new Date().toISOString().split('T')[0];
 const addMonths = (n) => {
@@ -24,6 +24,7 @@ export default function ExportModal({ subrubro, onClose }) {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handlePreset = (idx) => {
     setPreset(idx);
@@ -36,12 +37,15 @@ export default function ExportModal({ subrubro, onClose }) {
 
   const handleExport = async () => {
     setLoading(true);
+    setError(null);
     try {
       const p = PRESETS[preset];
       const d = p.label === 'Todo' ? null : desde || null;
       const h = p.label === 'Todo' ? null : hasta || null;
       await movimientosApi.exportExcel(subrubro.id, subrubro.nombre, d, h);
       onClose();
+    } catch (err) {
+      setError(err?.message ? err.message : getErrorMsg(err));
     } finally {
       setLoading(false);
     }
@@ -100,6 +104,10 @@ export default function ExportModal({ subrubro, onClose }) {
 
         {PRESETS[preset].label === 'Todo' && (
           <p className="text-xs text-slate-400 dark:text-slate-500 mb-5 text-center">Se exportarán todos los movimientos sin filtro de fecha.</p>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-500 dark:text-red-400 mb-3 text-center">{error}</p>
         )}
 
         <button
