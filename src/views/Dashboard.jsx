@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { movimientosApi, cajaApi, dashboardApi, authApi } from '../api';
+import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
   ChevronRight, ChevronLeft, Building2, CheckCircle2, AlertTriangle, Banknote,
@@ -78,15 +78,67 @@ const mesActualStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange }) {
+// Convierte la tendencia de un rubro en el saldo del mes actual (Facturas/Pagos/Deuda).
+// Mismas métricas que su gráfica → tabla y gráfico quedan siempre consistentes.
+function computeSaldo(rubro, tendencia) {
+  const mes = mesActualStr();
+  const mesEntry = tendencia?.find(t => t.mes === mes);
+  const ultima = tendencia?.length ? tendencia[tendencia.length - 1] : null;
+  const facturas = mesEntry?.facturado ?? 0;
+  const pagos = mesEntry?.pagado ?? 0;
+  // La deuda es acumulada: si no hubo movimientos este mes, se arrastra la del último mes con datos.
+  const deuda = mesEntry?.diferencia ?? ultima?.diferencia ?? 0;
+  const fecha = new Date(mes + '-01T00:00:00');
+  const nombreMes = `${fecha.toLocaleDateString('es-AR', { month: 'long' })} ${fecha.getFullYear()}`;
+  return { rubro, facturas, pagos, deuda, nombreMes };
+}
+
+// Tarjeta de saldo mensual de un rubro. Formato idéntico para todos los rubros;
+// al clickear abre la gráfica asociada a ese mismo rubro (tabla ↔ gráfico).
+function SaldoCard({ rubro, facturas, pagos, deuda, nombreMes, onOpenGrafica, onNavigate }) {
+  return (
+    <div
+      onClick={() => (onOpenGrafica ? onOpenGrafica(rubro.id) : onNavigate?.(rubro, null))}
+      className="group bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
+          <Truck size={16} />
+        </span>
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{rubro.nombre}</span>
+        <span className="ml-auto text-xs text-slate-400 capitalize">{nombreMes}</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'facturado'); }}
+          className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3 cursor-pointer transition-shadow hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700">
+          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Facturas</p>
+          <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(facturas)}</p>
+        </div>
+        <div onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'pagado'); }}
+          className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3 cursor-pointer transition-shadow hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-700">
+          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">Pagos</p>
+          <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(pagos)}</p>
+        </div>
+        <div onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'diferencia'); }}
+          className={`rounded-xl p-3 cursor-pointer transition-shadow hover:ring-2 ${deuda > 0 ? 'bg-red-50 dark:bg-red-950/30 hover:ring-red-300 dark:hover:ring-red-800' : 'bg-slate-50 dark:bg-slate-700/40 hover:ring-slate-300 dark:hover:ring-slate-600'}`}>
+          <p className={`text-xs font-medium mb-1 ${deuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>Deuda</p>
+          <p className={`text-lg font-bold tabular-nums truncate ${deuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(deuda)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange, onOpenGrafica }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [loadingVenc, setLoadingVenc] = useState(true);
   const [rangoVenc, setRangoVenc] = useState(30);
   const [rangoVencOpen, setRangoVencOpen] = useState(false);
   const [cajaHoy, setCajaHoy] = useState([]);
-  const [provTendencia, setProvTendencia] = useState(null);
-
-  const proveedoresRubro = rubros.find(r => r.nombre.toLowerCase().includes('provee'));
+  // Rubros configurados para "Saldos mensuales" (null = config sin cargar todavía)
+  const [dashboardRubroIds, setDashboardRubroIds] = useState(null);
+  // Resultado listo para render: [{ rubro, facturas, pagos, deuda, nombreMes }]
+  const [saldos, setSaldos] = useState([]);
 
   useEffect(() => {
     movimientosApi.getVencimientos(30).then(data => {
@@ -94,26 +146,32 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
       setLoadingVenc(false);
     }).catch(() => setLoadingVenc(false));
     cajaApi.getByFecha(todayStr()).then(setCajaHoy).catch(() => {});
+    // Config del dashboard: qué rubros mostrar como tablas de saldos
+    appConfigApi.get()
+      .then(cfg => setDashboardRubroIds(cfg.dashboard_tablas || []))
+      .catch(() => setDashboardRubroIds([]));
   }, []);
 
-  const proveedoresRubroId = proveedoresRubro?.id;
+  // Para cada rubro configurado, traer su tendencia y computar el saldo del mes.
+  // Si no hay config, se usa el rubro "Proveedores" (comportamiento previo).
   useEffect(() => {
-    if (!proveedoresRubroId) return;
-    dashboardApi.getTendencia(proveedoresRubroId, 6)
-      .then(d => setProvTendencia(d.tendencia ?? []))
-      .catch(() => setProvTendencia([]));
-  }, [proveedoresRubroId]);
+    if (dashboardRubroIds === null || !rubros.length) return;
+    let ids = dashboardRubroIds;
+    if (!ids.length) {
+      const prov = rubros.find(r => r.nombre.toLowerCase().includes('provee'));
+      ids = prov ? [prov.id] : [];
+    }
+    const seleccion = ids.map(id => rubros.find(r => r.id === id)).filter(Boolean);
 
-  // Totales de Proveedores del mes actual (mismas métricas que la gráfica)
-  const mesActual = mesActualStr();
-  const provMesEntry = provTendencia?.find(t => t.mes === mesActual);
-  const provUltima = provTendencia?.length ? provTendencia[provTendencia.length - 1] : null;
-  const provFacturas = provMesEntry?.facturado ?? 0;
-  const provPagos = provMesEntry?.pagado ?? 0;
-  // La deuda es acumulada: si no hubo movimientos este mes, se arrastra la del último mes con datos.
-  const provDeuda = provMesEntry?.diferencia ?? provUltima?.diferencia ?? 0;
-  const provFecha = new Date(mesActual + '-01T00:00:00');
-  const provNombreMes = `${provFecha.toLocaleDateString('es-AR', { month: 'long' })} ${provFecha.getFullYear()}`;
+    // Promise.all([]) resuelve a [] → limpia las tablas si no hay rubros elegidos.
+    let cancelado = false;
+    Promise.all(seleccion.map(rubro =>
+      dashboardApi.getTendencia(rubro.id, 6)
+        .then(d => computeSaldo(rubro, d.tendencia ?? []))
+        .catch(() => computeSaldo(rubro, []))
+    )).then(res => { if (!cancelado) setSaldos(res); });
+    return () => { cancelado = true; };
+  }, [rubros, dashboardRubroIds]);
 
   const totalSubrubros = Object.values(rubroStats).reduce((a, b) => a + b, 0);
   const vencidos    = vencimientos.filter(v => v.dias_restantes <= 0);
@@ -356,35 +414,19 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
         </div>
       </div>
 
-      {/* Proveedores — mes actual */}
-      {proveedoresRubro && (
+      {/* Saldos mensuales — una tabla por rubro configurado, cada una con su gráfica */}
+      {saldos.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Saldos mensuales</p>
-          <div
-            onClick={() => onNavigate?.(proveedoresRubro, null)}
-            className="group bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center text-slate-500 dark:text-slate-300">
-                <Truck size={16} />
-              </span>
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{proveedoresRubro.nombre}</span>
-              <span className="ml-auto text-xs text-slate-400 capitalize">{provNombreMes}</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3">
-                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Facturas</p>
-                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(provFacturas)}</p>
-              </div>
-              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3">
-                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">Pagos</p>
-                <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(provPagos)}</p>
-              </div>
-              <div className={`rounded-xl p-3 ${provDeuda > 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-slate-50 dark:bg-slate-700/40'}`}>
-                <p className={`text-xs font-medium mb-1 ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>Deuda</p>
-                <p className={`text-lg font-bold tabular-nums truncate ${provDeuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(provDeuda)}</p>
-              </div>
-            </div>
+          <div className={`grid grid-cols-1 gap-4 ${saldos.length > 1 ? 'xl:grid-cols-2' : ''}`}>
+            {saldos.map(s => (
+              <SaldoCard
+                key={s.rubro.id}
+                {...s}
+                onOpenGrafica={onOpenGrafica}
+                onNavigate={onNavigate}
+              />
+            ))}
           </div>
         </div>
       )}

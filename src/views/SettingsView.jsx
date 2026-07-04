@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { appConfigApi, usersApi, auditApi, getErrorMsg } from '../api';
+import { appConfigApi, usersApi, auditApi, rubrosApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History } from 'lucide-react';
+import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard } from 'lucide-react';
 
 const SECCIONES = [
-  { key: 'alertas',   label: 'Alertas',    icon: Bell,       ready: true },
-  { key: 'usuarios',  label: 'Usuarios',   icon: Users,      ready: true },
-  { key: 'auditoria', label: 'Auditoría',  icon: History,    ready: true },
+  { key: 'alertas',   label: 'Alertas',    icon: Bell,           ready: true },
+  { key: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard, ready: true },
+  { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true },
+  { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true },
   { key: 'idioma',    label: 'Idioma',     icon: Globe,      ready: false },
   { key: 'moneda',    label: 'Moneda',     icon: DollarSign, ready: false },
   { key: 'negocio',   label: 'Negocio',    icon: Building2,  ready: false },
@@ -134,6 +135,85 @@ function Proximamente({ label }) {
       <p className="text-2xl mb-3">🚧</p>
       <p className="font-semibold text-slate-600 dark:text-slate-300">{label}</p>
       <p className="text-sm text-slate-400 mt-1">Próximamente</p>
+    </div>
+  );
+}
+
+function DashboardSection() {
+  const [rubros, setRubros] = useState(null);
+  const [seleccion, setSeleccion] = useState([]);   // rubro_ids elegidos
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    Promise.all([rubrosApi.getAll(), appConfigApi.get()])
+      .then(([rs, cfg]) => {
+        setRubros(rs);
+        setSeleccion(cfg.dashboard_tablas || []);
+      })
+      .catch(err => toast.error(getErrorMsg(err)));
+  }, []);
+
+  const toggle = (id) => {
+    setSeleccion(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await appConfigApi.update({ dashboard_tablas: seleccion });
+      toast.success('Dashboard actualizado');
+    } catch (err) {
+      toast.error(getErrorMsg(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (rubros === null) return <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Cargando...</div>;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Tablas del dashboard</h2>
+        <p className="text-xs text-slate-400">Elegí qué rubros mostrar como tablas de "Saldos mensuales". Cada uno incluye su gráfico. Si no elegís ninguno, se muestra Proveedores por defecto.</p>
+      </div>
+
+      {rubros.length === 0 ? (
+        <p className="text-sm text-slate-400">No hay rubros creados todavía.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {rubros.map(r => {
+            const checked = seleccion.includes(r.id);
+            return (
+              <label
+                key={r.id}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${
+                  checked
+                    ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/40'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(r.id)}
+                  className="w-4 h-4 rounded accent-blue-600"
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{r.nombre}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60"
+      >
+        <CheckCircle size={15} />
+        {saving ? 'Guardando...' : 'Guardar'}
+      </button>
     </div>
   );
 }
@@ -409,6 +489,7 @@ export default function SettingsView() {
         {/* Contenido */}
         <div className="flex-1 p-6">
           {activa?.key === 'alertas' ? <AlertasSection />
+            : activa?.key === 'dashboard' ? <DashboardSection />
             : activa?.key === 'usuarios' ? <UsuariosSection />
             : activa?.key === 'auditoria' ? <AuditoriaSection />
             : <Proximamente label={activa?.label} />
