@@ -805,11 +805,11 @@ export default function CajaView({ rubros = [] }) {
           toast.error('Definí el método de pago antes de confirmar');
           return;
         }
-        // El pago se registra en la fecha del ítem de caja, que es la fecha de
-        // vencimiento de la factura. Así una factura que vence el 16/7 queda
-        // registrada en Caja y en el Subrubro el 16/7, aunque la confirmes antes.
-        // Vale para vencimientos futuros, de hoy o ya vencidos.
-        const fechaConfirm = m.fecha;
+        // El pago se registra en la FECHA REAL en que se confirma = el día que se
+        // está viendo en la Caja (`fecha`, por defecto hoy), NO la fecha de
+        // vencimiento del ítem. Así una factura que venció el 15/7 y se paga el 17/7
+        // queda registrada en Caja y en el Subrubro el 17/7 (fecha del pago real).
+        const fechaConfirm = fecha;
         await cajaApi.update(m.id, { confirmado: true, fecha: fechaConfirm });
         if (m.subrubro_id) {
           const pago = await movimientosApi.create(m.subrubro_id, {

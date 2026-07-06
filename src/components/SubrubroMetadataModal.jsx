@@ -29,6 +29,9 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
   const [diaSemanaVencimiento, setDiaSemanaVencimiento] = useState(
     subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : ''
   );
+  const [diaMesVencimiento, setDiaMesVencimiento] = useState(
+    subrubro?.dia_mes_vencimiento != null ? String(subrubro.dia_mes_vencimiento) : ''
+  );
   const [notas, setNotas] = useState(subrubro?.notas || '');
   const [metodoPagoDefault, setMetodoPagoDefault] = useState(subrubro?.metodo_pago_default || 'ambas');
   const [saving, setSaving] = useState(false);
@@ -44,6 +47,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     setModoVencimiento(subrubro?.modo_vencimiento || 'dias');
     setDiaVencimiento(subrubro?.dia_vencimiento != null ? String(subrubro.dia_vencimiento) : '');
     setDiaSemanaVencimiento(subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : '');
+    setDiaMesVencimiento(subrubro?.dia_mes_vencimiento != null ? String(subrubro.dia_mes_vencimiento) : '');
     setNotas(subrubro?.notas || '');
     setMetodoPagoDefault(subrubro?.metodo_pago_default || 'ambas');
   }, [subrubro?.id]);
@@ -57,6 +61,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     // Validación del vencimiento según el modo elegido
     let dia = null;
     let diaSemana = null;
+    let diaMes = null;
     if (modoVencimiento === 'dia_semana') {
       if (diaSemanaVencimiento !== '') {
         const w = Number(diaSemanaVencimiento);
@@ -65,6 +70,15 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
           return;
         }
         diaSemana = w;
+      }
+    } else if (modoVencimiento === 'dia_mes') {
+      if (diaMesVencimiento !== '') {
+        const dm = Number(diaMesVencimiento);
+        if (!Number.isInteger(dm) || dm < 1 || dm > 31) {
+          alert('El día del mes debe ser un número entero entre 1 y 31.');
+          return;
+        }
+        diaMes = dm;
       }
     } else {
       if (diaVencimiento.trim() !== '') {
@@ -88,6 +102,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         modo_vencimiento: modoVencimiento,
         dia_vencimiento: dia,
         dia_semana_vencimiento: diaSemana,
+        dia_mes_vencimiento: diaMes,
         metodo_pago_default: metodoPagoDefault,
         notas: notas.trim(),
       });
@@ -180,9 +195,10 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
             >
               <option value="dias">Días desde emisión</option>
               <option value="dia_semana">Día fijo de la semana</option>
+              <option value="dia_mes">Día fijo del mes</option>
             </select>
 
-            {modoVencimiento === 'dias' ? (
+            {modoVencimiento === 'dias' && (
               <>
                 <input
                   type="number"
@@ -198,7 +214,9 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                   Cada factura vence N días después de su fecha (ej: 30 = vence 30 días después de emitida).
                 </p>
               </>
-            ) : (
+            )}
+
+            {modoVencimiento === 'dia_semana' && (
               <>
                 <select
                   className={`${inputCls} mt-2`}
@@ -212,6 +230,24 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                 </select>
                 <p className="mt-1 text-[11px] text-slate-400">
                   Cada factura vence el próximo día elegido. Si se emite ese mismo día, vence el de la semana siguiente.
+                </p>
+              </>
+            )}
+
+            {modoVencimiento === 'dia_mes' && (
+              <>
+                <select
+                  className={`${inputCls} mt-2`}
+                  value={diaMesVencimiento}
+                  onChange={e => setDiaMesVencimiento(e.target.value)}
+                >
+                  <option value="">Sin día definido</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                    <option key={d} value={d}>Día {d}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Cada factura vence ese día fijo del mes. Si ese día ya pasó, vence el del mes siguiente. En meses más cortos (ej: febrero) se ajusta al último día.
                 </p>
               </>
             )}
