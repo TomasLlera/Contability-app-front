@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-export default function Modal({ title, onClose, children, size = 'lg' }) {
+export default function Modal({ title, onClose, children, size = 'lg', closeOnBackdrop = true }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
     window.addEventListener('keydown', onKey);
@@ -20,7 +20,7 @@ export default function Modal({ title, onClose, children, size = 'lg' }) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4
                  bg-slate-950/60 backdrop-blur-sm
                  animate-[fadeIn_150ms_ease-out]"
-      onClick={onClose}
+      onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div
         role="dialog"

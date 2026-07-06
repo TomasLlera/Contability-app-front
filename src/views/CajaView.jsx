@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
+import ConfirmModal from '../components/ConfirmModal';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -599,6 +600,8 @@ export default function CajaView({ rubros = [] }) {
   const [showForm, setShowForm]     = useState(false);
   const [tipoForm, setTipoForm]     = useState(null);
   const [editingMov, setEditingMov] = useState(null);
+  // Id del movimiento de caja pendiente de confirmar su eliminación (null = sin modal).
+  const [deleteId, setDeleteId] = useState(null);
   // ID del gasto cuya confirmación/reversión está en curso (bloquea doble clic en
   // el botón de confirmar, que de otro modo crearía dos pagos en el subrubro).
   const [confirmingId, setConfirmingId] = useState(null);
@@ -838,13 +841,19 @@ export default function CajaView({ rubros = [] }) {
     finally { confirmingRef.current.delete(m.id); setConfirmingId(null); }
   };
 
-  const handleDelete = async (id) => {
+  // Click en el ícono de eliminar: abre el modal de confirmación (no borra todavía).
+  const handleDelete = (id) => setDeleteId(id);
+
+  // Borrado real: solo se ejecuta cuando el usuario confirma en el modal.
+  const confirmDelete = async () => {
+    const id = deleteId;
     const mov = movs.find(m => m.id === id);
     if (mov?.pago_mov_id && mov?.confirmado === true) {
       try { await movimientosApi.delete(mov.pago_mov_id); } catch {}
     }
     await cajaApi.delete(id);
     setMovs(prev => prev.filter(m => m.id !== id));
+    setDeleteId(null);
     toast.success('Eliminado');
   };
 
@@ -1146,6 +1155,15 @@ export default function CajaView({ rubros = [] }) {
 
       {showConfig && (
         <ConfigPanel config={config} rubros={allSubrubros} allRubros={rubros} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />
+      )}
+
+      {deleteId !== null && (
+        <ConfirmModal
+          message="¿Estás seguro de que querés eliminar este pago? Esta acción no se puede deshacer."
+          confirmLabel="Eliminar"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteId(null)}
+        />
       )}
     </div>
   );

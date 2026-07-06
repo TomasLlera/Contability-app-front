@@ -544,6 +544,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
         <Modal
           title={editingMov ? 'Editar movimiento' : `Nuevo movimiento — ${subrubro.nombre}`}
           onClose={() => { setShowForm(false); setEditingMov(null); }}
+          closeOnBackdrop={false}
         >
           <MovimientoForm
             campos={campos}
