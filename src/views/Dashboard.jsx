@@ -3,7 +3,7 @@ import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '..
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
   ChevronRight, ChevronLeft, Building2, CheckCircle2, AlertTriangle, Banknote,
-  ArrowLeftRight, Check, Truck
+  ArrowLeftRight, Check, Truck, CalendarClock
 } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
@@ -413,6 +413,21 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           )}
         </div>
       </div>
+
+      {/* Atajo a las comparativas del mes (viven en Gráficas) */}
+      <button
+        onClick={() => onViewChange?.('graficas')}
+        className="w-full flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-left hover:border-blue-300 dark:hover:border-blue-700 transition-colors group"
+      >
+        <span className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0">
+          <CalendarClock size={18} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Rendimiento mensual</span>
+          <span className="block text-xs text-slate-400">Comparación de quincena y cierre con el período anterior.</span>
+        </span>
+        <ChevronRight size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
+      </button>
 
       {/* Saldos mensuales — una tabla por rubro configurado, cada una con su gráfica */}
       {saldos.length > 0 && (

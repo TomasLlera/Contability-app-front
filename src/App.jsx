@@ -11,7 +11,7 @@ import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, ClipboardList, Settings, Package, Building2, Receipt } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt } from 'lucide-react';
 import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
@@ -401,7 +401,7 @@ export default function App() {
               activeView === 'caja' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
-            <ClipboardList size={15} />
+            <Wallet size={15} />
             Caja del día
           </button>
 
@@ -411,7 +411,7 @@ export default function App() {
               activeView === 'stock' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
-            <Package size={15} />
+            <Boxes size={15} />
             Stock
           </button>
 

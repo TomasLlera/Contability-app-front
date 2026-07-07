@@ -191,6 +191,55 @@ export const dashboardApi = {
     api.get(`/dashboard/tendencia-subrubro/${subrubroId}`, { params: { meses } }).then(r => r.data),
   getComparacion: (rubroId) =>
     api.get(`/dashboard/comparacion/${rubroId}`).then(r => r.data),
+  getComparativa: () => api.get('/dashboard/comparativa').then(r => r.data),
+  getComparativaCaja: () => api.get('/dashboard/comparativa-caja').then(r => r.data),
+};
+
+// Descarga un blob desde una respuesta axios, detectando errores JSON devueltos como blob.
+async function descargarBlob(res, filename) {
+  const ct = res.data?.type || '';
+  if (ct.includes('application/json')) {
+    const txt = await res.data.text();
+    let msg = 'No se pudo generar el archivo';
+    try { msg = JSON.parse(txt).error || msg; } catch { /* usa msg por defecto */ }
+    throw new Error(msg);
+  }
+  const url = URL.createObjectURL(res.data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+export const reportesApi = {
+  subrubrosMensual: async (rubroId, nombre, { mes, subrubroId = null, orden = 'saldo' }) => {
+    const params = { mes, orden };
+    if (subrubroId) params.subrubroId = subrubroId;
+    const res = await api.get(`/reportes/subrubros-mensual/${rubroId}`, { params, responseType: 'blob' });
+    const safe = String(nombre).replace(/[^\w\-]+/g, '_').slice(0, 40);
+    await descargarBlob(res, `analisis_${safe}_${mes}.xlsx`);
+  },
+  cajaMensual: async ({ mes }) => {
+    const res = await api.get('/reportes/caja-mensual', { params: { mes }, responseType: 'blob' });
+    await descargarBlob(res, `caja_${mes}.xlsx`);
+  },
+};
+
+export const backupApi = {
+  exportZip: async () => {
+    const res = await api.get('/backup/export', { responseType: 'blob' });
+    const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
+    await descargarBlob(res, `backup_${fecha}.zip`);
+  },
+  importFile: (file, mode = 'merge') => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('mode', mode);
+    return api.post('/backup/import', fd).then(r => r.data);
+  },
 };
 
 export const movimientosApi = {
@@ -254,6 +303,7 @@ export const movimientosApi = {
 export const usersApi = {
   getAll: () => api.get('/users').then(r => r.data),
   create: (usuario, password, role) => api.post('/users', { usuario, password, role }).then(r => r.data),
+  update: (id, data) => api.put(`/users/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/users/${id}`).then(r => r.data),
   changePassword: (id, password) => api.put(`/users/${id}/password`, { password }).then(r => r.data),
 };
@@ -328,6 +378,7 @@ export const appConfigApi = {
 
 export const auditApi = {
   list: (params = {}) => api.get('/audit', { params }).then(r => r.data),
+  get: (id) => api.get(`/audit/${id}`).then(r => r.data),
 };
 
 export const cajaApi = {

@@ -6,8 +6,9 @@ import SubrubroView from './SubrubroView';
 import ImportModal from '../components/ImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
+import ReporteMensualModal from '../components/ReporteMensualModal';
 import toast from 'react-hot-toast';
-import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, Eraser, ArrowUp } from 'lucide-react';
+import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, Eraser, ArrowUp, FileSpreadsheet } from 'lucide-react';
 import { EntityIcon, ICON_LIST } from '../icons';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
@@ -38,6 +39,7 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
   const editingSubRef = useRef(null);
   const [search, setSearch] = useState('');
   const [showImport, setShowImport] = useState(false);
+  const [showReporte, setShowReporte] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [stats, setStats] = useState({});
   const [editingMetadataSub, setEditingMetadataSub] = useState(null);
@@ -200,6 +202,13 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
         >
           <Settings2 size={14} /> <span className="hidden sm:inline">Columnas</span>
         </button>
+        <button
+          onClick={() => setShowReporte(true)}
+          title="Análisis mensual (Excel)"
+          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 px-2.5 py-1.5 rounded-lg text-sm hover:bg-emerald-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+        >
+          <FileSpreadsheet size={14} /> <span className="hidden sm:inline">Análisis mensual</span>
+        </button>
         {isAdmin && (
           <button
             onClick={() => setConfirmModal({
@@ -359,6 +368,14 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
         <Modal title={`Columnas de ${rubro.nombre}`} onClose={() => setShowCampos(false)}>
           <CamposManager rubro={rubro} onClose={() => setShowCampos(false)} />
         </Modal>
+      )}
+
+      {showReporte && (
+        <ReporteMensualModal
+          rubro={rubro}
+          subrubros={subrubros}
+          onClose={() => setShowReporte(false)}
+        />
       )}
 
       {confirmModal && (

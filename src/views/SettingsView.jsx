@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
-import { appConfigApi, usersApi, auditApi, rubrosApi, getErrorMsg } from '../api';
+import { appConfigApi, usersApi, auditApi, rubrosApi, authApi, backupApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard } from 'lucide-react';
+import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle } from 'lucide-react';
+import AuditDetailModal from '../components/AuditDetailModal';
+
+// Metadatos visuales por rol (jerarquía: superadmin > admin > viewer).
+const ROLE_META = {
+  superadmin: { label: 'Super Admin',   desc: 'Control total + gestión de usuarios', icon: Crown,       box: 'bg-amber-100 dark:bg-amber-900/40', iconCls: 'text-amber-600 dark:text-amber-400' },
+  admin:      { label: 'Administrador',  desc: 'Administra funcionalidades',          icon: ShieldCheck, box: 'bg-blue-100 dark:bg-blue-900/40',   iconCls: 'text-blue-600 dark:text-blue-400' },
+  viewer:     { label: 'Solo lectura',   desc: 'Acceso limitado (lectura)',           icon: ShieldAlert, box: 'bg-slate-200 dark:bg-slate-600',    iconCls: 'text-slate-500 dark:text-slate-400' },
+};
 
 const SECCIONES = [
   { key: 'alertas',   label: 'Alertas',    icon: Bell,           ready: true },
   { key: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard, ready: true },
   { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true },
   { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true },
+  { key: 'backup',    label: 'Backup',     icon: Database,       ready: true },
   { key: 'idioma',    label: 'Idioma',     icon: Globe,      ready: false },
   { key: 'moneda',    label: 'Moneda',     icon: DollarSign, ready: false },
   { key: 'negocio',   label: 'Negocio',    icon: Building2,  ready: false },
@@ -20,6 +29,7 @@ function AuditoriaSection() {
   const [loading, setLoading] = useState(false);
   const [filtroRecurso, setFiltroRecurso] = useState('');
   const [filtroUsuario, setFiltroUsuario] = useState('');
+  const [detalle, setDetalle] = useState(null);
   const limit = 25;
 
   const cargar = async (p = page) => {
@@ -95,14 +105,16 @@ function AuditoriaSection() {
               ) : items.length === 0 ? (
                 <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Sin registros</td></tr>
               ) : items.map(it => (
-                <tr key={it._id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                <tr key={it._id} onClick={() => setDetalle(it)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40">
                   <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     {new Date(it.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}
                   </td>
                   <td className="px-3 py-1.5 text-slate-700 dark:text-slate-200">{it.usuario}</td>
                   <td className={`px-3 py-1.5 font-medium ${accionColor(it.accion)}`}>{it.accion}</td>
                   <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">{it.recurso}</td>
-                  <td className="px-3 py-1.5 text-slate-400 font-mono text-xs">{it.recurso_id ?? '-'}</td>
+                  <td className="px-3 py-1.5">
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-xs hover:underline">{it.recurso_id ?? '-'}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -125,6 +137,8 @@ function AuditoriaSection() {
           >Siguiente</button>
         </div>
       </div>
+
+      {detalle && <AuditDetailModal item={detalle} onClose={() => setDetalle(null)} />}
     </div>
   );
 }
@@ -347,6 +361,8 @@ function UsuariosSection() {
   const [changingPassId, setChangingPassId] = useState(null);
   const [newPassValue, setNewPassValue] = useState('');
 
+  const isSuper = authApi.getRole() === 'superadmin';
+
   const cargar = () => usersApi.getAll().then(setUsers).finally(() => setLoading(false));
   useEffect(() => { cargar(); }, []);
 
@@ -371,6 +387,22 @@ function UsuariosSection() {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
+  const handleChangeRole = async (id, role) => {
+    try {
+      await usersApi.update(id, { role });
+      toast.success('Rol actualizado');
+      cargar();
+    } catch (err) { toast.error(getErrorMsg(err)); }
+  };
+
+  const handleToggleActivo = async (u) => {
+    try {
+      await usersApi.update(u.id, { activo: !u.activo });
+      toast.success(u.activo ? 'Usuario desactivado' : 'Usuario activado');
+      cargar();
+    } catch (err) { toast.error(getErrorMsg(err)); }
+  };
+
   const handleChangePass = async (id) => {
     if (!newPassValue || newPassValue.length < 6) { toast.error('Mínimo 6 caracteres'); return; }
     try {
@@ -386,66 +418,218 @@ function UsuariosSection() {
     <div className="space-y-5">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Usuarios</h2>
-        <p className="text-xs text-slate-400">Gestioná quién puede acceder y con qué permisos</p>
+        <p className="text-xs text-slate-400">
+          {isSuper ? 'Gestioná quién puede acceder y con qué permisos' : 'Listado de usuarios del sistema'}
+        </p>
       </div>
+
+      {!isSuper && (
+        <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+          <Crown size={14} /> Solo un Super Administrador puede crear, editar o eliminar usuarios.
+        </div>
+      )}
 
       <div className="space-y-2">
-        {users.map(u => (
-          <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${u.role === 'admin' ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-slate-200 dark:bg-slate-600'}`}>
-              {u.role === 'admin' ? <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" /> : <ShieldAlert size={14} className="text-slate-500 dark:text-slate-400" />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{u.usuario}</p>
-              <p className="text-xs text-slate-400">{u.role === 'admin' ? 'Administrador' : 'Solo lectura'}</p>
-            </div>
-            {changingPassId === u.id ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="password"
-                  value={newPassValue}
-                  onChange={e => setNewPassValue(e.target.value)}
-                  placeholder="Nueva contraseña"
-                  autoFocus
-                  className="w-36 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button onClick={() => handleChangePass(u.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700">OK</button>
-                <button onClick={() => { setChangingPassId(null); setNewPassValue(''); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+        {users.map(u => {
+          const meta = ROLE_META[u.role] || ROLE_META.viewer;
+          const Icon = meta.icon;
+          return (
+            <div key={u.id} className={`flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 ${u.activo === false ? 'opacity-60' : ''}`}>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${meta.box}`}>
+                <Icon size={14} className={meta.iconCls} />
               </div>
-            ) : (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={() => { setChangingPassId(u.id); setNewPassValue(''); }} className="text-slate-400 hover:text-blue-600 transition-colors" title="Cambiar contraseña">
-                  <KeyRound size={14} />
-                </button>
-                <button onClick={() => handleDelete(u.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
-                  <Trash2 size={14} />
-                </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
+                  {u.usuario}
+                  {u.activo === false && <span className="text-[10px] uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">Inactivo</span>}
+                </p>
+                <p className="text-xs text-slate-400">{meta.label}</p>
               </div>
-            )}
-          </div>
-        ))}
+
+              {isSuper && changingPassId === u.id ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="password"
+                    value={newPassValue}
+                    onChange={e => setNewPassValue(e.target.value)}
+                    placeholder="Nueva contraseña"
+                    autoFocus
+                    className="w-36 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button onClick={() => handleChangePass(u.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700">OK</button>
+                  <button onClick={() => { setChangingPassId(null); setNewPassValue(''); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+              ) : isSuper ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <select
+                    value={u.role}
+                    onChange={e => handleChangeRole(u.id, e.target.value)}
+                    title="Cambiar rol"
+                    className="text-xs border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="superadmin">Super Admin</option>
+                    <option value="admin">Administrador</option>
+                    <option value="viewer">Solo lectura</option>
+                  </select>
+                  <button onClick={() => handleToggleActivo(u)} className="text-slate-400 hover:text-amber-600 transition-colors text-xs px-1.5 py-1 rounded" title={u.activo === false ? 'Activar' : 'Desactivar'}>
+                    {u.activo === false ? 'Activar' : 'Pausar'}
+                  </button>
+                  <button onClick={() => { setChangingPassId(u.id); setNewPassValue(''); }} className="text-slate-400 hover:text-blue-600 transition-colors" title="Cambiar contraseña">
+                    <KeyRound size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(u.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nuevo usuario</p>
-        <div className="grid grid-cols-2 gap-2">
-          <input value={nuevoUser} onChange={e => setNuevoUser(e.target.value)} placeholder="Usuario" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
-          <div className="relative">
-            <input type={showPass ? 'text' : 'password'} value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} placeholder="Contraseña (mín. 6)" className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
-            <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
-              {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+      {isSuper && (
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nuevo usuario</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={nuevoUser} onChange={e => setNuevoUser(e.target.value)} placeholder="Usuario" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
+            <div className="relative">
+              <input type={showPass ? 'text' : 'password'} value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} placeholder="Contraseña (mín. 6)" className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
+              <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <select value={nuevoRole} onChange={e => setNuevoRole(e.target.value)} className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="viewer">Solo lectura</option>
+              <option value="admin">Administrador</option>
+              <option value="superadmin">Super Admin</option>
+            </select>
+            <button onClick={handleCreate} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+              <Plus size={14} /> {saving ? 'Creando...' : 'Crear'}
             </button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <select value={nuevoRole} onChange={e => setNuevoRole(e.target.value)} className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="viewer">Solo lectura</option>
-            <option value="admin">Administrador</option>
+      )}
+    </div>
+  );
+}
+
+function BackupSection() {
+  const isSuper = authApi.getRole() === 'superadmin';
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [file, setFile] = useState(null);
+  const [mode, setMode] = useState('merge');
+  const [historial, setHistorial] = useState([]);
+
+  const cargarHistorial = () => {
+    auditApi.list({ recurso: 'backup_export', limit: 5 })
+      .then(r => setHistorial(r.items || []))
+      .catch(() => {});
+  };
+  useEffect(() => { if (isSuper) cargarHistorial(); }, [isSuper]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await backupApi.exportZip();
+      toast.success('Backup descargado');
+      cargarHistorial();
+    } catch (err) { toast.error(err?.message || getErrorMsg(err)); }
+    finally { setExporting(false); }
+  };
+
+  const handleImport = async () => {
+    if (!file) { toast.error('Elegí un archivo de backup'); return; }
+    if (mode === 'replace' && !window.confirm('Modo REEMPLAZAR: se borrarán los datos actuales de cada módulo antes de cargar el backup. ¿Continuar?')) return;
+    setImporting(true);
+    try {
+      const res = await backupApi.importFile(file, mode);
+      const total = Object.keys(res.importado || {}).length;
+      toast.success(`Backup importado (${total} módulos)`);
+      setFile(null);
+    } catch (err) { toast.error(err?.message || getErrorMsg(err)); }
+    finally { setImporting(false); }
+  };
+
+  if (!isSuper) {
+    return (
+      <div className="space-y-3">
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100">Backup y Recuperación</h2>
+        <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+          <Crown size={14} /> Solo un Super Administrador puede exportar o importar backups.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Backup y Recuperación</h2>
+        <p className="text-xs text-slate-400">Exportá todos los datos (sectorizados por módulo) o restaurá desde un backup anterior.</p>
+      </div>
+
+      {/* Exportar */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Download size={15} className="text-emerald-600 dark:text-emerald-400" />
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Exportar backup completo</h3>
+        </div>
+        <p className="text-xs text-slate-400 mb-3">Genera un ZIP con metadata, un JSON por módulo (rubros, movimientos, caja, stock, IVA, configuración, auditoría) y un volcado para reimportar. Los usuarios se exportan sin contraseñas.</p>
+        <button onClick={handleExport} disabled={exporting} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
+          <Download size={14} /> {exporting ? 'Generando...' : 'Descargar backup (.zip)'}
+        </button>
+      </div>
+
+      {/* Importar */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Upload size={15} className="text-blue-600 dark:text-blue-400" />
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Importar backup</h3>
+        </div>
+        <p className="text-xs text-slate-400 mb-3">Subí un <strong>.zip</strong> o <strong>.json</strong> generado por esta app. No modifica usuarios ni auditoría.</p>
+        <input
+          type="file"
+          accept=".zip,.json,application/zip,application/json"
+          onChange={e => setFile(e.target.files?.[0] || null)}
+          className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 mb-3"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={mode} onChange={e => setMode(e.target.value)} className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="merge">Combinar (upsert por ID)</option>
+            <option value="replace">Reemplazar (borra y carga)</option>
           </select>
-          <button onClick={handleCreate} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
-            <Plus size={14} /> {saving ? 'Creando...' : 'Crear'}
+          <button onClick={handleImport} disabled={importing || !file} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+            <Upload size={14} /> {importing ? 'Importando...' : 'Importar'}
           </button>
         </div>
+        {mode === 'replace' && (
+          <p className="flex items-center gap-1.5 text-xs text-red-500 dark:text-red-400 mt-2">
+            <AlertTriangle size={13} /> Reemplazar borra los datos actuales de cada módulo del backup. Hacé un backup nuevo antes.
+          </p>
+        )}
+      </div>
+
+      {/* Historial */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Últimos backups exportados</h3>
+        {historial.length === 0 ? (
+          <p className="text-xs text-slate-400">Todavía no se exportó ningún backup.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {historial.map(h => (
+              <li key={h._id} className="flex items-center justify-between text-xs">
+                <span className="text-slate-600 dark:text-slate-300">{new Date(h.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</span>
+                <span className="text-slate-400">{h.usuario}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+          Para backups automáticos de fin de mes, programá un Cron Job (Render) que descargue <code className="text-slate-500">/api/backup/export</code> el último día del mes.
+        </p>
       </div>
     </div>
   );
@@ -492,6 +676,7 @@ export default function SettingsView() {
             : activa?.key === 'dashboard' ? <DashboardSection />
             : activa?.key === 'usuarios' ? <UsuariosSection />
             : activa?.key === 'auditoria' ? <AuditoriaSection />
+            : activa?.key === 'backup' ? <BackupSection />
             : <Proximamente label={activa?.label} />
           }
         </div>

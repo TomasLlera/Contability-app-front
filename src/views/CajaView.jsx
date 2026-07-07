@@ -3,11 +3,12 @@ import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
-  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff
+  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
 import ConfirmModal from '../components/ConfirmModal';
+import CajaExportModal from '../components/CajaExportModal';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -632,6 +633,7 @@ export default function CajaView({ rubros = [] }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [config, setConfig]             = useState({ empleados: [], proveedores: [], rubros_sync: [], dias_anticipacion_caja: 3 });
   const [showConfig, setShowConfig]     = useState(false);
+  const [showExport, setShowExport]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
 
   const cargar = async () => {
@@ -971,6 +973,10 @@ export default function CajaView({ rubros = [] }) {
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 disabled:opacity-50" title="Refrescar ahora (sincroniza pagos y vencimientos)">
           <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
         </button>
+        <button onClick={() => setShowExport(true)}
+          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 shrink-0" title="Exportar mes a Excel">
+          <FileSpreadsheet size={16} />
+        </button>
         <button onClick={() => setShowConfig(true)}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0" title="Configurar empleados y proveedores">
           <Settings size={16} />
@@ -1152,6 +1158,8 @@ export default function CajaView({ rubros = [] }) {
           disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
       </div>
+
+      {showExport && <CajaExportModal onClose={() => setShowExport(false)} />}
 
       {showConfig && (
         <ConfigPanel config={config} rubros={allSubrubros} allRubros={rubros} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />

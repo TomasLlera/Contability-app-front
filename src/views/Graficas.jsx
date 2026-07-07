@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
-import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList, CalendarRange, CalendarClock, Wallet, Boxes } from 'lucide-react';
 import { EntityIcon } from '../icons';
+import ComparativaCard from '../components/ComparativaCard';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
@@ -202,6 +203,8 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   const [showResumen, setShowResumen] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [resumen, setResumen] = useState(null);
+  const [comparativa, setComparativa] = useState(null);
+  const [comparativaCaja, setComparativaCaja] = useState(null);
   const [selectedRubroId, setSelectedRubroId] = useState(initialRubroId);
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubroId, setSelectedSubrubroId] = useState(null);
@@ -224,6 +227,8 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => { dashboardApi.getResumen().then(setResumen); }, []);
+  useEffect(() => { dashboardApi.getComparativa().then(setComparativa).catch(() => {}); }, []);
+  useEffect(() => { dashboardApi.getComparativaCaja().then(setComparativaCaja).catch(() => {}); }, []);
   useEffect(() => { if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id); }, [rubros]);
   // Al abrir Gráficas apuntando a un rubro (ej. desde la card de Proveedores del dashboard).
   useEffect(() => { if (initialRubroId) { setSelectedRubroId(initialRubroId); setTab('rubros'); } }, [initialRubroId]);
@@ -317,16 +322,17 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
 
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-        {[['rubros', '📊 Rubros'], ['caja', '🗂️ Caja'], ['stock', '📦 Stock']].map(([key, label]) => (
+        {[['rubros', 'Rubros', BarChart3], ['caja', 'Caja', Wallet], ['stock', 'Stock', Boxes]].map(([key, label, Icon]) => (
           <button
             key={key}
             onClick={() => { setTab(key); sessionStorage.setItem('graficas_tab', key); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
               tab === key
                 ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
+            <Icon size={15} />
             {label}
           </button>
         ))}
@@ -335,6 +341,51 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
       {/* Tab: Rubros */}
       {tab === 'rubros' && (
         <>
+          {/* Comparativas del mes: quincena y cierre vs mes anterior */}
+          {comparativa && (() => {
+            const { meta, quincena, mes } = comparativa;
+            const fmtMes = (ym) => {
+              const [a, mm] = ym.split('-');
+              return new Date(Number(a), Number(mm) - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+            };
+            const proy = mes.proyeccion;
+            const antFull = mes.anterior;
+            const pctProy = antFull.facturado ? ((proy.facturado - antFull.facturado) / antFull.facturado) * 100 : null;
+            const footerCierre = (
+              <div className="rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2 text-xs">
+                <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">Proyección de cierre</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Facturado proyectado del mes</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{fmt(proy.facturado)}</span>
+                </div>
+                {pctProy !== null && (
+                  <p className={`mt-1 font-medium ${pctProy >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                    {pctProy >= 0 ? '↑ Vas a cerrar mejor' : '↓ Vas a cerrar peor'} que {fmtMes(meta.mesAnterior)} ({pctProy >= 0 ? '+' : ''}{pctProy.toFixed(1)}%)
+                  </p>
+                )}
+              </div>
+            );
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <ComparativaCard
+                  titulo="Primera quincena"
+                  subtitulo={`Días 1–15 · ${fmtMes(meta.mesActual)} vs ${fmtMes(meta.mesAnterior)}`}
+                  icon={<span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0"><CalendarRange size={16} /></span>}
+                  actual={quincena.actual}
+                  anterior={quincena.anterior}
+                />
+                <ComparativaCard
+                  titulo="Cierre de mes"
+                  subtitulo={`${fmtMes(meta.mesActual)} a la fecha vs ${fmtMes(meta.mesAnterior)} completo`}
+                  icon={<span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 shrink-0"><CalendarClock size={16} /></span>}
+                  actual={mes.actual}
+                  anterior={mes.anterior}
+                  footer={footerCierre}
+                />
+              </div>
+            );
+          })()}
+
           <div>
             <button
               onClick={() => setShowResumen(v => !v)}
@@ -410,6 +461,59 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
 
       {/* Tab: Caja */}
       {tab === 'caja' && (
+        <div className="space-y-5">
+        {/* Comparativas de caja: quincena y cierre vs mes anterior */}
+        {comparativaCaja && (() => {
+          const CAJA_METRICAS = [
+            { key: 'ingresos', label: 'Ingresos', good: true,  bar: 'bg-emerald-500' },
+            { key: 'egresos',  label: 'Egresos',  good: false, bar: 'bg-red-500' },
+            { key: 'neto',     label: 'Saldo neto', good: true, bar: 'bg-blue-500' },
+          ];
+          const { meta, quincena, mes } = comparativaCaja;
+          const fmtMes = (ym) => {
+            const [a, mm] = ym.split('-');
+            return new Date(Number(a), Number(mm) - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+          };
+          const proy = mes.proyeccion;
+          const antFull = mes.anterior;
+          const pctProy = antFull.neto ? ((proy.neto - antFull.neto) / Math.abs(antFull.neto)) * 100 : null;
+          const footerCierre = (
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2 text-xs">
+              <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">Proyección de cierre</p>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Saldo neto proyectado del mes</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">{fmt(proy.neto)}</span>
+              </div>
+              {pctProy !== null && (
+                <p className={`mt-1 font-medium ${pctProy >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                  {pctProy >= 0 ? '↑ Vas a cerrar mejor' : '↓ Vas a cerrar peor'} que {fmtMes(meta.mesAnterior)} ({pctProy >= 0 ? '+' : ''}{pctProy.toFixed(1)}%)
+                </p>
+              )}
+            </div>
+          );
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ComparativaCard
+                titulo="Primera quincena"
+                subtitulo={`Días 1–15 · ${fmtMes(meta.mesActual)} vs ${fmtMes(meta.mesAnterior)}`}
+                icon={<span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0"><CalendarRange size={16} /></span>}
+                actual={quincena.actual}
+                anterior={quincena.anterior}
+                metricas={CAJA_METRICAS}
+              />
+              <ComparativaCard
+                titulo="Cierre de mes"
+                subtitulo={`${fmtMes(meta.mesActual)} a la fecha vs ${fmtMes(meta.mesAnterior)} completo`}
+                icon={<span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 shrink-0"><CalendarClock size={16} /></span>}
+                actual={mes.actual}
+                anterior={mes.anterior}
+                footer={footerCierre}
+                metricas={CAJA_METRICAS}
+              />
+            </div>
+          );
+        })()}
+
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2 mr-auto">
@@ -453,6 +557,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
           ) : (
             <CajaBarChart datos={cajaAggregated} chartCfg={activeCajaCfg} />
           )}
+        </div>
         </div>
       )}
 
@@ -505,6 +610,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                       </div>
                     ))}
                   </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
                     <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Ganancia por período</p>
                     <div className="flex items-end gap-1" style={{ height: '140px' }}>
@@ -536,6 +642,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                         );
                       })}
                     </div>
+                  </div>
                   </div>
                 </div>
               );
