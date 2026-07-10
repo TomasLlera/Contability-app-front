@@ -3,7 +3,7 @@ import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
-  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet
+  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
@@ -479,7 +479,7 @@ function MetodoBadge({ metodo }) {
   return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-dashed border-amber-300 dark:border-amber-700">Sin definir</span>;
 }
 
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false }) {
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect }) {
   const esPendiente  = m.tipo === 'gasto' && m.confirmado === false;
   const esConfirmado = m.tipo === 'gasto' && m.confirmado === true;
   const esGasto      = m.tipo === 'gasto';
@@ -488,17 +488,42 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   const montoColor = esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600') : colorMonto;
 
   return (
-    <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${
-      esPendiente
-        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600 border-dashed'
-        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+    <div
+      onClick={selectable ? () => onToggleSelect(m.id) : undefined}
+      className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-colors ${selectable ? 'cursor-pointer' : ''} ${
+        selected
+          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/50'
+          : esPendiente
+            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600 border-dashed'
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
     }`}>
+      {selectable && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onToggleSelect(m.id); }}
+          title={selected ? 'Deseleccionar' : 'Seleccionar'}
+          className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+            selected
+              ? 'bg-blue-500 border-blue-500 text-white'
+              : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-blue-400'
+          }`}>
+          <Check size={12} />
+        </button>
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className={`text-sm font-medium truncate ${esPendiente ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
             {m.concepto}
           </p>
           {m.es_especial && <Star size={11} className="text-amber-500 shrink-0" />}
+          {subrubro && onGoToSubrubro && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onGoToSubrubro(m); }}
+              title={`Ir al subrubro: ${subrubro.nombre}`}
+              className="shrink-0 text-slate-400 hover:text-blue-500 transition-colors"
+            >
+              <ExternalLink size={12} />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <MetodoBadge metodo={m.metodo} />
@@ -510,7 +535,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
         {fmt(m.monto)}
       </p>
       {esGasto && (
-        <button onClick={() => onConfirmar(m)} disabled={confirming}
+        <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming}
           title={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
           className={`p-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
             esConfirmado
@@ -520,8 +545,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           {confirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
         </button>
       )}
-      <button onClick={() => onEdit(m)} className="text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
-      <button onClick={() => onDelete(m.id)} className="text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
+      <button onClick={(e) => { e.stopPropagation(); onEdit(m); }} className="text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} className="text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
     </div>
   );
 }
@@ -591,7 +616,7 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
   );
 }
 
-export default function CajaView({ rubros = [] }) {
+export default function CajaView({ rubros = [], onNavigate }) {
   const [fecha, setFecha]           = useState(todayStr());
   // Ocultar los montos de "Saldo del día" y "Saldo en cuenta" (privacidad). Persiste.
   const [ocultarSaldos, setOcultarSaldos] = useState(() => localStorage.getItem('cajaOcultarSaldos') === '1');
@@ -635,6 +660,15 @@ export default function CajaView({ rubros = [] }) {
   const [showConfig, setShowConfig]     = useState(false);
   const [showExport, setShowExport]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
+
+  // Selección múltiple de gastos (para sumar/agrupar por proveedor/subrubro).
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const toggleSelection = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
 
   const cargar = async () => {
     setLoading(true);
@@ -722,7 +756,7 @@ export default function CajaView({ rubros = [] }) {
     }
   };
 
-  useEffect(() => { cargar(); }, [fecha]);
+  useEffect(() => { cargar(); clearSelection(); }, [fecha]);
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
 
   // Auto-refresh: al volver el foco a la ventana o reactivar la pestaña, recarga
@@ -843,6 +877,19 @@ export default function CajaView({ rubros = [] }) {
     finally { confirmingRef.current.delete(m.id); setConfirmingId(null); }
   };
 
+  // Subrubro vinculado a un movimiento de caja (si tiene subrubro_id resoluble).
+  const subrubroDe = (m) => (m.subrubro_id ? allSubrubros.find(s => s.id === m.subrubro_id) : null);
+
+  // Acceso directo: navega al Subrubro de origen del movimiento para ver/editar el
+  // pago real. Requiere que App haya pasado onNavigate y que el subrubro exista.
+  const handleGoToSubrubro = (m) => {
+    const sub = subrubroDe(m);
+    if (!sub) return;
+    const rubro = rubros.find(r => r.id === sub.rubro_id);
+    if (!rubro) return;
+    onNavigate?.(rubro, sub);
+  };
+
   // Click en el ícono de eliminar: abre el modal de confirmación (no borra todavía).
   const handleDelete = (id) => setDeleteId(id);
 
@@ -853,7 +900,7 @@ export default function CajaView({ rubros = [] }) {
     if (mov?.pago_mov_id && mov?.confirmado === true) {
       try { await movimientosApi.delete(mov.pago_mov_id); } catch {}
     }
-    await cajaApi.delete(id);
+    await cajaApi.delete(id, fecha);
     setMovs(prev => prev.filter(m => m.id !== id));
     setDeleteId(null);
     toast.success('Eliminado');
@@ -910,6 +957,29 @@ export default function CajaView({ rubros = [] }) {
   const empleados     = movs.filter(m => m.tipo === 'empleado');
   const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra');
   const gastos        = movs.filter(m => m.tipo === 'gasto');
+
+  // --- Selección múltiple de gastos ---
+  const selectedGastos = gastos.filter(m => selectedIds.has(m.id));
+  const selTotal       = selectedGastos.reduce((s, m) => s + m.monto, 0);
+  // Subrubros distintos involucrados en la selección (para el panel de resumen).
+  const selSubNames    = [...new Set(selectedGastos.map(m => subrubroDe(m)?.nombre).filter(Boolean))];
+  const allGastosSelected = gastos.length > 0 && gastos.every(m => selectedIds.has(m.id));
+  const selectAllGastos   = () => setSelectedIds(new Set(gastos.map(m => m.id)));
+
+  // Marca como pagados (confirma) todos los gastos seleccionados que estén sin
+  // confirmar y tengan método definido. Reusa la confirmación individual para
+  // mantener la misma lógica (crea el pago en el subrubro si corresponde).
+  const bulkConfirmSeleccionados = async () => {
+    const aConfirmar = selectedGastos.filter(m => m.confirmado === false && m.metodo);
+    const sinMetodo  = selectedGastos.filter(m => m.confirmado === false && !m.metodo).length;
+    if (aConfirmar.length === 0) {
+      toast.error(sinMetodo ? 'Definí el método de pago en los gastos seleccionados' : 'No hay gastos pendientes para confirmar');
+      return;
+    }
+    for (const m of aConfirmar) await handleConfirmarGasto(m);
+    clearSelection();
+    if (sinMetodo) toast('Se saltearon ' + sinMetodo + ' sin método definido', { icon: '⚠️' });
+  };
 
   const disponibleEfvo  = saldoInicial
     + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
@@ -1131,6 +1201,12 @@ export default function CajaView({ rubros = [] }) {
             )}
             <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${gastosOpen ? 'rotate-180' : ''}`} />
           </button>
+          {gastos.length > 0 && (
+            <button onClick={allGastosSelected ? clearSelection : selectAllGastos}
+              className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-2">
+              {allGastosSelected ? 'Quitar selección' : 'Seleccionar todos'}
+            </button>
+          )}
           <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={11} /> Agregar</button>
         </div>
         {gastosOpen && (
@@ -1143,7 +1219,7 @@ export default function CajaView({ rubros = [] }) {
             )}
             {gastos.map(m => (
               <div key={m.id} className="mb-2">
-                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} />}
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} />}
               </div>
             ))}
           </>
@@ -1173,6 +1249,49 @@ export default function CajaView({ rubros = [] }) {
           onCancel={() => setDeleteId(null)}
         />
       )}
+
+      {selectedGastos.length > 0 && (
+        <SeleccionPanel
+          total={selTotal}
+          count={selectedGastos.length}
+          subNames={selSubNames}
+          onClear={clearSelection}
+          onConfirmar={bulkConfirmSeleccionados}
+        />
+      )}
+    </div>
+  );
+}
+
+// Panel flotante de resumen de la selección múltiple de gastos: total acumulado,
+// cantidad y subrubro(s) involucrado(s). Acciones: marcar como pagados / limpiar.
+function SeleccionPanel({ total, count, subNames, onClear, onConfirmar }) {
+  const subLabel = subNames.length === 0
+    ? 'Sin subrubro'
+    : subNames.length === 1
+      ? subNames[0]
+      : `Múltiples (${subNames.length})`;
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-lg">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl ring-1 ring-white/10 px-4 py-3 flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-slate-400">Total seleccionado</span>
+            <span className="text-lg font-bold text-green-400">{fmt(total)}</span>
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5 truncate">
+            {count} {count === 1 ? 'movimiento' : 'movimientos'} · <span className="text-slate-200">{subLabel}</span>
+          </div>
+        </div>
+        <button onClick={onConfirmar}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 transition-colors shrink-0 flex items-center gap-1">
+          <Check size={13} /> Marcar pagados
+        </button>
+        <button onClick={onClear} title="Limpiar selección"
+          className="text-slate-400 hover:text-white transition-colors shrink-0">
+          <X size={16} />
+        </button>
+      </div>
     </div>
   );
 }

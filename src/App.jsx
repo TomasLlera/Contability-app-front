@@ -800,7 +800,7 @@ export default function App() {
           ) : activeView === 'graficas' ? (
             <Graficas rubros={rubros} initialRubroId={graficaRubroId} initialMetrica={graficaMetrica} />
           ) : activeView === 'caja' ? (
-            <CajaView rubros={rubros} />
+            <CajaView rubros={rubros} onNavigate={handleNavigateFromVenc} />
           ) : activeView === 'stock' ? (
             <StockView role={role} />
           ) : activeView === 'iva-compras' || activeView === 'iva-ventas' ? (

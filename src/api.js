@@ -386,7 +386,7 @@ export const cajaApi = {
   getRango: (desde, hasta) => api.get('/caja/rango', { params: { desde, hasta } }).then(r => r.data),
   create: (data) => api.post('/caja', data).then(r => r.data),
   update: (id, data) => api.put(`/caja/${id}`, data).then(r => r.data),
-  delete: (id) => api.delete(`/caja/${id}`).then(r => r.data),
+  delete: (id, fecha) => api.delete(`/caja/${id}`, { params: { fecha } }).then(r => r.data),
   getConfig: () => api.get('/caja/config').then(r => r.data),
   saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
   autoSync: (fecha) => api.post('/caja/auto-sync', null, { params: { fecha } }).then(r => r.data),
