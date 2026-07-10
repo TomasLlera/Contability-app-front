@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { appConfigApi, usersApi, auditApi, rubrosApi, authApi, backupApi, getErrorMsg } from '../api';
+import { appConfigApi, usersApi, auditApi, rubrosApi, subrubrosApi, authApi, backupApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
 import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle } from 'lucide-react';
 import AuditDetailModal from '../components/AuditDetailModal';
+import InfoTooltip from '../components/InfoTooltip';
 
 // Metadatos visuales por rol (jerarquía: superadmin > admin > viewer).
 const ROLE_META = {
@@ -30,7 +31,22 @@ function AuditoriaSection() {
   const [filtroRecurso, setFiltroRecurso] = useState('');
   const [filtroUsuario, setFiltroUsuario] = useState('');
   const [detalle, setDetalle] = useState(null);
+  const [subrubros, setSubrubros] = useState({}); // id → { nombre, razon_social } para traducir el modal
   const limit = 25;
+
+  // Carga (una vez) un mapa de subrubros para que el modal muestre nombres/proveedor
+  // en lugar de IDs crudos. Tolerante a fallos: si falla, el modal cae a "#id".
+  useEffect(() => {
+    (async () => {
+      try {
+        const rubros = await rubrosApi.getAll();
+        const listas = await Promise.all((rubros || []).map(r => subrubrosApi.getByRubro(r.id).catch(() => [])));
+        const map = {};
+        for (const lista of listas) for (const s of (lista || [])) map[s.id] = { nombre: s.nombre, razon_social: s.razon_social };
+        setSubrubros(map);
+      } catch { /* sin lookup: el modal usa #id */ }
+    })();
+  }, []);
 
   const cargar = async (p = page) => {
     setLoading(true);
@@ -138,7 +154,7 @@ function AuditoriaSection() {
         </div>
       </div>
 
-      {detalle && <AuditDetailModal item={detalle} onClose={() => setDetalle(null)} />}
+      {detalle && <AuditDetailModal item={detalle} onClose={() => setDetalle(null)} lookups={{ subrubros }} />}
     </div>
   );
 }
@@ -573,11 +589,11 @@ function BackupSection() {
 
       {/* Exportar */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-3">
           <Download size={15} className="text-emerald-600 dark:text-emerald-400" />
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Exportar backup completo</h3>
+          <InfoTooltip text="Genera un ZIP con metadata, un JSON por módulo (rubros, movimientos, caja, stock, IVA, configuración, auditoría) y un volcado para reimportar. Los usuarios se exportan sin contraseñas." width="w-64" />
         </div>
-        <p className="text-xs text-slate-400 mb-3">Genera un ZIP con metadata, un JSON por módulo (rubros, movimientos, caja, stock, IVA, configuración, auditoría) y un volcado para reimportar. Los usuarios se exportan sin contraseñas.</p>
         <button onClick={handleExport} disabled={exporting} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
           <Download size={14} /> {exporting ? 'Generando...' : 'Descargar backup (.zip)'}
         </button>
@@ -585,11 +601,11 @@ function BackupSection() {
 
       {/* Importar */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-3">
           <Upload size={15} className="text-blue-600 dark:text-blue-400" />
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Importar backup</h3>
+          <InfoTooltip text="Subí un .zip o .json generado por esta app. No modifica usuarios ni auditoría." width="w-64" />
         </div>
-        <p className="text-xs text-slate-400 mb-3">Subí un <strong>.zip</strong> o <strong>.json</strong> generado por esta app. No modifica usuarios ni auditoría.</p>
         <input
           type="file"
           accept=".zip,.json,application/zip,application/json"

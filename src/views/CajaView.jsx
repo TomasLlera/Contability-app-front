@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
-  Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check, HelpCircle,
+  Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
   Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
 import ConfirmModal from '../components/ConfirmModal';
 import CajaExportModal from '../components/CajaExportModal';
+import InfoTooltip from '../components/InfoTooltip';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -29,31 +30,6 @@ const formatFechaCorta = (dateStr) => {
 };
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const selectCls = inputCls;
-
-const InfoTooltip = ({ text }) => {
-  const [show, setShow] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!show) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setShow(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [show]);
-  return (
-    <div ref={ref} className="relative inline-flex shrink-0">
-      <button type="button" onClick={() => setShow(v => !v)}
-        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-        <HelpCircle size={13} />
-      </button>
-      {show && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg px-3 py-2.5 z-20 shadow-lg leading-relaxed">
-          {text}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ── Panel de configuración ──────────────────────────────────────────────────
 function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {

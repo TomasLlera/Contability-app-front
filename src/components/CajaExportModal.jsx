@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, X, FileSpreadsheet } from 'lucide-react';
 import { reportesApi, getErrorMsg } from '../api';
+import InfoTooltip from './InfoTooltip';
 
 const mesActual = () => {
   const d = new Date();
@@ -29,16 +30,14 @@ export default function CajaExportModal({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <FileSpreadsheet size={18} className="text-emerald-600 dark:text-emerald-400" />
             <h2 className="font-semibold text-slate-800 dark:text-slate-100">Exportar caja</h2>
+            <InfoTooltip text="Genera un Excel con Resumen, Detalle día a día y Comparativas (quincena y mes vs mes anterior)." />
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
-          Genera un Excel con <strong className="text-slate-700 dark:text-slate-200">Resumen</strong>, <strong className="text-slate-700 dark:text-slate-200">Detalle día a día</strong> y <strong className="text-slate-700 dark:text-slate-200">Comparativas</strong> (quincena y mes vs mes anterior).
-        </p>
 
         <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Mes</label>
         <input
