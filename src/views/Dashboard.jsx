@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
+import { EntityIcon } from '../icons';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
   ChevronRight, ChevronLeft, Building2, CheckCircle2, AlertTriangle, Banknote,
@@ -413,44 +414,46 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           </div>
 
           {!loadingVenc && vencimientos.length > 0 && (
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-base font-bold text-slate-800 dark:text-slate-100 tabular-nums">
-                {fmt(totalVencFiltrados)}
-              </span>
-              <span className="text-xs text-slate-400 dark:text-slate-500">a pagar en {rangoVenc} días</span>
-            </div>
-          )}
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-base font-bold text-slate-800 dark:text-slate-100 tabular-nums">
+                  {fmt(totalVencFiltrados)}
+                </span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">a pagar en {rangoVenc} días</span>
+              </div>
 
-          {/* Filtro por local: solo tiene sentido con 2+ locales. */}
-          {!loadingVenc && mostrarFiltroLocales && vencimientos.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap mb-3">
-              <button
-                onClick={limpiarLocales}
-                className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
-                  localesSel.size === 0
-                    ? 'bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-                }`}
-              >
-                Todos
-              </button>
-              {localesOrdenados.map(l => {
-                const activo = localesSel.has(l.id);
-                return (
+              {/* Filtro por local: solo con 2+ locales. Alineado a la derecha, bajo el selector de días. */}
+              {mostrarFiltroLocales && (
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <button
-                    key={l.id}
-                    onClick={() => toggleLocal(l.id)}
-                    className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-                      activo
-                        ? badgeDeLocal.get(l.id).cls + ' ring-1 ring-current/30'
+                    onClick={limpiarLocales}
+                    className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                      localesSel.size === 0
+                        ? 'bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800'
                         : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
                     }`}
                   >
-                    <span>{l.icon}</span>
-                    {l.nombre}
+                    Todos
                   </button>
-                );
-              })}
+                  {localesOrdenados.map(l => {
+                    const activo = localesSel.has(l.id);
+                    return (
+                      <button
+                        key={l.id}
+                        onClick={() => toggleLocal(l.id)}
+                        className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+                          activo
+                            ? badgeDeLocal.get(l.id).cls + ' ring-1 ring-current/30'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        <EntityIcon value={l.icon} fallback="home" size={12} />
+                        {l.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
