@@ -370,6 +370,24 @@ export const ivaApi = {
   },
 };
 
+// Registro → Venta Sistema (ventas propias) y Tarjetas (QR/débito/crédito/prepaga)
+export const registroApi = {
+  ventas: {
+    getMes: (mes) => api.get(`/registro/ventas-sistema/mes/${mes}`).then(r => r.data),
+    getDia: (fecha) => api.get(`/registro/ventas-sistema/dia/${fecha}`).then(r => r.data),
+    create: (data) => api.post('/registro/ventas-sistema', data).then(r => r.data),
+    update: (id, data) => api.put(`/registro/ventas-sistema/${id}`, data).then(r => r.data),
+    delete: (id) => api.delete(`/registro/ventas-sistema/${id}`).then(r => r.data),
+  },
+  tarjetas: {
+    getMes: (mes) => api.get(`/registro/tarjetas/mes/${mes}`).then(r => r.data),
+    getDia: (fecha) => api.get(`/registro/tarjetas/dia/${fecha}`).then(r => r.data),
+    create: (data) => api.post('/registro/tarjetas', data).then(r => r.data),
+    update: (id, data) => api.put(`/registro/tarjetas/${id}`, data).then(r => r.data),
+    delete: (id) => api.delete(`/registro/tarjetas/${id}`).then(r => r.data),
+  },
+};
+
 export const appConfigApi = {
   get: () => api.get('/config').then(r => r.data),
   update: (data) => api.put('/config', data).then(r => r.data),

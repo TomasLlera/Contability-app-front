@@ -7,11 +7,13 @@ import CajaView from './views/CajaView';
 import SettingsView from './views/SettingsView';
 import StockView from './views/StockView';
 import IvaView from './views/IvaView';
+import VentaSistemaView from './views/VentaSistemaView';
+import TarjetasView from './views/TarjetasView';
 import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt } from 'lucide-react';
+import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt, ClipboardList } from 'lucide-react';
 import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
@@ -47,6 +49,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [localesSectionOpen, setLocalesSectionOpen] = useState(true);
   const [ivaSectionOpen, setIvaSectionOpen] = useState(false);
+  const [registroSectionOpen, setRegistroSectionOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'dark';
@@ -61,8 +64,6 @@ export default function App() {
   const [headerHidden, setHeaderHidden] = useState(false);
   const mainRef = useRef(null);
   const lastScrollY = useRef(0);
-  const touchStartX = useRef(null);
-  const touchStartY = useRef(null);
   const editingRubroRef = useRef(null);
   const editingLocalRef = useRef(null);
   const newRubroRef = useRef(null);
@@ -446,6 +447,37 @@ export default function App() {
             )}
           </div>
 
+          <div>
+            <button
+              onClick={() => setRegistroSectionOpen(v => !v)}
+              className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                activeView === 'registro-ventas' || activeView === 'registro-tarjetas'
+                  ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30'
+                  : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
+              }`}
+            >
+              <ClipboardList size={15} />
+              <span className="flex-1 text-left">Registro</span>
+              {registroSectionOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+            {registroSectionOpen && (
+              <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-700/40 pl-2">
+                <button
+                  onClick={() => { setActiveView('registro-ventas'); setInitialSubrubro(null); closeSidebar(); }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                    activeView === 'registro-ventas' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                  }`}
+                >Venta Sistema</button>
+                <button
+                  onClick={() => { setActiveView('registro-tarjetas'); setInitialSubrubro(null); closeSidebar(); }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                    activeView === 'registro-tarjetas' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                  }`}
+                >Tarjetas</button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => { setActiveView('config'); setInitialSubrubro(null); closeSidebar(); }}
             className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
@@ -729,6 +761,16 @@ export default function App() {
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">IVA</h1>
               <p className="text-xs text-slate-400">Compras, ventas y diferencia mensual</p>
             </div>
+          ) : activeView === 'registro-ventas' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Venta Sistema</h1>
+              <p className="text-xs text-slate-400">Registro diario y evolución mensual de ventas</p>
+            </div>
+          ) : activeView === 'registro-tarjetas' ? (
+            <div>
+              <h1 className="font-semibold text-slate-800 dark:text-slate-100">Tarjetas</h1>
+              <p className="text-xs text-slate-400">QR, débito, crédito y prepagas</p>
+            </div>
           ) : activeView === 'config' ? (
             <div>
               <h1 className="font-semibold text-slate-800 dark:text-slate-100">Configuración</h1>
@@ -766,26 +808,12 @@ export default function App() {
           )}
         </header>
 
+        {/* Sin swipe para abrir el sidebar: capturaba cualquier arrastre horizontal
+            del contenido (p. ej. scrollear la tabla de un subrubro) y lo abría solo.
+            En mobile se abre únicamente con el botón de las tres líneas. */}
         <main
           ref={mainRef}
           className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto"
-          onTouchStart={(e) => {
-            touchStartX.current = e.touches[0].clientX;
-            touchStartY.current = e.touches[0].clientY;
-          }}
-          onTouchEnd={(e) => {
-            if (touchStartX.current === null) return;
-            const dx = e.changedTouches[0].clientX - touchStartX.current;
-            const dy = e.changedTouches[0].clientY - touchStartY.current;
-            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-              if (!sidebarRight && dx > 0) setSidebarOpen(true);
-              if (!sidebarRight && dx < 0) setSidebarOpen(false);
-              if (sidebarRight && dx < 0) setSidebarOpen(true);
-              if (sidebarRight && dx > 0) setSidebarOpen(false);
-            }
-            touchStartX.current = null;
-            touchStartY.current = null;
-          }}
         >
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>
@@ -805,6 +833,10 @@ export default function App() {
             <StockView role={role} />
           ) : activeView === 'iva-compras' || activeView === 'iva-ventas' ? (
             <IvaView key={activeView} initialTab={activeView === 'iva-ventas' ? 'ventas' : 'compras'} role={role} />
+          ) : activeView === 'registro-ventas' ? (
+            <VentaSistemaView role={role} />
+          ) : activeView === 'registro-tarjetas' ? (
+            <TarjetasView role={role} />
           ) : activeView === 'config' ? (
             <SettingsView />
           ) : (
