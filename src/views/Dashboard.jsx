@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
@@ -129,11 +129,26 @@ function SaldoCard({ rubro, facturas, pagos, deuda, nombreMes, onOpenGrafica, on
   );
 }
 
+// Badge de color por local. Se asigna por posición en la lista (ordenada por nombre),
+// así un mismo local mantiene su color mientras no se agregue/borre otro antes.
+const LOCAL_BADGES = [
+  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+  'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
+  'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300',
+  'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
+  'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+];
+
 export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange, onOpenGrafica }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [loadingVenc, setLoadingVenc] = useState(true);
   const [rangoVenc, setRangoVenc] = useState(30);
-  const [rangoVencOpen, setRangoVencOpen] = useState(false);
+  // Filtro de vencimientos por local. Set vacío = "Todos" (sin filtrar).
+  const [localesSel, setLocalesSel] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('dash_venc_locales') || '[]')); }
+    catch { return new Set(); }
+  });
   const [cajaHoy, setCajaHoy] = useState([]);
   // Rubros configurados para "Saldos mensuales" (null = config sin cargar todavía)
   const [dashboardRubroIds, setDashboardRubroIds] = useState(null);
@@ -176,8 +191,46 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const totalSubrubros = Object.values(rubroStats).reduce((a, b) => a + b, 0);
   const vencidos    = vencimientos.filter(v => v.dias_restantes <= 0);
   const proximos7d  = vencimientos.filter(v => v.dias_restantes > 0 && v.dias_restantes <= 7);
+
+  // El local de una factura no está en el movimiento: se deriva del rubro, que ya viene
+  // embebido en la respuesta de /vencimientos/proximos. `rubros` es el fallback para
+  // respuestas viejas cacheadas donde el rubro no traiga local_id.
+  const localPorRubro = useMemo(
+    () => new Map(rubros.map(r => [r.id, r.local_id])),
+    [rubros]
+  );
+  const localDe = (v) => v.rubro?.local_id ?? localPorRubro.get(v.rubro?.id) ?? null;
+
+  const localesOrdenados = useMemo(
+    () => [...locales].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [locales]
+  );
+  const badgeDeLocal = useMemo(() => {
+    const m = new Map();
+    localesOrdenados.forEach((l, i) => m.set(l.id, { ...l, cls: LOCAL_BADGES[i % LOCAL_BADGES.length] }));
+    return m;
+  }, [localesOrdenados]);
+
+  const mostrarFiltroLocales = localesOrdenados.length > 1;
+
+  const toggleLocal = (id) => setLocalesSel(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    // Seleccionar todos equivale a no filtrar: se guarda como Set vacío ("Todos").
+    if (next.size === localesOrdenados.length) next.clear();
+    localStorage.setItem('dash_venc_locales', JSON.stringify([...next]));
+    return next;
+  });
+  const limpiarLocales = () => {
+    localStorage.setItem('dash_venc_locales', '[]');
+    setLocalesSel(new Set());
+  };
+
   // Las vencidas (días < 0) se muestran siempre; el rango filtra solo lo que está por vencer.
-  const vencFiltrados = vencimientos.filter(v => v.dias_restantes < 0 || v.dias_restantes <= rangoVenc);
+  // El filtro de locales, en cambio, aplica a todo (incluidas las vencidas).
+  const vencFiltrados = vencimientos
+    .filter(v => v.dias_restantes < 0 || v.dias_restantes <= rangoVenc)
+    .filter(v => !mostrarFiltroLocales || localesSel.size === 0 || localesSel.has(localDe(v)));
   const montoVencido = vencidos.reduce((s, v) => s + v.monto, 0);
   // Total (saldo) de las boletas mostradas en el rango elegido (7/14/30d).
   const totalVencFiltrados = vencFiltrados.reduce((s, v) => s + (v.monto || 0), 0);
@@ -332,45 +385,74 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
 
         {/* Vencimientos */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <AlertTriangle size={15} className="text-amber-500" />
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle size={15} className="text-amber-500 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Próximos vencimientos</h3>
             {!loadingVenc && vencimientos.length > 0 && (
-              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-                {vencFiltrados.length}
-              </span>
-            )}
-            {!loadingVenc && vencimientos.length > 0 && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-200" title={`Total de las boletas en ${rangoVenc} días`}>
-                  {fmt(totalVencFiltrados)}
+              <>
+                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                  {vencFiltrados.length}
                 </span>
-                <button
-                  onClick={() => setRangoVencOpen(o => !o)}
-                  title="Cambiar rango"
-                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                >
-                  <ChevronLeft size={13} className={`transition-transform ${rangoVencOpen ? 'rotate-180' : ''}`} />
-                  {rangoVenc}d
-                </button>
-                <div className={`flex items-center gap-1 overflow-hidden transition-all duration-200 ${rangoVencOpen ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0'}`}>
+                <div className="flex bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5 ml-auto shrink-0">
                   {[7, 14, 30].map(d => (
                     <button
                       key={d}
-                      onClick={() => { setRangoVenc(d); setRangoVencOpen(false); }}
-                      className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                      onClick={() => setRangoVenc(d)}
+                      className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
                         rangoVenc === d
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                          ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                       }`}
                     >
                       {d}d
                     </button>
                   ))}
                 </div>
-              </div>
+              </>
             )}
           </div>
+
+          {!loadingVenc && vencimientos.length > 0 && (
+            <div className="flex items-baseline gap-2 mb-3">
+              <span className="text-base font-bold text-slate-800 dark:text-slate-100 tabular-nums">
+                {fmt(totalVencFiltrados)}
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">a pagar en {rangoVenc} días</span>
+            </div>
+          )}
+
+          {/* Filtro por local: solo tiene sentido con 2+ locales. */}
+          {!loadingVenc && mostrarFiltroLocales && vencimientos.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+              <button
+                onClick={limpiarLocales}
+                className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                  localesSel.size === 0
+                    ? 'bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                Todos
+              </button>
+              {localesOrdenados.map(l => {
+                const activo = localesSel.has(l.id);
+                return (
+                  <button
+                    key={l.id}
+                    onClick={() => toggleLocal(l.id)}
+                    className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+                      activo
+                        ? badgeDeLocal.get(l.id).cls + ' ring-1 ring-current/30'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    <span>{l.icon}</span>
+                    {l.nombre}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {loadingVenc ? (
             <div className="space-y-1.5">
@@ -385,7 +467,11 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
             </div>
           ) : vencFiltrados.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-slate-400">Sin vencimientos en los próximos {rangoVenc} días</p>
+              <p className="text-sm text-slate-400">
+                {localesSel.size > 0
+                  ? `Sin vencimientos en ${rangoVenc} días para los locales elegidos`
+                  : `Sin vencimientos en los próximos ${rangoVenc} días`}
+              </p>
             </div>
           ) : (
             <div className="space-y-1.5 overflow-y-auto max-h-64 pr-0.5">
@@ -400,7 +486,14 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${info.dot}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate">{item.subrubro?.nombre}</p>
-                      <p className="text-xs opacity-60 truncate">{item.rubro?.nombre}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-xs opacity-60 truncate">{item.rubro?.nombre}</p>
+                        {mostrarFiltroLocales && badgeDeLocal.get(localDe(item)) && (
+                          <span className={`text-xs px-1.5 rounded shrink-0 font-medium ${badgeDeLocal.get(localDe(item)).cls}`}>
+                            {badgeDeLocal.get(localDe(item)).nombre}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold">{fmt(item.monto)}</p>

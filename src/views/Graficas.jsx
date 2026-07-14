@@ -197,6 +197,75 @@ function CajaBarChart({ datos, chartCfg }) {
   );
 }
 
+// ── Detalle de gastos especiales (acordeón) ──────────────────────────────────
+const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia' };
+const fmtFecha = (f) => {
+  const [a, m, d] = (f || '').split('-');
+  return d ? `${d}/${m}/${a}` : f;
+};
+
+function DetalleEspeciales({ movs, open, onToggle }) {
+  const total = movs.reduce((s, m) => s + (m.monto || 0), 0);
+
+  return (
+    <div className="mt-5 border border-amber-200 dark:border-amber-900/60 rounded-xl overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+      >
+        {open ? <ChevronDown size={14} className="text-amber-600 dark:text-amber-400" /> : <ChevronRight size={14} className="text-amber-600 dark:text-amber-400" />}
+        <span className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Detalle de especiales</span>
+        <span className="ml-auto text-xs text-amber-600/70 dark:text-amber-400/70 tabular-nums">
+          {movs.length} {movs.length === 1 ? 'pago' : 'pagos'} · {fmt(total)}
+        </span>
+      </button>
+
+      <div className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          {movs.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-slate-400">Sin pagos especiales en este período</p>
+          ) : (
+            <>
+              <div className="max-h-72 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400">
+                    <tr>
+                      <th className="text-left font-semibold px-3 py-2">Fecha</th>
+                      <th className="text-left font-semibold px-3 py-2">Concepto</th>
+                      <th className="text-left font-semibold px-3 py-2 hidden sm:table-cell">Tipo</th>
+                      <th className="text-right font-semibold px-3 py-2">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movs.map(m => (
+                      <tr key={m.id} className="border-t border-slate-100 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                        <td className="px-3 py-2 text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap">{fmtFecha(m.fecha)}</td>
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-200">{m.concepto || '—'}</td>
+                        <td className="px-3 py-2 hidden sm:table-cell">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                            {METODO_LABEL[m.metodo] || m.metodo || '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 tabular-nums whitespace-nowrap">−{fmt(m.monto)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 dark:bg-slate-700/40 border-t border-slate-200 dark:border-slate-700">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Total de especiales · {movs.length} {movs.length === 1 ? 'transacción' : 'transacciones'}
+                </span>
+                <span className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{fmt(total)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Graficas({ rubros = [], initialRubroId = null, initialMetrica = null }) {
   const [tab, setTab] = useState(() => sessionStorage.getItem('graficas_tab') || 'rubros');
@@ -219,6 +288,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   const [cajaMetrica, setCajaMetrica] = useState('ingresosEfvo');
   const [cajaMovs, setCajaMovs]       = useState([]);
   const [cajaLoading, setCajaLoading] = useState(false);
+  const [showEspeciales, setShowEspeciales] = useState(() => sessionStorage.getItem('graficas_especiales') !== '0');
 
   // Stock
   const [stockVista, setStockVista]   = useState('mes');
@@ -316,6 +386,18 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   }, [cajaMovs, cajaVista]);
 
   const activeCajaCfg = CAJA_CHARTS.find(c => c.key === cajaMetrica) || CAJA_CHARTS[0];
+
+  const movsEspeciales = useMemo(
+    () => cajaMovs
+      .filter(m => m.tipo === 'gasto' && m.es_especial)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha)),
+    [cajaMovs]
+  );
+
+  const toggleEspeciales = () => setShowEspeciales(v => {
+    sessionStorage.setItem('graficas_especiales', v ? '0' : '1');
+    return !v;
+  });
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -556,6 +638,10 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos de caja para este período</div>
           ) : (
             <CajaBarChart datos={cajaAggregated} chartCfg={activeCajaCfg} />
+          )}
+
+          {!cajaLoading && cajaMetrica === 'gastosEspeciales' && (
+            <DetalleEspeciales movs={movsEspeciales} open={showEspeciales} onToggle={toggleEspeciales} />
           )}
         </div>
         </div>
