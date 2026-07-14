@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { appConfigApi, usersApi, auditApi, rubrosApi, subrubrosApi, authApi, backupApi, getErrorMsg } from '../api';
+import { appConfigApi, usersApi, auditApi, rubrosApi, subrubrosApi, authApi, backupApi, cotizacionesApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle } from 'lucide-react';
+import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw } from 'lucide-react';
 import AuditDetailModal from '../components/AuditDetailModal';
 import InfoTooltip from '../components/InfoTooltip';
 
@@ -18,8 +18,8 @@ const SECCIONES = [
   { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true },
   { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true },
   { key: 'backup',    label: 'Backup',     icon: Database,       ready: true },
+  { key: 'moneda',    label: 'Moneda',     icon: DollarSign, ready: true },
   { key: 'idioma',    label: 'Idioma',     icon: Globe,      ready: false },
-  { key: 'moneda',    label: 'Moneda',     icon: DollarSign, ready: false },
   { key: 'negocio',   label: 'Negocio',    icon: Building2,  ready: false },
 ];
 
@@ -651,6 +651,128 @@ function BackupSection() {
   );
 }
 
+// Formato de cotización: 2 decimales, sin símbolo (la moneda va en el encabezado de la columna).
+const fmtCotiz = (n) => n == null
+  ? '—'
+  : new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+const fmtFecha = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d)) return null;
+  return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+};
+
+// Un color por cotización: la barra lateral las hace distinguibles de un vistazo sin leer el nombre.
+const COTIZ_COLOR = {
+  oficial:         { barra: 'bg-blue-500',    fondo: 'bg-blue-50/70 dark:bg-blue-900/20',       texto: 'text-blue-700 dark:text-blue-300' },
+  blue:            { barra: 'bg-indigo-500',  fondo: 'bg-indigo-50/60 dark:bg-indigo-900/15',   texto: 'text-indigo-700 dark:text-indigo-300' },
+  bolsa:           { barra: 'bg-violet-500',  fondo: 'bg-violet-50/60 dark:bg-violet-900/15',   texto: 'text-violet-700 dark:text-violet-300' },
+  contadoconliqui: { barra: 'bg-fuchsia-500', fondo: 'bg-fuchsia-50/60 dark:bg-fuchsia-900/15', texto: 'text-fuchsia-700 dark:text-fuchsia-300' },
+  tarjeta:         { barra: 'bg-amber-500',   fondo: 'bg-amber-50/60 dark:bg-amber-900/15',     texto: 'text-amber-700 dark:text-amber-300' },
+  mayorista:       { barra: 'bg-cyan-500',    fondo: 'bg-cyan-50/60 dark:bg-cyan-900/15',       texto: 'text-cyan-700 dark:text-cyan-300' },
+  euro:            { barra: 'bg-emerald-500', fondo: 'bg-emerald-50/60 dark:bg-emerald-900/15', texto: 'text-emerald-700 dark:text-emerald-300' },
+};
+
+function FilaCotizacion({ clave, nombre, compra, venta, actualizado }) {
+  const c = COTIZ_COLOR[clave] ?? COTIZ_COLOR.oficial;
+  return (
+    <div className={`relative grid grid-cols-[1fr_auto_auto] items-center gap-2 pl-4 pr-3 py-1.5 rounded-lg overflow-hidden ${c.fondo}`}>
+      <span className={`absolute left-0 inset-y-0 w-1 ${c.barra}`} />
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span className={`text-sm font-semibold truncate ${c.texto}`}>{nombre}</span>
+        {actualizado && <span className="text-xs text-slate-400 shrink-0">{fmtFecha(actualizado)}</span>}
+      </div>
+      <span className="text-sm font-semibold text-rose-600 dark:text-rose-400 tabular-nums w-20 text-right">{fmtCotiz(compra)}</span>
+      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums w-20 text-right">{fmtCotiz(venta)}</span>
+    </div>
+  );
+}
+
+function MonedaSection() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(true);
+
+  const cargar = async (refresh = false) => {
+    setCargando(true);
+    setError('');
+    try {
+      setData(await cotizacionesApi.get(refresh));
+      setError('');
+    } catch (err) {
+      setError(getErrorMsg(err));
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setData(await cotizacionesApi.get());
+      } catch (err) {
+        setError(getErrorMsg(err));
+      } finally {
+        setCargando(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+            Cotizaciones
+            <InfoTooltip text="Valores de referencia del mercado argentino tomados de dolarapi.com. Se actualizan solos cada 5 minutos; el botón fuerza una consulta nueva. No afectan los montos cargados en la app." width="w-72" />
+          </h2>
+          <p className="text-xs text-slate-400">Dólar y euro, compra y venta.</p>
+        </div>
+        <button
+          onClick={() => cargar(true)}
+          disabled={cargando}
+          className="shrink-0 flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw size={13} className={cargando ? 'animate-spin' : ''} />
+          Actualizar
+        </button>
+      </div>
+
+      {error && !data ? (
+        <div className="flex items-center gap-2 text-sm text-red-500 dark:text-red-400 px-3 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
+          <AlertTriangle size={14} className="shrink-0" /> {error}
+        </div>
+      ) : !data ? (
+        <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Cargando cotizaciones...</div>
+      ) : (
+        <>
+          {data.desactualizado && (
+            <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle size={13} /> No se pudo contactar la fuente. Mostrando la última cotización obtenida.
+            </p>
+          )}
+
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2 pl-4 pr-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span>Moneda</span>
+            <span className="w-20 text-right text-rose-400 dark:text-rose-500">Compra</span>
+            <span className="w-20 text-right text-emerald-500 dark:text-emerald-600">Venta</span>
+          </div>
+
+          <div className="space-y-1">
+            {data.dolar?.map(d => <FilaCotizacion key={d.clave} {...d} />)}
+            {data.euro && <FilaCotizacion {...data.euro} clave="euro" nombre="Euro oficial" />}
+          </div>
+
+          <p className="text-xs text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700">
+            Fuente: dolarapi.com{data.consultado ? ` · consultado ${fmtFecha(data.consultado)}` : ''}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsView() {
   const [seccion, setSeccion] = useState('alertas');
   const activa = SECCIONES.find(s => s.key === seccion);
@@ -694,6 +816,7 @@ export default function SettingsView() {
             : activa?.key === 'usuarios' ? <UsuariosSection />
             : activa?.key === 'auditoria' ? <AuditoriaSection />
             : activa?.key === 'backup' ? <BackupSection />
+            : activa?.key === 'moneda' ? <MonedaSection />
             : <Proximamente label={activa?.label} />
           }
         </div>

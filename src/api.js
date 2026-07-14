@@ -394,6 +394,10 @@ export const appConfigApi = {
   testEmail: () => api.post('/config/test-email').then(r => r.data),
 };
 
+export const cotizacionesApi = {
+  get: (refresh = false) => api.get('/cotizaciones', { params: refresh ? { refresh: 1 } : {} }).then(r => r.data),
+};
+
 export const auditApi = {
   list: (params = {}) => api.get('/audit', { params }).then(r => r.data),
   get: (id) => api.get(`/audit/${id}`).then(r => r.data),

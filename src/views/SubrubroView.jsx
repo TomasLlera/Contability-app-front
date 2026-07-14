@@ -498,11 +498,16 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                       <TipoBadge mov={m} />
                     </td>
 
-                    {camposTexto.map(c => (
-                      <td key={c.id} className="px-3 sm:px-4 py-3 text-slate-500 text-xs max-w-36 truncate">
-                        {m.campos_extra?.[c.nombre] || <span className="text-slate-300">—</span>}
-                      </td>
-                    ))}
+                    {camposTexto.map(c => {
+                      const val = m.campos_extra?.[c.nombre];
+                      return (
+                        // title: el texto se trunca a 9rem, así el valor completo queda accesible al hover.
+                        <td key={c.id} title={val || undefined}
+                          className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200 max-w-36 truncate">
+                          {val || <span className="text-slate-300 dark:text-slate-600 font-normal">—</span>}
+                        </td>
+                      );
+                    })}
 
                     {hayVencimientos && (
                       <td className="px-3 sm:px-4 py-3">
