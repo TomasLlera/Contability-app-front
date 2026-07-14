@@ -317,8 +317,10 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
                     </div>
                   )}
                 </button>
+                {/* Siempre visibles donde no hay hover (touch): con opacity-0 puro
+                    estas acciones eran inalcanzables en mobile/tablet. */}
                 {isAdmin && (
-                  <div className="px-4 pb-3 flex justify-center gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="px-4 pb-3 flex justify-center gap-4 sm:gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
                     <button
                       onClick={e => { e.stopPropagation(); setEditingMetadataSub(sub); }}
                       className="text-xs text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1"

@@ -23,6 +23,12 @@ const formatFecha = (dateStr) => {
   const s = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
+// Versión compacta para pantallas angostas: "Mié 13 jul" en vez de "Miércoles, 13 de julio".
+const formatFechaMobile = (dateStr) => {
+  const d = new Date(dateStr + 'T00:00:00');
+  const s = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
 const formatFechaCorta = (dateStr) => {
   if (!dateStr) return '';
   const [, m, d] = dateStr.split('-');
@@ -374,7 +380,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
       {esGastoNuevo && rubros.length > 0 && (
         <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-600">
           <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1"><Link2 size={11} className="text-blue-400" /> Subrubro <span className="text-slate-400">(opcional — registra un pago en el subrubro)</span></p>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <select className={selectCls} value={rubroSel} onChange={e => { setRubroSel(e.target.value); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}>
               <option value="">— Rubro —</option>
               {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
@@ -466,7 +472,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   return (
     <div
       onClick={selectable ? () => onToggleSelect(m.id) : undefined}
-      className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-colors ${selectable ? 'cursor-pointer' : ''} ${
+      className={`flex items-center gap-2 sm:gap-3 rounded-xl px-3 sm:px-4 py-3 border transition-colors ${selectable ? 'cursor-pointer' : ''} ${
         selected
           ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/50'
           : esPendiente
@@ -507,22 +513,28 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> Pago confirmado</span>}
         </div>
       </div>
-      <p className={`text-base font-bold whitespace-nowrap ${montoColor}`}>
-        {fmt(m.monto)}
-      </p>
-      {esGasto && (
-        <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming}
-          title={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
-          className={`p-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
-            esConfirmado
-              ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
-              : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
-          }`}>
-          {confirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-        </button>
-      )}
-      <button onClick={(e) => { e.stopPropagation(); onEdit(m); }} className="text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
-      <button onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} className="text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
+      {/* En mobile el monto se apila sobre las acciones: si van todos en línea, el
+          concepto se queda sin ancho y se trunca a nada. */}
+      <div className="shrink-0 flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+        <p className={`text-sm sm:text-base font-bold whitespace-nowrap ${montoColor}`}>
+          {fmt(m.monto)}
+        </p>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {esGasto && (
+            <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming}
+              title={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
+              className={`p-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
+                esConfirmado
+                  ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
+                  : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
+              }`}>
+              {confirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            </button>
+          )}
+          <button onClick={(e) => { e.stopPropagation(); onEdit(m); }} className="p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} className="p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -579,9 +591,9 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
           {vencAbierto && (
             <div className="mt-1.5 space-y-0.5">
               {vencimientos.map((v, i) => (
-                <div key={i} className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
-                  <span className="truncate max-w-32">{v.subrubro?.nombre}</span>
-                  <span>{fmt(v.monto)}</span>
+                <div key={i} className="flex justify-between gap-2 text-xs text-amber-700 dark:text-amber-400">
+                  <span className="truncate min-w-0">{v.subrubro?.nombre}</span>
+                  <span className="shrink-0">{fmt(v.monto)}</span>
                 </div>
               ))}
             </div>
@@ -985,18 +997,20 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
-      {/* Navegación de fecha */}
-      <div className="flex items-center gap-2">
+      {/* Navegación de fecha. En mobile la fecha va sola en su fila y las acciones
+          debajo: no entran los 6 botones más la fecha larga en 360px de ancho. */}
+      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
         <button onClick={() => setFecha(addDays(fecha, -1))}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
           <ChevronLeft size={18} />
         </button>
-        <div className="flex-1 text-center">
+        <div className="flex-1 min-w-0 text-center">
           <button
             onClick={() => { try { dateInputRef.current?.showPicker(); } catch { dateInputRef.current?.click(); } }}
-            className="font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            className="font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 transition-colors max-w-full truncate"
           >
-            {formatFecha(fecha)}
+            <span className="sm:hidden">{formatFechaMobile(fecha)}</span>
+            <span className="hidden sm:inline">{formatFecha(fecha)}</span>
           </button>
           {fecha !== todayStr() && (
             <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline block mx-auto">Ir a hoy</button>
@@ -1009,24 +1023,26 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <input ref={dateInputRef} type="date" value={fecha}
           onChange={e => setFecha(e.target.value)}
           className="sr-only" />
-        <button
-          onClick={() => setOcultarSaldos(v => { localStorage.setItem('cajaOcultarSaldos', v ? '0' : '1'); return !v; })}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
-          title={ocultarSaldos ? 'Mostrar saldos' : 'Ocultar saldos'}>
-          {ocultarSaldos ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-        <button onClick={refrescarTodo} disabled={refreshing}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 disabled:opacity-50" title="Refrescar ahora (sincroniza pagos y vencimientos)">
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-        </button>
-        <button onClick={() => setShowExport(true)}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 shrink-0" title="Exportar mes a Excel">
-          <FileSpreadsheet size={16} />
-        </button>
-        <button onClick={() => setShowConfig(true)}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0" title="Configurar empleados y proveedores">
-          <Settings size={16} />
-        </button>
+        <div className="flex items-center justify-end gap-1 sm:gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setOcultarSaldos(v => { localStorage.setItem('cajaOcultarSaldos', v ? '0' : '1'); return !v; })}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+            title={ocultarSaldos ? 'Mostrar saldos' : 'Ocultar saldos'}>
+            {ocultarSaldos ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+          <button onClick={refrescarTodo} disabled={refreshing}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 disabled:opacity-50" title="Refrescar ahora (sincroniza pagos y vencimientos)">
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          </button>
+          <button onClick={() => setShowExport(true)}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 shrink-0" title="Exportar mes a Excel">
+            <FileSpreadsheet size={16} />
+          </button>
+          <button onClick={() => setShowConfig(true)}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0" title="Configurar empleados y proveedores">
+            <Settings size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Saldos del día */}
@@ -1166,11 +1182,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       {/* Gastos / Proveedores */}
       <div>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-y-1 mb-2">
           <button type="button" onClick={() => setGastosOpen(v => !v)}
             className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
             <ShoppingCart size={14} className="text-red-500 shrink-0" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Gastos y proveedores</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Gastos y proveedores</h3>
             {gastos.length > 0 && <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
             {!gastosOpen && gastos.length > 0 && (
               <span className="text-xs text-slate-400 dark:text-slate-500">· {gastos.length}</span>

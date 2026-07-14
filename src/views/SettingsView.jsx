@@ -83,28 +83,28 @@ function AuditoriaSection() {
         <p className="text-xs text-slate-400">Historial de cambios en el sistema ({total} registros)</p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <input
           type="text"
           placeholder="Filtrar por recurso (ej: movimiento)"
           value={filtroRecurso}
           onChange={e => setFiltroRecurso(e.target.value)}
-          className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-40 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <input
           type="text"
           placeholder="Usuario"
           value={filtroUsuario}
           onChange={e => setFiltroUsuario(e.target.value)}
-          className="w-40 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 sm:flex-none sm:w-40 min-w-24 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <button onClick={() => cargar(1)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+        <button onClick={() => cargar(1)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shrink-0">
           Filtrar
         </button>
       </div>
 
       <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-        <div className="max-h-125 overflow-y-auto">
+        <div className="max-h-125 overflow-y-auto overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0">
               <tr className="text-xs text-slate-500 dark:text-slate-400 uppercase">
@@ -450,7 +450,7 @@ function UsuariosSection() {
           const meta = ROLE_META[u.role] || ROLE_META.viewer;
           const Icon = meta.icon;
           return (
-            <div key={u.id} className={`flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 ${u.activo === false ? 'opacity-60' : ''}`}>
+            <div key={u.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 ${u.activo === false ? 'opacity-60' : ''}`}>
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${meta.box}`}>
                 <Icon size={14} className={meta.iconCls} />
               </div>
@@ -463,20 +463,20 @@ function UsuariosSection() {
               </div>
 
               {isSuper && changingPassId === u.id ? (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
                   <input
                     type="password"
                     value={newPassValue}
                     onChange={e => setNewPassValue(e.target.value)}
                     placeholder="Nueva contraseña"
                     autoFocus
-                    className="w-36 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 sm:flex-none sm:w-36 min-w-0 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button onClick={() => handleChangePass(u.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700">OK</button>
                   <button onClick={() => { setChangingPassId(null); setNewPassValue(''); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
                 </div>
               ) : isSuper ? (
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end">
                   <select
                     value={u.role}
                     onChange={e => handleChangeRole(u.id, e.target.value)}
@@ -506,7 +506,7 @@ function UsuariosSection() {
       {isSuper && (
         <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nuevo usuario</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input value={nuevoUser} onChange={e => setNuevoUser(e.target.value)} placeholder="Usuario" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
             <div className="relative">
               <input type={showPass ? 'text' : 'password'} value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} placeholder="Contraseña (mín. 6)" className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
@@ -657,10 +657,11 @@ export default function SettingsView() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex gap-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+      <div className="flex flex-col sm:flex-row bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
 
-        {/* Barra lateral de secciones */}
-        <nav className="w-44 shrink-0 border-r border-slate-100 dark:border-slate-700 py-2">
+        {/* Secciones: tabs horizontales con scroll en mobile, barra lateral en desktop.
+            Fija, la barra de 11rem no deja ancho usable al contenido en un celular. */}
+        <nav className="flex sm:flex-col sm:w-44 shrink-0 overflow-x-auto sm:overflow-x-visible border-b sm:border-b-0 sm:border-r border-slate-100 dark:border-slate-700 sm:py-2">
           {SECCIONES.map(s => {
             const Icon = s.icon;
             const isActive = seccion === s.key;
@@ -668,14 +669,14 @@ export default function SettingsView() {
               <button
                 key={s.key}
                 onClick={() => setSeccion(s.key)}
-                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${
+                className={`shrink-0 sm:w-full flex items-center gap-2.5 px-4 py-2.5 text-sm whitespace-nowrap transition-colors text-left ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium border-r-2 border-blue-600 dark:border-blue-400 -mr-px'
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium border-b-2 sm:border-b-0 sm:border-r-2 border-blue-600 dark:border-blue-400 sm:-mr-px'
                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-200'
                 }`}
               >
                 <Icon size={15} className="shrink-0" />
-                <span className="flex-1">{s.label}</span>
+                <span className="sm:flex-1">{s.label}</span>
                 {!s.ready && (
                   <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 px-1 rounded">
                     pronto
@@ -687,7 +688,7 @@ export default function SettingsView() {
         </nav>
 
         {/* Contenido */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 min-w-0 p-4 sm:p-6">
           {activa?.key === 'alertas' ? <AlertasSection />
             : activa?.key === 'dashboard' ? <DashboardSection />
             : activa?.key === 'usuarios' ? <UsuariosSection />
