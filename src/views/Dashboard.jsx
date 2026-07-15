@@ -219,8 +219,6 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const toggleLocal = (id) => setLocalesSel(prev => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
-    // Seleccionar todos equivale a no filtrar: se guarda como Set vacío ("Todos").
-    if (next.size === localesOrdenados.length) next.clear();
     localStorage.setItem('dash_venc_locales', JSON.stringify([...next]));
     return next;
   });
