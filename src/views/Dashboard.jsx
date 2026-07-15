@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import { EntityIcon } from '../icons';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
-  ChevronRight, ChevronLeft, Building2, CheckCircle2, AlertTriangle, Banknote,
+  ChevronRight, ChevronLeft, ChevronDown, Building2, CheckCircle2, AlertTriangle, Banknote,
   ArrowLeftRight, Check, Truck, CalendarClock
 } from 'lucide-react';
 
@@ -150,6 +150,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
     try { return new Set(JSON.parse(localStorage.getItem('dash_venc_locales') || '[]')); }
     catch { return new Set(); }
   });
+  const [localesDropOpen, setLocalesDropOpen] = useState(false);
+  const localesDropRef = useRef(null);
   const [cajaHoy, setCajaHoy] = useState([]);
   // Rubros configurados para "Saldos mensuales" (null = config sin cargar todavía)
   const [dashboardRubroIds, setDashboardRubroIds] = useState(null);
@@ -226,6 +228,20 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
     localStorage.setItem('dash_venc_locales', '[]');
     setLocalesSel(new Set());
   };
+
+  // Cierra el dropdown de locales al hacer click fuera.
+  useEffect(() => {
+    if (!localesDropOpen) return;
+    const onClick = (e) => {
+      if (localesDropRef.current && !localesDropRef.current.contains(e.target)) setLocalesDropOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [localesDropOpen]);
+
+  const etiquetaLocales = localesSel.size === 0
+    ? 'Todos los locales'
+    : `${localesSel.size} ${localesSel.size === 1 ? 'local' : 'locales'}`;
 
   // Las vencidas (días < 0) se muestran siempre; el rango filtra solo lo que está por vencer.
   // El filtro de locales, en cambio, aplica a todo (incluidas las vencidas).
@@ -422,36 +438,43 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 <span className="text-xs text-slate-400 dark:text-slate-500">a pagar en {rangoVenc} días</span>
               </div>
 
-              {/* Filtro por local: solo con 2+ locales. Alineado a la derecha, bajo el selector de días. */}
+              {/* Filtro por local: dropdown desplegable. Solo con 2+ locales. */}
               {mostrarFiltroLocales && (
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <div className="relative" ref={localesDropRef}>
                   <button
-                    onClick={limpiarLocales}
-                    className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${
-                      localesSel.size === 0
-                        ? 'bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-                    }`}
+                    onClick={() => setLocalesDropOpen(o => !o)}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                   >
-                    Todos
+                    <Building2 size={12} />
+                    {etiquetaLocales}
+                    <ChevronDown size={13} className={`transition-transform ${localesDropOpen ? 'rotate-180' : ''}`} />
                   </button>
-                  {localesOrdenados.map(l => {
-                    const activo = localesSel.has(l.id);
-                    return (
+                  {localesDropOpen && (
+                    <div className="absolute right-0 z-20 mt-1 w-48 max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg p-1">
                       <button
-                        key={l.id}
-                        onClick={() => toggleLocal(l.id)}
-                        className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-                          activo
-                            ? badgeDeLocal.get(l.id).cls + ' ring-1 ring-current/30'
-                            : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-                        }`}
+                        onClick={limpiarLocales}
+                        className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                       >
-                        <EntityIcon value={l.icon} fallback="home" size={12} />
-                        {l.nombre}
+                        <span className="w-3.5 shrink-0">{localesSel.size === 0 && <Check size={13} className="text-blue-500" />}</span>
+                        Todos los locales
                       </button>
-                    );
-                  })}
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                      {localesOrdenados.map(l => {
+                        const activo = localesSel.has(l.id);
+                        return (
+                          <button
+                            key={l.id}
+                            onClick={() => toggleLocal(l.id)}
+                            className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            <span className="w-3.5 shrink-0">{activo && <Check size={13} className="text-blue-500" />}</span>
+                            <EntityIcon value={l.icon} fallback="home" size={13} />
+                            <span className="truncate">{l.nombre}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
