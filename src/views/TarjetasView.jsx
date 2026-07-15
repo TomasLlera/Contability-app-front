@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { registroApi, cajaApi, getErrorMsg } from '../api';
+import { registroApi, cajaApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
 import TarjetasGraficosModal from '../components/TarjetasGraficosModal';
+import RegistroExportModal from '../components/RegistroExportModal';
 import {
-  QrCode, CreditCard, Landmark, Ticket, Plus, Pencil, Trash2, Check, X, Users, BarChart3,
+  QrCode, CreditCard, Landmark, Ticket, Plus, Pencil, Trash2, Check, X, Users, BarChart3, FileSpreadsheet,
   ChevronLeft, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -31,6 +32,16 @@ const TIPOS = [
 ];
 const tipoDef = (key) => TIPOS.find(t => t.key === key) || TIPOS[0];
 
+// Rotación de carga: la primera vuelta arranca en el ancla (el tipo elegido a mano)
+// y sigue con el resto en orden. Al cerrar el ciclo vuelve al primero (orden natural),
+// no al ancla. Ej: ancla 'debito' → debito, qr, credito, prepaga; luego qr, debito, credito, prepaga…
+const rotarTipo = (anchor, current) => {
+  const seq = [anchor, ...TIPOS.map(t => t.key).filter(k => k !== anchor)];
+  const i = seq.indexOf(current);
+  const cerroCiclo = i === seq.length - 1;
+  return { next: cerroCiclo ? TIPOS[0].key : seq[i + 1], cerroCiclo };
+};
+
 const inputCls = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500';
 const cellInput = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500';
 
@@ -45,12 +56,14 @@ export default function TarjetasView({ role }) {
   const [confirm, setConfirm] = useState(null);
   const [expandido, setExpandido] = useState(null); // tipo con el detalle abierto
   const [showMensual, setShowMensual] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
   // Elegir un día lleva el resumen mensual a ese mes (evita tener dos navegadores desfasados).
   const setFecha = (f) => { setFechaState(f); setMes(f.slice(0, 7)); };
 
   // Alta
   const [form, setForm] = useState({ tipo: 'qr', monto: '', empleado: '' });
+  const [anchorTipo, setAnchorTipo] = useState('qr'); // tipo donde arrancó la rotación de carga
   const [empleadoOtro, setEmpleadoOtro] = useState(false); // true = escribir a mano
   const [saving, setSaving] = useState(false);
 
@@ -88,7 +101,10 @@ export default function TarjetasView({ role }) {
     setSaving(true);
     try {
       await registroApi.tarjetas.create({ ...form, fecha });
-      setForm(f => ({ ...f, monto: '' })); // conserva tipo y empleado para cargas seguidas
+      // Avanza al próximo tipo de la rotación; conserva empleado y limpia el monto.
+      const { next, cerroCiclo } = rotarTipo(anchorTipo, form.tipo);
+      setForm(f => ({ ...f, monto: '', tipo: next }));
+      if (cerroCiclo) setAnchorTipo(TIPOS[0].key); // cerrado el ciclo → orden natural desde el primero
       await cargar();
       toast.success('Ingreso registrado');
     } catch (err) {
@@ -142,21 +158,31 @@ export default function TarjetasView({ role }) {
           onClose={() => setShowMensual(false)}
         />
       )}
+      {showExport && (
+        <RegistroExportModal
+          titulo="Exportar tarjetas"
+          ayuda="Genera un Excel con el resumen mes a mes por tipo (QR, débito, crédito, prepaga), el acumulado por empleado y el detalle de cada ingreso."
+          mesInicial={mes}
+          onExport={reportesApi.tarjetas}
+          onClose={() => setShowExport(false)}
+        />
+      )}
 
       {/* Navegador de día */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex items-center h-9 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
+        <div className="flex w-44 items-center h-9 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
           <button onClick={() => setFecha(shiftDia(fecha, -1))} title="Día anterior"
-            className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+            className="h-full px-2 shrink-0 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <ChevronLeft size={15} />
           </button>
-          <div className="relative h-full flex items-center justify-center border-x border-slate-300 dark:border-slate-600 px-3 min-w-36 cursor-pointer">
+          <div className="relative h-full flex-1 min-w-0 flex items-center justify-center border-x border-slate-300 dark:border-slate-600 px-3 cursor-pointer">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{fecha}</span>
             <input type="date" value={fecha} onChange={e => e.target.value && setFecha(e.target.value)} title="Elegir día"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              onClick={e => e.currentTarget.showPicker?.()}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-sm" />
           </div>
           <button onClick={() => setFecha(shiftDia(fecha, 1))} title="Día siguiente"
-            className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+            className="h-full px-2 shrink-0 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <ChevronRight size={15} />
           </button>
         </div>
@@ -167,6 +193,10 @@ export default function TarjetasView({ role }) {
               Ir a hoy
             </button>
           )}
+          <button onClick={() => setShowExport(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
+            <FileSpreadsheet size={14} /> Exportar Excel
+          </button>
           {/* Registro mensual — se abre en ventana, igual que los gráficos de Venta Sistema */}
           <button onClick={() => setShowMensual(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
@@ -234,7 +264,7 @@ export default function TarjetasView({ role }) {
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
             <div>
               <label className="block text-xs text-slate-400 mb-1">Tipo</label>
-              <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))} className={inputCls}>
+              <select value={form.tipo} onChange={e => { setForm(f => ({ ...f, tipo: e.target.value })); setAnchorTipo(e.target.value); }} className={inputCls}>
                 {TIPOS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
               </select>
             </div>
@@ -328,7 +358,7 @@ export default function TarjetasView({ role }) {
                       </td>
                       <td className="px-4 py-1.5">
                         <div className="flex gap-1.5">
-                          <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} className={cellInput} />
+                          <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className={cellInput} />
                           <select value={empleados.some(x => x.nombre === edit.empleado) || !edit.empleado ? edit.empleado : '__otro__'}
                             onChange={e => setEdit(p => ({ ...p, empleado: e.target.value === '__otro__' ? '' : e.target.value }))}
                             className={cellInput}>

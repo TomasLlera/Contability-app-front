@@ -801,7 +801,12 @@ export default function CajaView({ rubros = [], onNavigate }) {
         toast.success('Actualizado');
       } else {
         await cajaApi.create(data);
-        toast.success('Guardado — confirmá el pago para que descuente de la caja');
+        const msgCreado = {
+          ingreso_extra: 'Ingreso cargado ✓',
+          empleado: 'Caja ingresada ✓',
+          gasto: 'Pago ingresado ✓',
+        }[data.tipo] || 'Guardado — confirmá el pago para que descuente de la caja';
+        toast.success(msgCreado);
       }
       setShowForm(false); setEditingMov(null); setTipoForm(null);
       cargar();
@@ -914,7 +919,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
     if (existing) await cajaApi.update(existing.id, { monto: n, concepto: 'Saldo en cuenta', metodo: 'transferencia' });
     else await cajaApi.create({ fecha, tipo: 'saldo_cuenta', concepto: 'Saldo en cuenta', monto: n, metodo: 'transferencia', es_especial: false });
     setSaldoCuentaInput(''); setEditandoSaldoCuenta(false);
-    cargar(); toast.success('Saldo en cuenta guardado');
+    cargar(); toast.success('Saldo cargado con éxito ✓');
   };
 
   const handleSaveConfig = async (data) => {

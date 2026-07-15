@@ -226,6 +226,14 @@ export const reportesApi = {
     const res = await api.get('/reportes/caja-mensual', { params: { mes }, responseType: 'blob' });
     await descargarBlob(res, `caja_${mes}.xlsx`);
   },
+  ventasSistema: async ({ desde, hasta }) => {
+    const res = await api.get('/reportes/ventas-sistema', { params: { desde, hasta }, responseType: 'blob' });
+    await descargarBlob(res, desde === hasta ? `ventas_sistema_${desde}.xlsx` : `ventas_sistema_${desde}_a_${hasta}.xlsx`);
+  },
+  tarjetas: async ({ desde, hasta }) => {
+    const res = await api.get('/reportes/tarjetas', { params: { desde, hasta }, responseType: 'blob' });
+    await descargarBlob(res, desde === hasta ? `tarjetas_${desde}.xlsx` : `tarjetas_${desde}_a_${hasta}.xlsx`);
+  },
 };
 
 export const backupApi = {

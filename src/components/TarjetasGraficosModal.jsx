@@ -31,7 +31,7 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
   const igual = (comparativa.diferencia || 0) === 0;
 
   return (
-    <Modal title="Registro mensual — Tarjetas" onClose={onClose} size="2xl">
+    <Modal title="Registro mensual — Tarjetas" onClose={onClose} size="4xl">
       <div className="space-y-4">
         {/* Navegador de mes */}
         <div className="flex items-center justify-center">

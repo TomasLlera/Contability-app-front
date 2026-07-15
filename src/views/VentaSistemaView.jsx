@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { registroApi, getErrorMsg } from '../api';
+import { registroApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import VentaSistemaGraficosModal from '../components/VentaSistemaGraficosModal';
+import RegistroExportModal from '../components/RegistroExportModal';
 import InfoTooltip from '../components/InfoTooltip';
-import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,6 +28,7 @@ export default function VentaSistemaView({ role }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showGraficos, setShowGraficos] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [confirm, setConfirm] = useState(null);
 
   // Alta
@@ -111,6 +113,15 @@ export default function VentaSistemaView({ role }) {
     <div className="max-w-5xl mx-auto space-y-5">
       {confirm && <ConfirmModal message={confirm.message} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
       {showGraficos && <VentaSistemaGraficosModal data={data} onClose={() => setShowGraficos(false)} />}
+      {showExport && (
+        <RegistroExportModal
+          titulo="Exportar ventas"
+          ayuda="Genera un Excel con el resumen mes a mes (total, cantidad, promedio y comparativa) y el detalle de cada venta."
+          mesInicial={mes}
+          onExport={reportesApi.ventasSistema}
+          onClose={() => setShowExport(false)}
+        />
+      )}
 
       {/* Navegador de mes + gráficos */}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -130,10 +141,16 @@ export default function VentaSistemaView({ role }) {
           </button>
         </div>
 
-        <button onClick={() => setShowGraficos(true)}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
-          <BarChart3 size={14} /> Ver gráficos
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowExport(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
+            <FileSpreadsheet size={14} /> Exportar Excel
+          </button>
+          <button onClick={() => setShowGraficos(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
+            <BarChart3 size={14} /> Ver gráficos
+          </button>
+        </div>
       </div>
 
       {/* Resumen del mes */}
@@ -163,9 +180,9 @@ export default function VentaSistemaView({ role }) {
       {!isViewer && (
         <form onSubmit={handleAdd} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-end">
-            <div>
+            <div className="sm:w-44">
               <label className="block text-xs text-slate-400 mb-1">Fecha</label>
-              <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
+              <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} onClick={e => e.currentTarget.showPicker?.()} className={inputCls} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Monto</label>
@@ -250,7 +267,7 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
           {ventas.map(v => editId === v.id ? (
             <tr key={v.id} className="bg-blue-50/50 dark:bg-blue-900/10">
               <td className="px-4 py-1.5">
-                <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} className={cellInput} />
+                <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className={cellInput} />
               </td>
               <td className="px-4 py-1.5">
                 <input type="text" value={edit.concepto} onChange={e => setEdit(p => ({ ...p, concepto: e.target.value }))} placeholder="Detalle" className={cellInput} />

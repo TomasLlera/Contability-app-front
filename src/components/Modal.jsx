@@ -13,7 +13,7 @@ export default function Modal({ title, onClose, children, size = 'lg', closeOnBa
     };
   }, [onClose]);
 
-  const maxW = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl' }[size] || 'max-w-lg';
+  const maxW = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl', '4xl': 'max-w-4xl' }[size] || 'max-w-lg';
 
   return (
     <div
