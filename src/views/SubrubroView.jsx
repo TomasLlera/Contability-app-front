@@ -101,9 +101,13 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
     const { tipo, facturas_vinculadas_ids, concepto_diferencia, ...rest } = formData;
     const tieneVinculacion = facturas_vinculadas_ids?.length > 0;
     const esPagoONC = tipo === 'pago' || tipo === 'nota_credito';
+    // Si el movimiento editado TENÍA vinculación, siempre va por pago-vinculado:
+    // el PUT normal ignora facturas_vinculadas_ids y dejaría la vinculación vieja
+    // en la DB aunque el usuario la haya destildado (lista vacía = queda libre).
+    const teniaVinculacion = editingMov?.facturas_vinculadas_ids?.length > 0;
 
     try {
-      if (esPagoONC && tieneVinculacion) {
+      if (esPagoONC && (tieneVinculacion || (editingMov && teniaVinculacion))) {
 
         const payload = {
           tipo,

@@ -74,36 +74,86 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // Saldo restante de la factura (monto original − NC/pagos ya aplicados). Si el
   // backend no lo manda, cae al monto. Es lo que se debe vincular/mostrar para no
   // pisar créditos previos: una 2da NC ve el saldo, no el monto original.
-  const saldoFactura = (f) => (f.saldo != null ? f.saldo : (f.monto || 0));
-  const tieneCreditoPrevio = (f) => f.saldo != null && f.saldo < (f.monto || 0) - 0.005;
+  const saldoBase = (f) => (f.saldo != null ? f.saldo : (f.monto || 0));
+
+  // Al EDITAR un pago/NC vinculado, el saldo del backend ya descuenta ESTE
+  // movimiento. Como la edición reemplaza su aplicación (no la suma), hay que
+  // devolvérsela para mostrar/validar el saldo real disponible: se reparte
+  // mov.pago entre sus facturas vinculadas (en orden por fecha), sin exceder lo
+  // que a cada una le falta hasta su monto original.
+  const saldosSinEsteMov = (() => {
+    if (!movimiento?.id || !movimiento.facturas_vinculadas_ids?.length) return null;
+    if (movimiento.tipo !== 'pago' && movimiento.tipo !== 'nota_credito') return null;
+    const linked = new Set(movimiento.facturas_vinculadas_ids);
+    let restante = movimiento.pago || 0;
+    const map = new Map();
+    for (const f of todasFacturasPendientes) {
+      if (!linked.has(f.id) || restante <= 0.005) continue;
+      const s = saldoBase(f);
+      const devolver = Math.min(restante, Math.max(0, (f.monto || 0) - s));
+      map.set(f.id, Math.round((s + devolver) * 100) / 100);
+      restante = Math.round((restante - devolver) * 100) / 100;
+    }
+    return map;
+  })();
+
+  const saldoFactura = (f) => saldosSinEsteMov?.get(f.id) ?? saldoBase(f);
+  const tieneCreditoPrevio = (f) => saldoFactura(f) < (f.monto || 0) - 0.005;
 
   const totalSeleccionado = todasFacturasPendientes
     .filter(f => facturasSeleccionadas.has(f.id))
     .reduce((s, f) => s + saldoFactura(f), 0);
 
+  // Autocompletar el monto con el saldo seleccionado SOLO cuando el usuario cambia
+  // la selección. En el primer render (modo edición) se saltea: si no, pisaría el
+  // monto original del pago/NC que se está editando.
+  const selInicialRef = useRef(true);
   useEffect(() => {
+    if (selInicialRef.current) { selInicialRef.current = false; return; }
     if (facturasSeleccionadas.size > 0) setPago(String(totalSeleccionado));
   }, [facturasSeleccionadas]);
 
   const montoPago = Number(pago) || 0;
   const diferencia = Math.round((totalSeleccionado - montoPago) * 100) / 100;
   const hayVinculacion = facturasSeleccionadas.size > 0;
+  // Una NC nunca puede superar el saldo de las facturas a las que se aplica
+  // (un pago sí: el excedente queda como crédito libre). Bloquea el guardado.
+  const excedeNC = tipo === 'nota_credito' && hayVinculacion && diferencia < -0.005;
 
+  const r2 = (n) => Math.round(n * 100) / 100;
+
+  // Preview de la aplicación automática (FIFO): igual que el backend, aplica
+  // contra el SALDO restante de cada factura (no el monto original) y admite
+  // aplicación parcial sobre la última.
   const previewFIFO = () => {
     if (!montoPago || montoPago <= 0 || hayVinculacion) return null;
     let restante = montoPago;
-    const cubiertas = [];
+    const aplicadas = [];
     for (const b of todasFacturasPendientes) {
-      if (restante >= b.monto) {
-        cubiertas.push(b);
-        restante -= b.monto;
-      } else {
-        break;
-      }
+      if (restante <= 0.005) break;
+      const s = saldoFactura(b);
+      if (s <= 0.005) continue;
+      const aplicado = Math.min(restante, s);
+      aplicadas.push({ id: b.id, fecha: b.fecha, saldo: s, aplicado, saldoNuevo: r2(s - aplicado) });
+      restante = r2(restante - aplicado);
     }
-    return { cubiertas, restante };
+    return { aplicadas, restante };
   };
   const preview = !esPagoONC ? null : previewFIFO();
+
+  // Aplicación sobre las facturas seleccionadas, en el mismo orden (por fecha)
+  // que usa el backend: contra el saldo, con parcial sobre la última.
+  const previewVinculadas = () => {
+    let restante = montoPago;
+    return todasFacturasPendientes
+      .filter(f => facturasSeleccionadas.has(f.id))
+      .map(f => {
+        const s = saldoFactura(f);
+        const aplicado = Math.min(restante, s);
+        restante = r2(restante - aplicado);
+        return { f, saldo: s, aplicado, saldoNuevo: r2(s - aplicado) };
+      });
+  };
 
   const handleChangeTipo = (t) => {
     setTipo(t);
@@ -124,6 +174,9 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     if (esPagoONC) {
       const p = Number(pago) || 0;
       if (!p) return;
+      // NC mayor al saldo de las facturas vinculadas: bloqueada (el backend
+      // también la rechaza con 400).
+      if (excedeNC) return;
       payload = {
         tipo,
         pago: p,
@@ -330,7 +383,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             <label className={labelCls}>
               Vencimiento <span className="text-slate-400">(opcional)</span>
             </label>
-            <input type="date" className={inputCls} value={fechaVenc} onChange={e => setFechaVenc(e.target.value)} />
+            <input type="date" className={inputCls} value={fechaVenc} min={fecha} onChange={e => setFechaVenc(e.target.value)} />
           </div>
 
           {camposTexto.map(c => (
@@ -462,10 +515,18 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                     </div>
                   )}
                   {diferencia < -0.005 && (
-                    <div className="flex justify-between text-blue-600 dark:text-blue-400 font-medium">
-                      <span>Excedente (queda como crédito libre):</span>
-                      <span>{fmt(Math.abs(diferencia))}</span>
-                    </div>
+                    tipo === 'nota_credito'
+                      ? (
+                        <div className="flex justify-between text-red-600 dark:text-red-400 font-medium">
+                          <span>⚠ La NC supera el saldo de las facturas seleccionadas — bajá el monto:</span>
+                          <span>{fmt(Math.abs(diferencia))} de más</span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-blue-600 dark:text-blue-400 font-medium">
+                          <span>Excedente (queda como crédito libre):</span>
+                          <span>{fmt(Math.abs(diferencia))}</span>
+                        </div>
+                      )
                   )}
                 </div>
               )}
@@ -474,19 +535,21 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
 
           {!hayVinculacion && preview && (
             <div className={`rounded-lg border p-3 text-sm ${
-              preview.cubiertas.length > 0
+              preview.aplicadas.length > 0
                 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                 : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
             }`}>
               <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1.5 text-xs">
-                Se aplicará automáticamente (más antiguas primero):
+                Se aplicará automáticamente al saldo (más antiguas primero):
               </p>
-              {preview.cubiertas.length > 0 && (
+              {preview.aplicadas.length > 0 && (
                 <ul className="space-y-0.5 mb-1">
-                  {preview.cubiertas.map(b => (
-                    <li key={b.id} className="flex items-center gap-1.5 text-green-700 dark:text-green-400 text-xs">
+                  {preview.aplicadas.map(a => (
+                    <li key={a.id} className="flex items-center gap-1.5 text-green-700 dark:text-green-400 text-xs">
                       <Check size={11} />
-                      <span>{b.fecha} — {fmt(b.monto)} → <strong>PAGADA</strong></span>
+                      <span>
+                        {a.fecha} — saldo {fmt(a.saldo)} − {fmt(a.aplicado)} → {a.saldoNuevo <= 0.005 ? <strong>SALDADA</strong> : <>queda {fmt(a.saldoNuevo)}</>}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -494,26 +557,26 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               {preview.restante > 0 && (
                 <p className="text-slate-500 dark:text-slate-400 text-xs">Quedan {fmt(preview.restante)} sin asignar.</p>
               )}
-              {preview.cubiertas.length === 0 && (
-                <p className="text-amber-700 dark:text-amber-400 text-xs">No alcanza para cubrir ninguna factura completa.</p>
+              {preview.aplicadas.length === 0 && (
+                <p className="text-amber-700 dark:text-amber-400 text-xs">No hay facturas con saldo pendiente.</p>
               )}
             </div>
           )}
 
-          {hayVinculacion && facturasSeleccionadas.size > 0 && (
+          {hayVinculacion && !excedeNC && (
             <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 text-xs">
               <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1">
-                Facturas que quedarán marcadas como pagadas:
+                Cómo se aplica sobre el saldo de cada factura:
               </p>
               <ul className="space-y-0.5">
-                {todasFacturasPendientes
-                  .filter(f => facturasSeleccionadas.has(f.id))
-                  .map(f => (
-                    <li key={f.id} className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-                      <Check size={11} />
-                      <span>{f.fecha} — {fmt(f.monto)}</span>
-                    </li>
-                  ))}
+                {previewVinculadas().map(({ f, saldo, aplicado, saldoNuevo }) => (
+                  <li key={f.id} className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
+                    <Check size={11} />
+                    <span>
+                      {f.fecha} — saldo {fmt(saldo)} − {fmt(aplicado)} → {saldoNuevo <= 0.005 ? <strong>SALDADA</strong> : <>queda {fmt(saldoNuevo)} pendiente</>}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </div>
           )}
@@ -527,7 +590,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         </button>
         <button
           type="submit"
-          disabled={saving || (esPagoONC ? !Number(pago) : !Number(monto))}
+          disabled={saving || excedeNC || (esPagoONC ? !Number(pago) : !Number(monto))}
           className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar'}

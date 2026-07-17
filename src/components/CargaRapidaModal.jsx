@@ -2,9 +2,43 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Zap } from 'lucide-react';
 import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg, newIdemKey } from '../api';
 import toast from 'react-hot-toast';
+import InfoTooltip from './InfoTooltip';
 
 const today = () => new Date().toISOString().split('T')[0];
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+
+// ── Vencimiento automático del subrubro (espejo de calcularVencimientoSub del backend) ──
+// 'dias' → emisión + N días; 'dia_semana' → próximo día fijo de la semana (nunca el
+// mismo día); 'dia_mes' → día fijo del mes (o el del mes siguiente si ya pasó).
+const addDias = (fechaStr, dias) => {
+  const d = new Date(fechaStr + 'T00:00:00');
+  d.setDate(d.getDate() + Number(dias));
+  return d.toISOString().split('T')[0];
+};
+const proximoDiaSemana = (fechaStr, target) => {
+  const d = new Date(fechaStr + 'T00:00:00');
+  const diff = ((Number(target) - d.getDay() + 6) % 7) + 1; // 1..7 → nunca el mismo día
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+};
+const proximoDiaMes = (fechaStr, target) => {
+  const t = Number(target);
+  const d = new Date(fechaStr + 'T00:00:00');
+  let anio = d.getFullYear(), mes = d.getMonth();
+  if (t < d.getDate()) { mes += 1; if (mes > 11) { mes = 0; anio += 1; } }
+  const ultimo = new Date(anio, mes + 1, 0).getDate(); // último día del mes destino
+  return `${anio}-${String(mes + 1).padStart(2, '0')}-${String(Math.min(t, ultimo)).padStart(2, '0')}`;
+};
+const calcVencimientoSub = (fechaStr, sub) => {
+  if (!fechaStr || !sub) return null;
+  if (sub.modo_vencimiento === 'dia_semana') {
+    return sub.dia_semana_vencimiento == null ? null : proximoDiaSemana(fechaStr, sub.dia_semana_vencimiento);
+  }
+  if (sub.modo_vencimiento === 'dia_mes') {
+    return sub.dia_mes_vencimiento == null ? null : proximoDiaMes(fechaStr, sub.dia_mes_vencimiento);
+  }
+  return sub.dia_vencimiento ? addDias(fechaStr, sub.dia_vencimiento) : null;
+};
 
 const TIPOS = [
   { value: 'factura',      label: 'Factura',       color: 'bg-amber-500' },
@@ -22,6 +56,11 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [tipo, setTipo] = useState('factura');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(today());
+  // Vencimiento de la factura: se pre-llena con el criterio del subrubro (si tiene)
+  // y es editable. El ref marca que el usuario lo tocó a mano: el auto-cálculo deja
+  // de pisarlo hasta que cambie de subrubro.
+  const [fechaVenc, setFechaVenc] = useState('');
+  const vencManualRef = useRef(false);
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [documento, setDocumento] = useState('factura');
   // Método de pago de la factura (opcional): viaja a la Caja del Día al vencer.
@@ -51,6 +90,18 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   // Remito: no lleva percepciones y se paga siempre en efectivo (automático).
   const esRemito = tipo === 'factura' && documento === 'remito';
 
+  // Al cambiar de subrubro, el override manual del vencimiento pierde sentido.
+  // (Declarado antes del efecto de abajo: los refs se actualizan en forma síncrona.)
+  useEffect(() => { vencManualRef.current = false; }, [subrubroId]);
+
+  // Auto-vencimiento: pre-llenar con el criterio del subrubro cada vez que cambia
+  // el subrubro o la fecha de emisión, salvo que el usuario lo haya editado a mano.
+  useEffect(() => {
+    if (vencManualRef.current) return;
+    const sub = subrubros.find(s => String(s.id) === String(subrubroId));
+    setFechaVenc((sub && fecha) ? (calcVencimientoSub(fecha, sub) || '') : '');
+  }, [subrubroId, fecha, subrubros]);
+
   // Boletas pendientes del subrubro: permiten aplicar el pago/NC a una factura
   // puntual (y dejar saldo si es parcial). Solo aplica a pago / nota de crédito.
   useEffect(() => {
@@ -73,6 +124,21 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
     e.preventDefault();
     const n = Number(monto);
     if (!n || !subrubroId) return;
+    // Vencimiento: obligatorio en facturas y nunca anterior a la emisión.
+    if (tipo === 'factura') {
+      if (!fechaVenc) { toast.error('Ingresá la fecha de vencimiento'); return; }
+      if (fechaVenc < fecha) { toast.error('El vencimiento no puede ser anterior a la fecha de emisión'); return; }
+    }
+    // Una NC aplicada a una boleta puntual nunca puede superar su saldo pendiente
+    // (el backend también la rechaza con 400).
+    if (tipo === 'nota_credito' && facturaSel) {
+      const f = facturas.find(x => String(x.id) === String(facturaSel));
+      const saldoSel = f ? (f.saldo != null ? f.saldo : f.monto) : null;
+      if (saldoSel != null && n > saldoSel + 0.005) {
+        toast.error(`La nota de crédito supera el saldo pendiente de la boleta (${fmt(saldoSel)})`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       if (esPago && facturaSel) {
@@ -94,7 +160,8 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           monto: esPago ? 0 : n,
           pago: esPago ? n : 0,
           fecha,
-          fecha_vencimiento: null,
+          // Vencimiento: solo aplica a facturas (elegido a mano o auto del subrubro).
+          fecha_vencimiento: tipo === 'factura' ? (fechaVenc || null) : null,
           campos_extra: {},
           facturas_vinculadas_ids: [],
           // metodo_pago: en 'pago' es el método del pago; en 'factura' es el método que
@@ -180,8 +247,25 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
                 )
           )}
 
-          {/* Fecha */}
-          <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
+          {/* Fecha de emisión + vencimiento (el vencimiento solo aplica a facturas) */}
+          {tipo === 'factura' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Emisión</label>
+                <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
+              </div>
+              <div>
+                <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                  Vencimiento
+                  <InfoTooltip text="Si el subrubro tiene un criterio de vencimiento configurado, se calcula solo — podés cambiarlo. Al vencer, la factura aparece en la Caja del Día." />
+                </label>
+                <input type="date" className={inputCls} value={fechaVenc} min={fecha}
+                  onChange={e => { vencManualRef.current = true; setFechaVenc(e.target.value); }} required />
+              </div>
+            </div>
+          ) : (
+            <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
+          )}
 
           {/* Documento — solo en Factura */}
           {tipo === 'factura' && (
