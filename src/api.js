@@ -193,6 +193,7 @@ export const dashboardApi = {
     api.get(`/dashboard/comparacion/${rubroId}`).then(r => r.data),
   getComparativa: () => api.get('/dashboard/comparativa').then(r => r.data),
   getComparativaCaja: () => api.get('/dashboard/comparativa-caja').then(r => r.data),
+  getDeudasCobrar: () => api.get('/dashboard/deudas-cobrar').then(r => r.data),
 };
 
 // Descarga un blob desde una respuesta axios, detectando errores JSON devueltos como blob.
@@ -260,7 +261,8 @@ export const movimientosApi = {
   actualizarPagoVinculado: (id, data) =>
     api.put(`/movimientos/${id}/pago-vinculado`, data).then(r => r.data),
   delete: (id) => api.delete(`/movimientos/${id}`),
-  getVencimientos: (dias = 30) => api.get('/movimientos/vencimientos/proximos', { params: { dias } }).then(r => r.data),
+  // tipo: 'factura' (default, boletas a pagar) | 'deuda' (deudas a cobrar)
+  getVencimientos: (dias = 30, tipo = undefined) => api.get('/movimientos/vencimientos/proximos', { params: { dias, tipo } }).then(r => r.data),
   search: (q, limit = 25) => api.get('/movimientos/search', { params: { q, limit } }).then(r => r.data),
   exportExcel: async (subrubroId, nombre, desde = null, hasta = null) => {
     const params = {};

@@ -256,7 +256,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const gastosPendientes   = gastosHoy.filter(m => m.confirmado === false);
   const saldoMov           = cajaHoy.find(m => m.tipo === 'saldo_inicial');
   const saldoCuentaMov     = cajaHoy.find(m => m.tipo === 'saldo_cuenta');
-  const ingresosExtra      = cajaHoy.filter(m => m.tipo === 'ingreso_extra');
+  // confirmado === false = deuda por cobrar todavía sin cobrar: no es un ingreso del día.
+  const ingresosExtra      = cajaHoy.filter(m => m.tipo === 'ingreso_extra' && m.confirmado !== false);
   const empleados          = cajaHoy.filter(m => m.tipo === 'empleado');
   const totalConfirmados   = gastosConfirmados.reduce((s, m) => s + m.monto, 0);
   const totalPendientes    = gastosPendientes.reduce((s, m) => s + m.monto, 0);

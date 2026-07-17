@@ -3,7 +3,7 @@ import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
-  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink
+  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink, HandCoins
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
@@ -462,12 +462,20 @@ function MetodoBadge({ metodo }) {
 }
 
 function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect }) {
-  const esPendiente  = m.tipo === 'gasto' && m.confirmado === false;
-  const esConfirmado = m.tipo === 'gasto' && m.confirmado === true;
+  // Cobro de deuda: ingreso auto-sincronizado con ciclo de confirmación (una deuda
+  // por cobrar apunta a su movimiento de origen). Los ingresos manuales/espejo de
+  // abono no llevan confirmación (confirmado null).
+  const esCobro      = m.tipo === 'ingreso_extra' && m.movimiento_id != null;
+  const esPendiente  = (m.tipo === 'gasto' || esCobro) && m.confirmado === false;
+  const esConfirmado = (m.tipo === 'gasto' || esCobro) && m.confirmado === true;
   const esGasto      = m.tipo === 'gasto';
+  const confirmable  = esGasto || esCobro;
   // Gastos: verde si el pago está confirmado, rojo mientras está sin pagar.
+  // Cobros de deuda: naranja mientras están sin cobrar, verde al confirmarse.
   // El resto de los tipos (empleados, ingresos) conservan su color de origen.
-  const montoColor = esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600') : colorMonto;
+  const montoColor = esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600')
+    : esCobro ? (esPendiente ? 'text-orange-500' : 'text-green-600')
+    : colorMonto;
 
   return (
     <div
@@ -509,8 +517,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <MetodoBadge metodo={m.metodo} />
-          {esPendiente && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">Sin confirmar</span>}
-          {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> Pago confirmado</span>}
+          {esPendiente && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
+          {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> {esCobro ? 'Cobro confirmado' : 'Pago confirmado'}</span>}
         </div>
       </div>
       {/* En mobile el monto se apila sobre las acciones: si van todos en línea, el
@@ -520,9 +528,9 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           {fmt(m.monto)}
         </p>
         <div className="flex items-center gap-2 sm:gap-3">
-          {esGasto && (
+          {confirmable && onConfirmar && (
             <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming}
-              title={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
+              title={esConfirmado ? 'Revertir confirmación' : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
               className={`p-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
                 esConfirmado
                   ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
@@ -622,8 +630,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // Acordeones con memoria: recuerdan si quedaron abiertos/cerrados entre recargas.
   const [gastosOpen, setGastosOpen] = useState(() => localStorage.getItem('cajaGastosOpen') !== '0');
   const [empleadosOpen, setEmpleadosOpen] = useState(() => localStorage.getItem('cajaEmpleadosOpen') !== '0');
+  const [deudasOpen, setDeudasOpen] = useState(() => localStorage.getItem('cajaDeudasOpen') !== '0');
   useEffect(() => { localStorage.setItem('cajaGastosOpen', gastosOpen ? '1' : '0'); }, [gastosOpen]);
   useEffect(() => { localStorage.setItem('cajaEmpleadosOpen', empleadosOpen ? '1' : '0'); }, [empleadosOpen]);
+  useEffect(() => { localStorage.setItem('cajaDeudasOpen', deudasOpen ? '1' : '0'); }, [deudasOpen]);
 
   const dateInputRef = useRef(null);
   // Bloqueo síncrono de confirmaciones en vuelo (por id de gasto). El estado
@@ -703,7 +713,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
         let running = saldoBase;
         for (let i = Math.max(startIdx, 0); i < dates.length; i++) {
           const ms = byDate[dates[i]];
-          running += ms.filter(m => (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') && m.metodo === 'efectivo').reduce((s, m) => s + m.monto, 0);
+          // confirmado !== false: los pendientes (gasto sin pagar / deuda sin cobrar) no mueven el saldo.
+          running += ms.filter(m => (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') && m.metodo === 'efectivo' && m.confirmado !== false).reduce((s, m) => s + m.monto, 0);
           running -= ms.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo' && m.confirmado !== false).reduce((s, m) => s + m.monto, 0);
         }
 
@@ -818,6 +829,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
     // ignorar. Sin esto, dos clics rápidos entran ambos a la rama de confirmar
     // (m.confirmado sigue siendo false en el render viejo) y crean dos pagos.
     if (confirmingRef.current.has(m.id)) return;
+    // Cobro de deuda (ingreso auto-sincronizado) vs gasto de proveedor: mismo
+    // flujo — al confirmar se crea el pago/abono en el subrubro de origen.
+    const esCobro = m.tipo === 'ingreso_extra';
     confirmingRef.current.add(m.id);
     setConfirmingId(m.id);
     try {
@@ -848,7 +862,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             tipo: 'pago',
             pago: m.monto,
             fecha: fechaConfirm,
-            concepto: `Pago caja: ${m.concepto}`,
+            concepto: `${esCobro ? 'Abono caja' : 'Pago caja'}: ${m.concepto}`,
             metodo_pago: m.metodo,
             caja_mov_id: m.id,
             // Si la entrada de caja apunta a una factura puntual, vincular el pago
@@ -864,7 +878,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
           if (pago?.id) await cajaApi.update(m.id, { pago_mov_id: pago.id });
         }
         cargar();
-        toast.success('Pago confirmado');
+        toast.success(esCobro ? 'Cobro confirmado — sumado a los ingresos del día' : 'Pago confirmado');
       }
     } catch { toast.error('Error al confirmar'); }
     finally { confirmingRef.current.delete(m.id); setConfirmingId(null); }
@@ -948,25 +962,34 @@ export default function CajaView({ rubros = [], onNavigate }) {
     : null;
 
   const empleados     = movs.filter(m => m.tipo === 'empleado');
-  const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra');
+  // Deudas por cobrar: ingresos auto-sincronizados desde un subrubro DEUDA
+  // (apuntan a la deuda por movimiento_id). Pendientes hasta confirmar el cobro.
+  const deudasCobro   = movs.filter(m => m.tipo === 'ingreso_extra' && m.movimiento_id != null);
+  const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra' && m.movimiento_id == null);
   const gastos        = movs.filter(m => m.tipo === 'gasto');
+  // Ingresos que cuentan para el saldo del día: manuales + abonos espejados +
+  // cobros de deuda YA confirmados (confirmado === false = todavía no entró la plata).
+  const ingresosDia   = movs.filter(m => m.tipo === 'ingreso_extra' && m.confirmado !== false);
 
   // --- Selección múltiple de gastos ---
-  const selectedGastos = gastos.filter(m => selectedIds.has(m.id));
+  // Seleccionables: gastos de proveedores y cobros de deuda (ambos confirmables).
+  const selectedGastos = [...gastos, ...deudasCobro].filter(m => selectedIds.has(m.id));
   const selTotal       = selectedGastos.reduce((s, m) => s + m.monto, 0);
   // Subrubros distintos involucrados en la selección (para el panel de resumen).
   const selSubNames    = [...new Set(selectedGastos.map(m => subrubroDe(m)?.nombre).filter(Boolean))];
   const allGastosSelected = gastos.length > 0 && gastos.every(m => selectedIds.has(m.id));
-  const selectAllGastos   = () => setSelectedIds(new Set(gastos.map(m => m.id)));
+  const selectAllGastos   = () => setSelectedIds(prev => new Set([...prev, ...gastos.map(m => m.id)]));
+  const allDeudasSelected = deudasCobro.length > 0 && deudasCobro.every(m => selectedIds.has(m.id));
+  const selectAllDeudas   = () => setSelectedIds(prev => new Set([...prev, ...deudasCobro.map(m => m.id)]));
 
-  // Marca como pagados (confirma) todos los gastos seleccionados que estén sin
-  // confirmar y tengan método definido. Reusa la confirmación individual para
-  // mantener la misma lógica (crea el pago en el subrubro si corresponde).
+  // Marca como pagados/cobrados (confirma) todos los ítems seleccionados que estén
+  // sin confirmar y tengan método definido. Reusa la confirmación individual para
+  // mantener la misma lógica (crea el pago/abono en el subrubro si corresponde).
   const bulkConfirmSeleccionados = async () => {
     const aConfirmar = selectedGastos.filter(m => m.confirmado === false && m.metodo);
     const sinMetodo  = selectedGastos.filter(m => m.confirmado === false && !m.metodo).length;
     if (aConfirmar.length === 0) {
-      toast.error(sinMetodo ? 'Definí el método de pago en los gastos seleccionados' : 'No hay gastos pendientes para confirmar');
+      toast.error(sinMetodo ? 'Definí el método de pago en los ítems seleccionados' : 'No hay pendientes para confirmar');
       return;
     }
     for (const m of aConfirmar) await handleConfirmarGasto(m);
@@ -976,12 +999,12 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
   const disponibleEfvo  = saldoInicial
     + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
-    + ingresosExtra.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
+    + ingresosDia.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
 
   const disponibleTrans = saldoCuentaHoy !== null
   ? saldoCuentaHoy
   : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
-    + ingresosExtra.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+    + ingresosDia.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
 
   // Solo los gastos confirmados (confirmado !== false) descuentan de la caja
   const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo'       && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
@@ -1143,12 +1166,25 @@ export default function CajaView({ rubros = [], onNavigate }) {
           </div>
           <button onClick={() => openForm('ingreso_extra')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
         </div>
-        {showForm && (tipoForm === 'ingreso_extra' || editingMov?.tipo === 'ingreso_extra') && (
+        {/* La edición de un cobro de deuda (ingreso con movimiento_id) se renderiza
+            en la sección "Deudas por cobrar", no acá. */}
+        {showForm && (tipoForm === 'ingreso_extra' || (editingMov?.tipo === 'ingreso_extra' && editingMov?.movimiento_id == null)) && (
           <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'ingreso_extra'} /></div>
         )}
         {ingresosExtra.map(m => (
           <div key={m.id} className="mb-2">
-            {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-amber-600" />}
+            {/* Abono de deuda espejado desde un subrubro (origen 'subrubro'): verde y
+                con acceso directo al subrubro de origen. Ingreso manual: ámbar. */}
+            {editingMov?.id === m.id && showForm ? null : (
+              <MovRow
+                m={m}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                colorMonto={m.origen === 'subrubro' ? 'text-green-600' : 'text-amber-600'}
+                subrubro={m.origen === 'subrubro' ? subrubroDe(m) : null}
+                onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -1222,6 +1258,59 @@ export default function CajaView({ rubros = [], onNavigate }) {
           </>
         )}
       </div>
+
+      {/* Deudas por cobrar — ingresos pendientes de cobro sincronizados desde los
+          subrubros DEUDA. Mismo flujo que los gastos: seleccionar varias, confirmar
+          con ✓ (registra el abono en el subrubro y suma a los ingresos del día). */}
+      {(deudasCobro.length > 0 || (showForm && editingMov?.tipo === 'ingreso_extra' && editingMov?.movimiento_id != null)) && (
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-y-1 mb-2">
+            <button type="button" onClick={() => setDeudasOpen(v => !v)}
+              className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
+              <HandCoins size={14} className="text-orange-500 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Deudas por cobrar</h3>
+              {deudasCobro.length > 0 && <span className="text-xs text-slate-400">{fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))}</span>}
+              {!deudasOpen && deudasCobro.length > 0 && (
+                <span className="text-xs text-slate-400 dark:text-slate-500">· {deudasCobro.length}</span>
+              )}
+              <InfoTooltip text="Plata que te deben, vencida o por vencer. Al confirmar el cobro con ✓ se registra el abono en el subrubro y el monto se suma a los ingresos del día bajo su método." />
+              <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${deudasOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {deudasCobro.length > 0 && (
+              <button onClick={allDeudasSelected ? clearSelection : selectAllDeudas}
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-orange-500 hover:underline shrink-0 ml-2">
+                {allDeudasSelected ? 'Quitar selección' : 'Seleccionar todas'}
+              </button>
+            )}
+          </div>
+          {deudasOpen && (
+            <>
+              {showForm && editingMov?.tipo === 'ingreso_extra' && editingMov?.movimiento_id != null && (
+                <div className="mb-2"><EntryForm {...formProps} initial={editingMov} /></div>
+              )}
+              {deudasCobro.map(m => (
+                <div key={m.id} className="mb-2">
+                  {editingMov?.id === m.id && showForm ? null : (
+                    <MovRow
+                      m={m}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onConfirmar={handleConfirmarGasto}
+                      colorMonto="text-orange-500"
+                      confirming={confirmingId === m.id}
+                      subrubro={subrubroDe(m)}
+                      onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
+                      selectable
+                      selected={selectedIds.has(m.id)}
+                      onToggleSelect={toggleSelection}
+                    />
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

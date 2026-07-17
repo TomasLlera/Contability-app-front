@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet } from 'lucide-react';
+import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet, HandCoins, Receipt } from 'lucide-react';
 import { EntityIcon, ICON_LIST } from '../icons';
 
 
@@ -34,7 +34,9 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
   );
   const [notas, setNotas] = useState(subrubro?.notas || '');
   const [metodoPagoDefault, setMetodoPagoDefault] = useState(subrubro?.metodo_pago_default || 'ambas');
+  const [tipoSubrubro, setTipoSubrubro] = useState(subrubro?.tipo_subrubro || 'factura');
   const [saving, setSaving] = useState(false);
+  const esDeuda = tipoSubrubro === 'deuda';
 
   useEffect(() => {
     setNombre(subrubro?.nombre || '');
@@ -50,6 +52,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     setDiaMesVencimiento(subrubro?.dia_mes_vencimiento != null ? String(subrubro.dia_mes_vencimiento) : '');
     setNotas(subrubro?.notas || '');
     setMetodoPagoDefault(subrubro?.metodo_pago_default || 'ambas');
+    setTipoSubrubro(subrubro?.tipo_subrubro || 'factura');
   }, [subrubro?.id]);
 
   const handleSubmit = async (e) => {
@@ -104,6 +107,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         dia_semana_vencimiento: diaSemana,
         dia_mes_vencimiento: diaMes,
         metodo_pago_default: metodoPagoDefault,
+        tipo_subrubro: tipoSubrubro,
         notas: notas.trim(),
       });
     } finally {
@@ -151,6 +155,36 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
               ))}
             </div>
           )}
+        </div>
+
+        {/* Tipo de subrubro: proveedor (facturas a pagar) o deuda (dinero a cobrar) */}
+        <div>
+          <label className={labelCls}>Tipo de subrubro</label>
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
+            {[
+              { value: 'factura', label: 'Facturas / Gastos', Icon: Receipt, activeCls: 'bg-blue-600 text-white' },
+              { value: 'deuda',   label: 'Deuda a cobrar',    Icon: HandCoins, activeCls: 'bg-orange-500 text-white' },
+            ].map(t => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTipoSubrubro(t.value)}
+                className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
+                  tipoSubrubro === t.value
+                    ? t.activeCls
+                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
+                }`}
+              >
+                <t.Icon size={14} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-slate-400">
+            {esDeuda
+              ? 'Registra plata que te DEBEN (préstamos a otros locales/personas). Cargás deudas y abonos; los abonos entran como ingresos en la Caja del Día.'
+              : 'Registra facturas de proveedores a pagar y sus pagos (comportamiento clásico).'}
+          </p>
         </div>
 
         <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-1">
@@ -211,7 +245,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                   onChange={e => setDiaVencimiento(e.target.value)}
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Cada factura vence N días después de su fecha (ej: 30 = vence 30 días después de emitida).
+                  Cada {esDeuda ? 'deuda' : 'factura'} vence N días después de su fecha (ej: 30 = vence 30 días después de {esDeuda ? 'registrada' : 'emitida'}).
                 </p>
               </>
             )}
@@ -229,7 +263,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                   ))}
                 </select>
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Cada factura vence el próximo día elegido. Si se emite ese mismo día, vence el de la semana siguiente.
+                  Cada {esDeuda ? 'deuda' : 'factura'} vence el próximo día elegido. Si se {esDeuda ? 'registra' : 'emite'} ese mismo día, vence el de la semana siguiente.
                 </p>
               </>
             )}
@@ -247,7 +281,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                   ))}
                 </select>
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Cada factura vence ese día fijo del mes. Si ese día ya pasó, vence el del mes siguiente. En meses más cortos (ej: febrero) se ajusta al último día.
+                  Cada {esDeuda ? 'deuda' : 'factura'} vence ese día fijo del mes. Si ese día ya pasó, vence el del mes siguiente. En meses más cortos (ej: febrero) se ajusta al último día.
                 </p>
               </>
             )}
@@ -296,7 +330,9 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
             <option value="efectivo">Efectivo (automático)</option>
           </select>
           <p className="mt-1 text-[11px] text-slate-400">
-            Si elegís un método fijo, los pagos de este subrubro lo toman automáticamente y aparecen en esa sección de Caja del día. Con "Ambas" se elige al momento de cargar.
+            {esDeuda
+              ? 'Si elegís un método fijo, los abonos de este subrubro lo toman automáticamente y entran como ingresos con ese método en la Caja del día. Con "Ambas" se elige al momento de cargar.'
+              : 'Si elegís un método fijo, los pagos de este subrubro lo toman automáticamente y aparecen en esa sección de Caja del día. Con "Ambas" se elige al momento de cargar.'}
           </p>
         </div>
 

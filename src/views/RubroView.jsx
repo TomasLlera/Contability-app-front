@@ -283,6 +283,11 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
                       <p className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 transition-colors truncate">
                         {sub.nombre}
                       </p>
+                      {sub.tipo_subrubro === 'deuda' && (
+                        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                          Deuda
+                        </span>
+                      )}
                     </div>
                     <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-400 transition-colors absolute right-0 shrink-0" />
                   </div>
@@ -303,8 +308,14 @@ export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Saldo pendiente</p>
-                        <p className={`text-xs sm:text-sm font-bold truncate ${stats[sub.id].saldo > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">
+                          {sub.tipo_subrubro === 'deuda' ? 'A cobrar' : 'Saldo pendiente'}
+                        </p>
+                        <p className={`text-xs sm:text-sm font-bold truncate ${
+                          stats[sub.id].saldo > 0
+                            ? (sub.tipo_subrubro === 'deuda' ? 'text-orange-600' : 'text-red-600')
+                            : 'text-emerald-600'
+                        }`}>
                           {fmt(stats[sub.id].saldo)}
                         </p>
                       </div>

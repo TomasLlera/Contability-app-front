@@ -40,7 +40,7 @@ function mesActualKey() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function TipoBadge({ mov }) {
+function TipoBadge({ mov, deuda = false }) {
   if (mov.tipo === 'nota_credito')
     return <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-full"><FileText size={11} /> NC</span>;
   if (mov.tipo === 'ajuste')
@@ -50,14 +50,21 @@ function TipoBadge({ mov }) {
       </span>
     );
   if (mov.tipo === 'pago' || ((mov.pago || 0) > 0 && !(mov.monto > 0)))
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full"><ArrowDownCircle size={11} /> Pago</span>;
+    return deuda
+      ? <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full"><ArrowDownCircle size={11} /> Abono</span>
+      : <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full"><ArrowDownCircle size={11} /> Pago</span>;
   if (mov.pagado)
-    return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full"><CheckCircle2 size={11} /> Pagada</span>;
-  return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendiente</span>;
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border border-green-200 dark:border-green-800 px-2 py-0.5 rounded-full"><CheckCircle2 size={11} /> {deuda ? 'Cobrada' : 'Pagada'}</span>;
+  return deuda
+    ? <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Por cobrar</span>
+    : <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendiente</span>;
 }
 
 export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   const isAdmin = role !== 'viewer';
+  // Subrubro DEUDA (dinero a cobrar): mismos datos, otra semántica visual —
+  // 'factura' se muestra como Deuda (rojo/naranja) y 'pago' como Abono (verde).
+  const esDeudaSub = subrubro.tipo_subrubro === 'deuda';
   const [data, setData] = useState({ movimientos: [], monto_base: 0, saldo_total: null, saldo_anterior: null });
   const [campos, setCampos] = useState([]);
   const [mesActual, setMesActual] = useState(mesActualKey);
@@ -227,7 +234,14 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
         </button>
         <div className="min-w-0">
           <p className="text-xs text-slate-400 uppercase tracking-wide font-medium truncate">{rubro.nombre}</p>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 truncate">{subrubro.nombre}</h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 truncate">{subrubro.nombre}</h1>
+            {esDeudaSub && (
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                Deuda a cobrar
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -235,28 +249,28 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           no entra en media pantalla con text-xl y desborda la tarjeta. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">Total facturado</p>
-          <p className="text-base sm:text-xl font-bold text-slate-800 dark:text-slate-100 mt-1 tabular-nums truncate">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Total adeudado' : 'Total facturado'}</p>
+          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums truncate ${esDeudaSub ? 'text-orange-600' : 'text-slate-800 dark:text-slate-100'}`}>
             {fmt(data.movimientos.reduce((s, m) => s + (m.monto || 0), 0))}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">Total pagado</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Total abonado' : 'Total pagado'}</p>
           <p className="text-base sm:text-xl font-bold text-green-700 mt-1 tabular-nums truncate">
             {fmt(data.movimientos.reduce((s, m) => s + (m.pago || 0), 0))}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">Saldo a vencer</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Deuda a vencer' : 'Saldo a vencer'}</p>
           <p className="text-base sm:text-xl font-bold text-amber-600 mt-1 tabular-nums truncate">
             {fmt(saldoAVencer)}
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{vencProxima ? vencProxima.label : 'Sin vencimientos'}</p>
         </div>
         <div className={`rounded-xl p-3 sm:p-4 border min-w-0 ${saldoPositivo ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'}`}>
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">Saldo pendiente</p>
-          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums truncate ${saldoPositivo ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(saldoFinal)}</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{todasFacturasPendientes.length} factura{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Saldo a cobrar' : 'Saldo pendiente'}</p>
+          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums truncate ${!saldoPositivo ? 'text-red-600' : esDeudaSub && saldoFinal > 0.005 ? 'text-orange-600' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(saldoFinal)}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{todasFacturasPendientes.length} {esDeudaSub ? 'deuda' : 'factura'}{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
@@ -376,8 +390,8 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
               <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
                 <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide sticky left-0 z-10 bg-slate-50 dark:bg-slate-700/60">Fecha</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Doc.</th>
-                <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monto</th>
-                <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Pago</th>
+                <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Deuda' : 'Monto'}</th>
+                <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Abono' : 'Pago'}</th>
                 <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Método</th>
                 {camposNumericos.map(c => (
@@ -408,8 +422,9 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
 
                 const rowCls = esFactura && m.pagado
                   ? 'bg-green-50/50 dark:bg-green-900/10'
-                  : (esPago || esNC) ? 'bg-blue-50/30 dark:bg-blue-900/10'
+                  : (esPago || esNC) ? (esDeudaSub ? 'bg-green-50/40 dark:bg-green-900/10' : 'bg-blue-50/30 dark:bg-blue-900/10')
                   : esAjuste ? 'bg-orange-50/30 dark:bg-orange-900/10'
+                  : esDeudaSub && esFactura ? 'bg-orange-50/30 dark:bg-orange-900/10'
                   : '';
 
                 return (
@@ -422,29 +437,31 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                     </td>
 
                     <td className="px-3 sm:px-4 py-3">
-                      {esFactura && m.documento && (
+                      {esFactura && (esDeudaSub || m.documento) && (
                         <span
                           className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            m.documento === 'remito'
-                              ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                            esDeudaSub
+                              ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400'
+                              : m.documento === 'remito'
+                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
                           }`}
                         >
-                          {m.documento === 'remito' ? 'Remito' : 'Factura'}
+                          {esDeudaSub ? 'Deuda' : m.documento === 'remito' ? 'Remito' : 'Factura'}
                         </span>
                       )}
                     </td>
 
                     <td className="px-3 sm:px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {(m.monto || 0) > 0
-                        ? <span className="text-slate-800 dark:text-slate-100">+{fmt(m.monto)}</span>
+                        ? <span className={esDeudaSub ? 'text-orange-600 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100'}>+{fmt(m.monto)}</span>
                         : <span className="text-slate-300 dark:text-slate-600">—</span>
                       }
                     </td>
 
                     <td className="px-3 sm:px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {(m.pago || 0) > 0 ? (
-                        <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : 'text-blue-600'}>
+                        <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : esDeudaSub ? 'text-green-600' : 'text-blue-600'}>
                           −{fmt(m.pago)}
                         </span>
                       ) : <span className="text-slate-300">—</span>
@@ -499,7 +516,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                     </td>
 
                     <td className="px-3 sm:px-4 py-3">
-                      <TipoBadge mov={m} />
+                      <TipoBadge mov={m} deuda={esDeudaSub} />
                     </td>
 
                     {camposTexto.map(c => {
@@ -563,6 +580,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
             campos={campos}
             movimiento={editingMov}
             metodoDefault={subrubro.metodo_pago_default || 'ambas'}
+            tipoSubrubro={subrubro.tipo_subrubro || 'factura'}
             todasFacturasPendientes={(() => {
               // Al editar un pago vinculado, incluir también las facturas ya pagadas
               // por ese pago (que no aparecerían en la lista de pendientes)

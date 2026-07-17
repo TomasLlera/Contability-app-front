@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2 } from 'lucide-react';
+import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2, HandCoins } from 'lucide-react';
 import { newIdemKey } from '../api';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
@@ -10,7 +10,17 @@ const TIPOS = [
   { value: 'nota_credito', label: 'Nota de Crédito',  Icon: FileMinus,  hint: 'Crédito emitido por el proveedor' },
 ];
 
-export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel, metodoDefault = 'ambas' }) {
+// Subrubro DEUDA (dinero a cobrar): mismos tipos internos ('factura' = deuda,
+// 'pago' = abono) pero presentados con su semántica real. Sin nota de crédito.
+const TIPOS_DEUDA = [
+  { value: 'factura', label: 'Deuda',  Icon: HandCoins,  hint: 'Dinero que te deben' },
+  { value: 'pago',    label: 'Abono',  Icon: CreditCard, hint: 'Pago recibido de la deuda' },
+];
+
+export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel, metodoDefault = 'ambas', tipoSubrubro = 'factura' }) {
+  // Modo DEUDA: cambia etiquetas, colores y oculta remito/percepciones/NC.
+  const esDeudaSub = tipoSubrubro === 'deuda';
+  const palabraDoc = esDeudaSub ? 'deuda' : 'factura';
   const today = new Date().toISOString().split('T')[0];
 
   const tipoInicial = movimiento?.tipo || 'factura';
@@ -203,12 +213,14 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         fecha_vencimiento: fechaVenc || null,
         campos_extra: camposExtra,
         facturas_vinculadas_ids: [],
-        documento,
+        // Una DEUDA a cobrar nunca es remito (el backend también lo fuerza).
+        documento: esDeudaSub ? 'factura' : documento,
         // Método de pago de la factura: viaja a la Caja del Día al vencer. Remito = efectivo.
-        metodo_pago: esRemito ? 'efectivo' : (metodoPago || null),
-        // Un remito nunca lleva percepciones (el backend también las fuerza a 0).
-        percepcion_iva: esRemito ? 0 : (Number(percepcionIva) || 0),
-        ingresos_brutos: esRemito ? 0 : (Number(ingresosBrutos) || 0),
+        // La deuda no genera gasto en Caja: el método se define recién en el abono.
+        metodo_pago: esDeudaSub ? null : esRemito ? 'efectivo' : (metodoPago || null),
+        // Un remito o una deuda nunca llevan percepciones.
+        percepcion_iva: (esRemito || esDeudaSub) ? 0 : (Number(percepcionIva) || 0),
+        ingresos_brutos: (esRemito || esDeudaSub) ? 0 : (Number(ingresosBrutos) || 0),
         idempotency_key: idemKeyRef.current,
       };
     }
@@ -258,14 +270,15 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
 
       {/* Selector de tipo */}
       <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
-        {TIPOS.map(t => (
+        {(esDeudaSub ? TIPOS_DEUDA : TIPOS).map(t => (
           <button
             key={t.value}
             type="button"
             onClick={() => handleChangeTipo(t.value)}
+            title={t.hint}
             className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
               tipo === t.value
-                ? 'bg-blue-600 text-white'
+                ? (esDeudaSub ? (t.value === 'factura' ? 'bg-orange-500 text-white' : 'bg-green-600 text-white') : 'bg-blue-600 text-white')
                 : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
             }`}
           >
@@ -281,9 +294,11 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         <input type="date" className={inputCls} value={fecha} max={today} onChange={e => setFecha(e.target.value)} required />
       </div>
 
-      {/* ── FACTURA ── */}
+      {/* ── FACTURA / DEUDA ── */}
       {tipo === 'factura' && (
         <>
+          {/* Documento (factura/remito): no aplica a una deuda a cobrar. */}
+          {!esDeudaSub && (
           <div>
             <label className={labelCls}>Documento</label>
             <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
@@ -300,9 +315,12 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               ))}
             </div>
           </div>
+          )}
 
           {/* Método de pago de la factura — viaja a la Caja del Día cuando vence.
-              Remito: fijo en efectivo. Si el subrubro tiene método fijo, tampoco es editable. */}
+              Remito: fijo en efectivo. Si el subrubro tiene método fijo, tampoco es editable.
+              Una DEUDA a cobrar no genera gasto en Caja: el método se define en el abono. */}
+          {!esDeudaSub && (
           <div>
             <label className={labelCls}>
               Método de pago <span className="text-slate-400">(al vencer, aparece así en la Caja del Día)</span>
@@ -339,16 +357,19 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               <p className="mt-1 text-xs text-slate-400">Sin definir — al vencer aparece en la Caja sin método asignado.</p>
             )}
           </div>
+          )}
 
-          {/* Percepciones — no aplican al remito. */}
-          {!esRemito && percepcionesBlock}
+          {/* Percepciones — no aplican al remito ni a una deuda a cobrar. */}
+          {!esRemito && !esDeudaSub && percepcionesBlock}
 
           <div>
             <label className={labelCls}>
-              Monto <span className="text-slate-400">(boleta/importe)</span>
+              {esDeudaSub
+                ? <>Monto de la deuda <span className="text-orange-500">(suma a lo que te deben)</span></>
+                : <>Monto <span className="text-slate-400">(boleta/importe)</span></>}
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 text-sm font-semibold">+</span>
+              <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esDeudaSub ? 'text-orange-500' : 'text-green-600'}`}>+</span>
               <input type="number" min="0" step="any" className={inputNumCls} placeholder="0"
                 value={monto} onChange={e => setMonto(e.target.value)} />
             </div>
@@ -396,12 +417,16 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         </>
       )}
 
-      {/* ── PAGO / NOTA DE CRÉDITO ── */}
+      {/* ── PAGO / ABONO / NOTA DE CRÉDITO ── */}
       {esPagoONC && (
         <>
           {tipo === 'pago' && (
             <div>
-              <label className={labelCls}>Método de pago</label>
+              <label className={labelCls}>
+                {esDeudaSub
+                  ? <>Método del abono <span className="text-slate-400">(entra como ingreso en la Caja del Día)</span></>
+                  : 'Método de pago'}
+              </label>
               <div className={`flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium ${metodoFijo ? 'opacity-90' : ''}`}>
                 {[
                   { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
@@ -439,10 +464,11 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
 
           <div>
             <label className={labelCls}>
-              {tipo === 'nota_credito' ? 'Monto de la nota de crédito' : 'Monto del pago'}
+              {tipo === 'nota_credito' ? 'Monto de la nota de crédito' : esDeudaSub ? 'Monto del abono' : 'Monto del pago'}
+              {esDeudaSub && <span className="ml-1 font-normal text-green-600">(reduce la deuda)</span>}
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 text-sm font-semibold">−</span>
+              <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esDeudaSub ? 'text-green-600' : 'text-blue-500'}`}>−</span>
               <input type="number" min="0" step="any"
                 className={inputNumCls}
                 placeholder="0"
@@ -455,7 +481,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className={labelCls + ' mb-0'}>
-                  Vincular a facturas específicas
+                  Vincular a {esDeudaSub ? 'deudas' : 'facturas'} específicas
                   <span className="ml-1 text-slate-400 font-normal">(opcional)</span>
                 </label>
                 {facturasSeleccionadas.size > 0 && (
@@ -501,16 +527,16 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                     <p className="text-amber-600 dark:text-amber-400">⚠ Esta factura ya tiene una NC/pago vinculado — se muestra el saldo restante.</p>
                   )}
                   <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                    <span>Saldo de facturas seleccionadas:</span>
+                    <span>Saldo de {esDeudaSub ? 'deudas' : 'facturas'} seleccionadas:</span>
                     <span className="font-semibold">{fmt(totalSeleccionado)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                    <span>Monto del {tipo === 'nota_credito' ? 'crédito' : 'pago'}:</span>
+                    <span>Monto del {tipo === 'nota_credito' ? 'crédito' : esDeudaSub ? 'abono' : 'pago'}:</span>
                     <span className="font-semibold">{fmt(montoPago)}</span>
                   </div>
                   {diferencia > 0.005 && (
                     <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
-                      <span>Saldo que queda pendiente en la factura:</span>
+                      <span>Saldo que queda pendiente en la {palabraDoc}:</span>
                       <span>{fmt(diferencia)}</span>
                     </div>
                   )}
@@ -558,7 +584,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 <p className="text-slate-500 dark:text-slate-400 text-xs">Quedan {fmt(preview.restante)} sin asignar.</p>
               )}
               {preview.aplicadas.length === 0 && (
-                <p className="text-amber-700 dark:text-amber-400 text-xs">No hay facturas con saldo pendiente.</p>
+                <p className="text-amber-700 dark:text-amber-400 text-xs">No hay {esDeudaSub ? 'deudas' : 'facturas'} con saldo pendiente.</p>
               )}
             </div>
           )}
@@ -566,7 +592,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
           {hayVinculacion && !excedeNC && (
             <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 text-xs">
               <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1">
-                Cómo se aplica sobre el saldo de cada factura:
+                Cómo se aplica sobre el saldo de cada {palabraDoc}:
               </p>
               <ul className="space-y-0.5">
                 {previewVinculadas().map(({ f, saldo, aplicado, saldoNuevo }) => (
