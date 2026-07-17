@@ -27,6 +27,27 @@ function vencInfo(dias) {
   return { label: `${dias}d`, dot: 'bg-blue-400', row: 'border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400' };
 }
 
+// Desglose efectivo / transferencia de un grupo de movimientos de caja.
+// Muestra solo los métodos con monto; "Sin método" cubre pendientes sin definir.
+function DesgloseMetodo({ movs }) {
+  const suma = (fn) => movs.filter(fn).reduce((s, m) => s + m.monto, 0);
+  const efectivo      = suma(m => m.metodo === 'efectivo');
+  const transferencia = suma(m => m.metodo === 'transferencia');
+  const sinMetodo     = suma(m => !m.metodo);
+  if (efectivo <= 0 && transferencia <= 0 && sinMetodo <= 0) return null;
+  return (
+    <div className="flex items-center gap-3 pl-5 mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+      {efectivo > 0 && (
+        <span className="flex items-center gap-1"><Banknote size={10} /> {fmt(efectivo)}</span>
+      )}
+      {transferencia > 0 && (
+        <span className="flex items-center gap-1"><ArrowLeftRight size={10} /> {fmt(transferencia)}</span>
+      )}
+      {sinMetodo > 0 && <span>Sin método {fmt(sinMetodo)}</span>}
+    </div>
+  );
+}
+
 function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick }) {
   const isInteractive = typeof onClick === 'function';
   return (
@@ -258,10 +279,13 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const saldoCuentaMov     = cajaHoy.find(m => m.tipo === 'saldo_cuenta');
   // confirmado === false = deuda por cobrar todavía sin cobrar: no es un ingreso del día.
   const ingresosExtra      = cajaHoy.filter(m => m.tipo === 'ingreso_extra' && m.confirmado !== false);
+  // Deudas por cobrar del día: ingresos espejados desde un subrubro DEUDA, pendientes de cobro.
+  const deudasPendientes   = cajaHoy.filter(m => m.tipo === 'ingreso_extra' && m.confirmado === false);
   const empleados          = cajaHoy.filter(m => m.tipo === 'empleado');
   const totalConfirmados   = gastosConfirmados.reduce((s, m) => s + m.monto, 0);
   const totalPendientes    = gastosPendientes.reduce((s, m) => s + m.monto, 0);
   const totalIngresoExtra  = ingresosExtra.reduce((s, m) => s + m.monto, 0);
+  const totalDeudas        = deudasPendientes.reduce((s, m) => s + m.monto, 0);
   const totalEmpleados     = empleados.reduce((s, m) => s + m.monto, 0);
 
   const tieneAlertas = vencidos.length > 0 || gastosPendientes.length > 0;
@@ -380,19 +404,36 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 </div>
               )}
               {gastosConfirmados.length > 0 && (
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Check size={11} className="text-green-500" /> {gastosConfirmados.length} gasto{gastosConfirmados.length !== 1 ? 's' : ''} confirmado{gastosConfirmados.length !== 1 ? 's' : ''}
-                  </span>
-                  <span className="text-sm font-semibold text-red-500">− {fmt(totalConfirmados)}</span>
+                <div className="py-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Check size={11} className="text-green-500" /> {gastosConfirmados.length} gasto{gastosConfirmados.length !== 1 ? 's' : ''} confirmado{gastosConfirmados.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-sm font-semibold text-red-500">− {fmt(totalConfirmados)}</span>
+                  </div>
+                  <DesgloseMetodo movs={gastosConfirmados} />
                 </div>
               )}
               {gastosPendientes.length > 0 && (
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Clock size={11} className="text-amber-500" /> {gastosPendientes.length} sin confirmar
-                  </span>
-                  <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{fmt(totalPendientes)}</span>
+                <div className="py-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Clock size={11} className="text-amber-500" /> {gastosPendientes.length} pago{gastosPendientes.length !== 1 ? 's' : ''} sin confirmar
+                    </span>
+                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{fmt(totalPendientes)}</span>
+                  </div>
+                  <DesgloseMetodo movs={gastosPendientes} />
+                </div>
+              )}
+              {deudasPendientes.length > 0 && (
+                <div className="py-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Clock size={11} className="text-orange-500" /> {deudasPendientes.length} deuda{deudasPendientes.length !== 1 ? 's' : ''} por cobrar
+                    </span>
+                    <span className="text-sm font-semibold text-orange-500">{fmt(totalDeudas)}</span>
+                  </div>
+                  <DesgloseMetodo movs={deudasPendientes} />
                 </div>
               )}
             </div>
