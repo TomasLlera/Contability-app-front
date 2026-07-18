@@ -165,7 +165,7 @@ const LOCAL_BADGES = [
 export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, onNavigate, onViewChange, onOpenGrafica }) {
   const [vencimientos, setVencimientos] = useState([]);
   const [loadingVenc, setLoadingVenc] = useState(true);
-  const [rangoVenc, setRangoVenc] = useState(30);
+  const [rangoVenc, setRangoVenc] = useState(7);
   // Filtro de vencimientos por local. Set vacío = "Todos" (sin filtrar).
   const [localesSel, setLocalesSel] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('dash_venc_locales') || '[]')); }

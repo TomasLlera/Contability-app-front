@@ -177,7 +177,19 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
       }
       toast.success('Movimiento guardado');
       onSaved?.();
-      onClose();
+      // Mantener el modal abierto conservando rubro/subrubro/tipo para encadenar
+      // varias cargas sin re-ingresar. Se limpian solo los datos propios de la
+      // boleta y se renueva la clave de idempotencia (si no, el backend
+      // deduplicaría la próxima alta por ser la misma clave).
+      idemKeyRef.current = newIdemKey();
+      setMonto('');
+      setFacturaSel('');
+      setPercepcionIva('');
+      setIngresosBrutos('');
+      // Tras un pago/NC cambió el saldo de las boletas: refrescar el listado.
+      if (esPago && subrubroId) {
+        cajaApi.getFacturasPendientes(subrubroId).then(setFacturas).catch(() => {});
+      }
     } catch (err) {
       toast.error(getErrorMsg(err));
     } finally {
@@ -350,7 +362,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600">
-              Cancelar
+              Cerrar
             </button>
             <button type="submit" disabled={saving || !Number(monto) || !subrubroId}
               className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">

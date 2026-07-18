@@ -114,12 +114,16 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     .filter(f => facturasSeleccionadas.has(f.id))
     .reduce((s, f) => s + saldoFactura(f), 0);
 
-  // Autocompletar el monto con el saldo seleccionado SOLO cuando el usuario cambia
-  // la selección. En el primer render (modo edición) se saltea: si no, pisaría el
-  // monto original del pago/NC que se está editando.
+  // Autocompletar el monto con el saldo seleccionado como comodidad, PERO solo
+  // mientras el usuario no haya tocado el monto a mano. Apenas escribe (o si está
+  // editando un pago/NC que ya trae monto), se respeta su valor: cambiar la
+  // selección de boletas ya no lo pisa. Así se puede aplicar un monto distinto
+  // al total seleccionado y seguir moviendo las boletas vinculadas.
+  const pagoManualRef = useRef(movimiento?.pago > 0);
   const selInicialRef = useRef(true);
   useEffect(() => {
     if (selInicialRef.current) { selInicialRef.current = false; return; }
+    if (pagoManualRef.current) return;
     if (facturasSeleccionadas.size > 0) setPago(String(totalSeleccionado));
   }, [facturasSeleccionadas]);
 
@@ -129,6 +133,9 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // Una NC nunca puede superar el saldo de las facturas a las que se aplica
   // (un pago sí: el excedente queda como crédito libre). Bloquea el guardado.
   const excedeNC = tipo === 'nota_credito' && hayVinculacion && diferencia < -0.005;
+  // Una NC se aplica a UNA sola boleta: vincular 2+ no está permitido. Bloquea el
+  // guardado. Un pago sí puede aplicarse a varias.
+  const ncMultiple = tipo === 'nota_credito' && facturasSeleccionadas.size > 1;
 
   const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -168,9 +175,14 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const handleChangeTipo = (t) => {
     setTipo(t);
     if (t === 'factura') {
+      // El monto (pago) se vacía: se reactiva el autocompletado para el próximo
+      // pago/NC (queda automático hasta que el usuario vuelva a escribir).
+      pagoManualRef.current = false;
       setPago('');
       setFacturasSeleccionadas(new Set());
     } else {
+      // Pago ↔ NC comparten el campo del monto: se preserva su valor Y la marca
+      // manual, para no pisar el monto al elegir otra boleta tras el cambio.
       setMonto('');
     }
   };
@@ -187,6 +199,8 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
       // NC mayor al saldo de las facturas vinculadas: bloqueada (el backend
       // también la rechaza con 400).
       if (excedeNC) return;
+      // NC vinculada a más de una boleta: no permitido.
+      if (ncMultiple) return;
       payload = {
         tipo,
         pago: p,
@@ -473,7 +487,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                 className={inputNumCls}
                 placeholder="0"
                 value={pago}
-                onChange={e => setPago(e.target.value)} />
+                onChange={e => { pagoManualRef.current = true; setPago(e.target.value); }} />
             </div>
           </div>
 
@@ -520,6 +534,12 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                   );
                 })}
               </div>
+
+              {ncMultiple && (
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                  ⚠ Una nota de crédito solo puede aplicarse a una boleta — dejá una sola seleccionada.
+                </p>
+              )}
 
               {hayVinculacion && (
                 <div className="mt-2 space-y-1 text-xs">
@@ -589,7 +609,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             </div>
           )}
 
-          {hayVinculacion && !excedeNC && (
+          {hayVinculacion && !excedeNC && !ncMultiple && (
             <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 text-xs">
               <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1">
                 Cómo se aplica sobre el saldo de cada {palabraDoc}:
@@ -616,7 +636,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         </button>
         <button
           type="submit"
-          disabled={saving || excedeNC || (esPagoONC ? !Number(pago) : !Number(monto))}
+          disabled={saving || excedeNC || ncMultiple || (esPagoONC ? !Number(pago) : !Number(monto))}
           className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar'}
