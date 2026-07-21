@@ -3,7 +3,8 @@ import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
-  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink, HandCoins
+  Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink, HandCoins,
+  HelpCircle, Percent
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
@@ -461,7 +462,85 @@ function MetodoBadge({ metodo }) {
   return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-dashed border-amber-300 dark:border-amber-700">Sin definir</span>;
 }
 
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect }) {
+// Tipo de comprobante de respaldo del movimiento de origen (campo derivado que el
+// backend adjunta desde Movimiento.documento). Los gastos manuales no tienen
+// comprobante enlazado y no muestran badge.
+function DocumentoBadge({ documento }) {
+  if (documento === 'factura')
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">Factura</span>;
+  if (documento === 'remito')
+    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">Remito</span>;
+  return null;
+}
+
+// ── Agrupación de la lista de pagos ─────────────────────────────────────────
+// Orden fijo de secciones: primero transferencias, después efectivo y al final los
+// que todavía no tienen método (auto-sync sin confirmar) para que queden a la vista
+// como pendientes de definir.
+const GRUPOS_METODO = [
+  { key: 'transferencia', label: 'Transferencias', icon: ArrowLeftRight, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-200 dark:border-blue-900' },
+  { key: 'efectivo',      label: 'Efectivo',       icon: Banknote,       color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-200 dark:border-green-900' },
+  { key: null,            label: 'Sin método',     icon: HelpCircle,     color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200 dark:border-amber-900' },
+];
+
+// El sync de remitos guarda el concepto con el prefijo "Remito — " (db.js). Con el
+// badge de comprobante a la vista el prefijo es redundante, y además mandaría al
+// remito a la "R" al ordenar, separándolo de la factura del mismo proveedor. Se
+// quita para mostrar y para ordenar; el dato en la base queda intacto.
+const conceptoLimpio = (m) =>
+  m.documento === 'remito'
+    ? (m.concepto || '').replace(/^Remito\s+—\s+/, '')
+    : (m.concepto || '');
+
+// sensitivity 'base' para que acentos y mayúsculas no rompan el orden
+// ("Álvarez" cae junto a "Alvarez").
+const collator = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
+
+// Devuelve solo los grupos con ítems, en el orden de GRUPOS_METODO y con cada grupo
+// ordenado A-Z por proveedor. No muta ni filtra datos: es puro reordenamiento de
+// presentación.
+//
+// `nombreDe` resuelve el nombre del proveedor (el subrubro vinculado, con fallback al
+// concepto). Ordenar por proveedor y NO por el concepto crudo es lo que mantiene
+// juntos al remito y a la factura del mismo proveedor en el mismo día: sus conceptos
+// difieren ("Remito — X" vs "X"), su proveedor no.
+function agruparPorMetodo(items, nombreDe) {
+  const ordenar = (a, b) =>
+    collator.compare(nombreDe(a), nombreDe(b))
+    // Mismo proveedor: factura primero, remito después. Desempate final por id para
+    // que el orden sea estable entre renders.
+    || (a.documento === 'remito' ? 1 : 0) - (b.documento === 'remito' ? 1 : 0)
+    || a.id - b.id;
+
+  return GRUPOS_METODO
+    .map(g => ({ ...g, items: items.filter(m => (m.metodo || null) === g.key).sort(ordenar) }))
+    .filter(g => g.items.length > 0);
+}
+
+// Encabezado de sección de método: ícono, label, contador y subtotal del grupo.
+function GrupoHeader({ grupo }) {
+  const Icon = grupo.icon;
+  const total = grupo.items.reduce((s, m) => s + (m.monto || 0), 0);
+  return (
+    <div className={`flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-lg border ${grupo.bg} ${grupo.border}`}>
+      <Icon size={13} className={`${grupo.color} shrink-0`} />
+      <span className={`text-xs font-semibold uppercase tracking-wide ${grupo.color}`}>{grupo.label}</span>
+      <span className="text-xs text-slate-400 dark:text-slate-500">({grupo.items.length})</span>
+      <span className="ml-auto text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmt(total)}</span>
+    </div>
+  );
+}
+
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false }) {
+  // Acordeón de descuento: arranca cerrado siempre (también después de confirmar) para
+  // no ocupar espacio; se abre a demanda, ya sea para cargar el descuento o para
+  // consultar el detalle de uno ya aplicado.
+  const [descOpen, setDescOpen] = useState(false);
+  const [descInput, setDescInput] = useState('');
+  // Modo de carga del descuento: 'monto' = pesos fijos · 'pct' = porcentaje sobre el
+  // bruto. El mismo "7" significa $7 o 7% según este toggle, así que la unidad tiene
+  // que estar siempre visible al lado del input.
+  const [descModo, setDescModo] = useState('monto');
   // Cobro de deuda: ingreso auto-sincronizado con ciclo de confirmación (una deuda
   // por cobrar apunta a su movimiento de origen). Los ingresos manuales/espejo de
   // abono no llevan confirmación (confirmado null).
@@ -473,20 +552,43 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   // Gastos: verde si el pago está confirmado, rojo mientras está sin pagar.
   // Cobros de deuda: naranja mientras están sin cobrar, verde al confirmarse.
   // El resto de los tipos (empleados, ingresos) conservan su color de origen.
-  const montoColor = esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600')
+  // Descuento por pago ya aplicado: el ítem vale el NETO y `descuento` guarda cuánto
+  // se descontó. Es lo que pinta la fila de violeta.
+  const conDescuento = Number(m.descuento) > 0;
+  // El acordeón se ofrece para cargar el descuento (pendiente, subrubro habilitado y
+  // vinculado a una factura) o para consultar uno ya aplicado.
+  const puedeDescontar = aplicaDescuento && esPendiente && m.movimiento_id != null;
+  const mostrarAcordeon = puedeDescontar || conDescuento;
+
+  const montoColor = conDescuento ? 'text-purple-600 dark:text-purple-400'
+    : esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600')
     : esCobro ? (esPendiente ? 'text-orange-500' : 'text-green-600')
     : colorMonto;
 
+  const bruto = Number(m.monto_bruto ?? m.monto) || 0;
+  const descRaw = Number(descInput) || 0;
+  const esPct = descModo === 'pct';
+  // En modo % el importe se previsualiza acá, pero el que vale es el que recalcula el
+  // backend al confirmar (mismo criterio de redondeo a centavos en un solo lugar).
+  const descNum = esPct ? Math.round(bruto * (descRaw / 100) * 100) / 100 : descRaw;
+  const netoPreview = bruto - descNum;
+  const descValido = esPct
+    ? descRaw > 0 && descRaw < 100
+    : descRaw > 0 && descRaw < bruto;
+
   return (
-    <div
-      onClick={selectable ? () => onToggleSelect(m.id) : undefined}
-      className={`flex items-center gap-2 sm:gap-3 rounded-xl px-3 sm:px-4 py-3 border transition-colors ${selectable ? 'cursor-pointer' : ''} ${
-        selected
-          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/50'
+    <div className={`rounded-xl border transition-colors ${
+      selected
+        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/50'
+        : conDescuento
+          ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-300 dark:border-purple-800'
           : esPendiente
             ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600 border-dashed'
             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
     }`}>
+    <div
+      onClick={selectable ? () => onToggleSelect(m.id) : undefined}
+      className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 ${selectable ? 'cursor-pointer' : ''}`}>
       {selectable && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onToggleSelect(m.id); }}
           title={selected ? 'Deseleccionar' : 'Seleccionar'}
@@ -501,7 +603,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className={`text-sm font-medium truncate ${esPendiente ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
-            {m.concepto}
+            {conceptoLimpio(m)}
           </p>
           {m.es_especial && <Star size={11} className="text-amber-500 shrink-0" />}
           {subrubro && onGoToSubrubro && (
@@ -516,9 +618,18 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <MetodoBadge metodo={m.metodo} />
+          {/* Dentro de una sección agrupada por método el badge repite lo que ya dice
+              el encabezado: se omite y queda solo el tipo de comprobante y el estado. */}
+          {!hideMetodo && <MetodoBadge metodo={m.metodo} />}
+          <DocumentoBadge documento={m.documento} />
           {esPendiente && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
           {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> {esCobro ? 'Cobro confirmado' : 'Pago confirmado'}</span>}
+          {conDescuento && (
+            <span title={`Descuento de ${fmt(m.descuento)}${m.descuento_pct ? ` (${m.descuento_pct}%)` : ''} aplicado sobre ${fmt(bruto)}`}
+              className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium flex items-center gap-0.5">
+              <Percent size={9} /> Con descuento
+            </span>
+          )}
         </div>
       </div>
       {/* En mobile el monto se apila sobre las acciones: si van todos en línea, el
@@ -539,10 +650,103 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
               {confirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             </button>
           )}
+          {mostrarAcordeon && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); setDescOpen(v => !v); }}
+              title={conDescuento ? 'Ver detalle del descuento' : 'Aplicar descuento por pago'}
+              className={`p-1.5 rounded-lg shrink-0 transition-colors flex items-center gap-0.5 ${
+                conDescuento
+                  ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
+                  : 'text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/40'
+              }`}>
+              <Percent size={13} />
+              <ChevronDown size={11} className={`transition-transform ${descOpen ? 'rotate-180' : ''}`} />
+            </button>
+          )}
           <button onClick={(e) => { e.stopPropagation(); onEdit(m); }} className="p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} className="p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
         </div>
       </div>
+    </div>
+
+    {/* Acordeón de descuento. Cerrado por defecto para no ocupar espacio: se abre
+        para cargar el descuento y, una vez confirmado, solo si el usuario quiere
+        revisar los números. */}
+    {mostrarAcordeon && descOpen && (
+      <div onClick={(e) => e.stopPropagation()}
+        className="px-3 sm:px-4 pb-3 pt-1 border-t border-purple-200 dark:border-purple-900/60 mt-1">
+        {conDescuento ? (
+          // Ya confirmado con descuento: detalle de solo lectura.
+          <div className="space-y-1 text-xs pt-2">
+            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+              <span>Monto original</span><span className="font-medium">{fmt(bruto)}</span>
+            </div>
+            <div className="flex justify-between text-purple-700 dark:text-purple-300">
+              <span>Descuento aplicado{m.descuento_pct ? ` (${m.descuento_pct}%)` : ''}</span>
+              <span className="font-medium">− {fmt(m.descuento)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-slate-800 dark:text-slate-100 border-t border-purple-200 dark:border-purple-900/60 pt-1">
+              <span>Pagado (neto)</span><span>{fmt(m.monto)}</span>
+            </div>
+            {m.nc_mov_id && (
+              <p className="text-[11px] text-slate-400 pt-0.5">
+                Nota de crédito #{m.nc_mov_id} generada automáticamente — el saldo de la factura queda en cero.
+              </p>
+            )}
+          </div>
+        ) : (
+          // Pendiente: carga del descuento y confirmación en un paso.
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-600 dark:text-slate-300 shrink-0">Descuento</label>
+              {/* Selector de unidad: sin esto un "7" es ambiguo entre $7 y 7%. */}
+              <div className="flex rounded-lg border border-purple-300 dark:border-purple-800 overflow-hidden text-xs font-medium shrink-0">
+                {[['monto', '$'], ['pct', '%']].map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => setDescModo(v)}
+                    className={`w-7 py-1.5 transition-colors ${
+                      descModo === v ? 'bg-purple-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <input type="number" min="0" step="any" autoFocus
+                value={descInput} onChange={e => setDescInput(e.target.value)}
+                placeholder={esPct ? '7' : '0,00'}
+                className="flex-1 min-w-0 border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+            {esPct && descValido && (
+              <div className="flex justify-between text-xs text-purple-700 dark:text-purple-300">
+                <span>{descRaw}% de {fmt(bruto)}</span><span className="font-medium">− {fmt(descNum)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
+              <span>Monto neto a pagar</span>
+              <span className={`font-bold ${descValido ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400'}`}>
+                {descValido ? fmt(netoPreview) : fmt(bruto)}
+              </span>
+            </div>
+            {!esPct && descRaw > 0 && descRaw >= bruto && (
+              <p className="text-[11px] text-red-500">El descuento no puede ser mayor o igual al monto de la factura ({fmt(bruto)}).</p>
+            )}
+            {esPct && descRaw > 0 && descRaw >= 100 && (
+              <p className="text-[11px] text-red-500">El porcentaje debe ser menor a 100.</p>
+            )}
+            <button type="button" disabled={!descValido || confirming}
+              onClick={() => {
+                onConfirmar(m, esPct ? { descuento_pct: descRaw } : { descuento: descNum });
+                setDescOpen(false); setDescInput('');
+              }}
+              className="w-full bg-purple-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+              {confirming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              Confirmar pago con descuento
+            </button>
+            <p className="text-[11px] text-slate-400">
+              Se registra el pago por el neto y una Nota de Crédito por el descuento, para que el saldo de la factura cierre en cero.
+            </p>
+          </div>
+        )}
+      </div>
+    )}
     </div>
   );
 }
@@ -631,6 +835,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [gastosOpen, setGastosOpen] = useState(() => localStorage.getItem('cajaGastosOpen') !== '0');
   const [empleadosOpen, setEmpleadosOpen] = useState(() => localStorage.getItem('cajaEmpleadosOpen') !== '0');
   const [deudasOpen, setDeudasOpen] = useState(() => localStorage.getItem('cajaDeudasOpen') !== '0');
+  // Filtro "solo pagos con descuento". No persiste: es una lente momentánea, no una
+  // preferencia — arrancar el día con la lista filtrada sería confuso.
+  const [soloDescuentos, setSoloDescuentos] = useState(false);
   useEffect(() => { localStorage.setItem('cajaGastosOpen', gastosOpen ? '1' : '0'); }, [gastosOpen]);
   useEffect(() => { localStorage.setItem('cajaEmpleadosOpen', empleadosOpen ? '1' : '0'); }, [empleadosOpen]);
   useEffect(() => { localStorage.setItem('cajaDeudasOpen', deudasOpen ? '1' : '0'); }, [deudasOpen]);
@@ -824,7 +1031,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
     } catch (err) { toast.error('Error al guardar'); throw err; }
   };
 
-  const handleConfirmarGasto = async (m) => {
+  // `opts` = { descuento } (monto fijo) o { descuento_pct } (porcentaje). Vacío = sin
+  // descuento. El backend resuelve el % a pesos.
+  const handleConfirmarGasto = async (m, opts = {}) => {
     // Bloqueo anti doble-clic: si ya hay una operación en curso para este gasto,
     // ignorar. Sin esto, dos clics rápidos entran ambos a la rama de confirmar
     // (m.confirmado sigue siendo false en el render viejo) y crean dos pagos.
@@ -836,13 +1045,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
     setConfirmingId(m.id);
     try {
       if (m.confirmado === true) {
-        // Desconfirmar: eliminar el pago del subrubro si existe.
-        // El backend también limpia el lado de caja por defensa (sync inverso),
-        // pero acá hacemos el toggle explícito porque el usuario lo pidió.
-        if (m.pago_mov_id) {
-          try { await movimientosApi.delete(m.pago_mov_id); } catch {}
-        }
-        await cajaApi.update(m.id, { confirmado: false, pago_mov_id: null });
+        // Revertir: el backend borra el pago Y la NC de descuento (si la hubo) y
+        // devuelve el ítem a su monto bruto, en una sola operación auditada.
+        await cajaApi.revertir(m.id);
         cargar();
         toast.success('Confirmación revertida');
       } else {
@@ -855,37 +1060,30 @@ export default function CajaView({ rubros = [], onNavigate }) {
         // está viendo en la Caja (`fecha`, por defecto hoy), NO la fecha de
         // vencimiento del ítem. Así una factura que venció el 15/7 y se paga el 17/7
         // queda registrada en Caja y en el Subrubro el 17/7 (fecha del pago real).
-        const fechaConfirm = fecha;
-        await cajaApi.update(m.id, { confirmado: true, fecha: fechaConfirm });
-        if (m.subrubro_id) {
-          const pago = await movimientosApi.create(m.subrubro_id, {
-            tipo: 'pago',
-            pago: m.monto,
-            fecha: fechaConfirm,
-            concepto: `${esCobro ? 'Abono caja' : 'Pago caja'}: ${m.concepto}`,
-            metodo_pago: m.metodo,
-            caja_mov_id: m.id,
-            // Si la entrada de caja apunta a una factura puntual, vincular el pago
-            // a esa factura para que quede saldada exactamente esa (no la más vieja
-            // por FIFO) y sin afectar las facturas anteriores pendientes.
-            facturas_vinculadas_ids: m.movimiento_id ? [m.movimiento_id] : [],
-            // Clave de idempotencia determinística: una entrada de caja genera como
-            // mucho UN pago. Si por una carrera llegan dos confirmaciones, el backend
-            // devuelve el mismo pago en vez de duplicarlo. Tras revertir (se borra el
-            // pago) la clave queda libre y se puede volver a confirmar.
-            idempotency_key: `caja-confirm-${m.id}`,
-          });
-          if (pago?.id) await cajaApi.update(m.id, { pago_mov_id: pago.id });
-        }
+        //
+        // El backend hace el pago (por el neto) y la NC del descuento juntos: si algo
+        // falla, no queda un pago huérfano sin su nota de crédito.
+        const r = await cajaApi.confirmar(m.id, { ...opts, fecha });
         cargar();
-        toast.success(esCobro ? 'Cobro confirmado — sumado a los ingresos del día' : 'Pago confirmado');
+        toast.success(
+          r?.descuento
+            ? `Pago confirmado con descuento de ${fmt(r.descuento)}${r.descuento_pct ? ` (${r.descuento_pct}%)` : ''} — NC generada`
+            : esCobro ? 'Cobro confirmado — sumado a los ingresos del día' : 'Pago confirmado'
+        );
       }
-    } catch { toast.error('Error al confirmar'); }
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Error al confirmar');
+    }
     finally { confirmingRef.current.delete(m.id); setConfirmingId(null); }
   };
 
   // Subrubro vinculado a un movimiento de caja (si tiene subrubro_id resoluble).
   const subrubroDe = (m) => (m.subrubro_id ? allSubrubros.find(s => s.id === m.subrubro_id) : null);
+
+  // Clave de orden alfabético: el proveedor real (nombre del subrubro vinculado), con
+  // fallback al concepto para los gastos manuales sin subrubro. Así el remito y la
+  // factura de un mismo proveedor quedan pegados aunque sus conceptos difieran.
+  const nombreProveedor = (m) => subrubroDe(m)?.nombre || conceptoLimpio(m);
 
   // Acceso directo: navega al Subrubro de origen del movimiento para ver/editar el
   // pago real. Requiere que App haya pasado onNavigate y que el subrubro exista.
@@ -904,8 +1102,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const confirmDelete = async () => {
     const id = deleteId;
     const mov = movs.find(m => m.id === id);
-    if (mov?.pago_mov_id && mov?.confirmado === true) {
-      try { await movimientosApi.delete(mov.pago_mov_id); } catch {}
+    // Revertir antes de borrar: limpia el pago Y la NC de descuento en el subrubro.
+    // Borrar el ítem sin revertir dejaría la nota de crédito huérfana, inflando el
+    // saldo a favor de la factura.
+    if (mov?.confirmado === true && (mov.pago_mov_id || mov.nc_mov_id)) {
+      try { await cajaApi.revertir(id); } catch {}
     }
     await cajaApi.delete(id, fecha);
     setMovs(prev => prev.filter(m => m.id !== id));
@@ -967,6 +1168,12 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const deudasCobro   = movs.filter(m => m.tipo === 'ingreso_extra' && m.movimiento_id != null);
   const ingresosExtra = movs.filter(m => m.tipo === 'ingreso_extra' && m.movimiento_id == null);
   const gastos        = movs.filter(m => m.tipo === 'gasto');
+  // Filtro de presentación: aísla los pagos con descuento aplicado. Solo afecta la
+  // LISTA — los totales, el resumen del día y la selección siguen operando sobre
+  // `gastos` completo, para que filtrar la vista no altere ningún número.
+  const gastosVisibles  = soloDescuentos ? gastos.filter(m => Number(m.descuento) > 0) : gastos;
+  const hayDescuentos   = gastos.some(m => Number(m.descuento) > 0);
+  const totalDescuentos = gastos.reduce((s, m) => s + (Number(m.descuento) || 0), 0);
   // Ingresos que cuentan para el saldo del día: manuales + abonos espejados +
   // cobros de deuda YA confirmados (confirmado === false = todavía no entró la plata).
   const ingresosDia   = movs.filter(m => m.tipo === 'ingreso_extra' && m.confirmado !== false);
@@ -1234,6 +1441,17 @@ export default function CajaView({ rubros = [], onNavigate }) {
             )}
             <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${gastosOpen ? 'rotate-180' : ''}`} />
           </button>
+          {hayDescuentos && (
+            <button onClick={() => setSoloDescuentos(v => !v)}
+              title={soloDescuentos ? 'Mostrar todos los pagos' : `Ver solo los pagos con descuento (${fmt(totalDescuentos)} descontados hoy)`}
+              className={`text-xs shrink-0 ml-2 px-1.5 py-0.5 rounded-full flex items-center gap-1 transition-colors ${
+                soloDescuentos
+                  ? 'bg-purple-600 text-white'
+                  : 'text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40'
+              }`}>
+              <Percent size={10} /> {fmt(totalDescuentos)}
+            </button>
+          )}
           {gastos.length > 0 && (
             <button onClick={allGastosSelected ? clearSelection : selectAllGastos}
               className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-2">
@@ -1250,9 +1468,16 @@ export default function CajaView({ rubros = [], onNavigate }) {
             {gastos.length === 0 && !(showForm && tipoForm === 'gasto') && (
               <p className="text-xs text-slate-400 py-2 text-center">Sin gastos cargados</p>
             )}
-            {gastos.map(m => (
-              <div key={m.id} className="mb-2">
-                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} />}
+            {/* Agrupados por método (transferencias → efectivo → sin método) y dentro
+                de cada grupo alfabéticamente por proveedor/concepto. */}
+            {agruparPorMetodo(gastosVisibles, nombreProveedor).map(grupo => (
+              <div key={grupo.key ?? 'sin-metodo'} className="mb-3">
+                <GrupoHeader grupo={grupo} />
+                {grupo.items.map(m => (
+                  <div key={m.id} className="mb-2">
+                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} />}
+                  </div>
+                ))}
               </div>
             ))}
           </>
@@ -1288,23 +1513,29 @@ export default function CajaView({ rubros = [], onNavigate }) {
               {showForm && editingMov?.tipo === 'ingreso_extra' && editingMov?.movimiento_id != null && (
                 <div className="mb-2"><EntryForm {...formProps} initial={editingMov} /></div>
               )}
-              {deudasCobro.map(m => (
-                <div key={m.id} className="mb-2">
-                  {editingMov?.id === m.id && showForm ? null : (
-                    <MovRow
-                      m={m}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onConfirmar={handleConfirmarGasto}
-                      colorMonto="text-orange-500"
-                      confirming={confirmingId === m.id}
-                      subrubro={subrubroDe(m)}
-                      onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
-                      selectable
-                      selected={selectedIds.has(m.id)}
-                      onToggleSelect={toggleSelection}
-                    />
-                  )}
+              {agruparPorMetodo(deudasCobro, nombreProveedor).map(grupo => (
+                <div key={grupo.key ?? 'sin-metodo'} className="mb-3">
+                  <GrupoHeader grupo={grupo} />
+                  {grupo.items.map(m => (
+                    <div key={m.id} className="mb-2">
+                      {editingMov?.id === m.id && showForm ? null : (
+                        <MovRow
+                          m={m}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onConfirmar={handleConfirmarGasto}
+                          colorMonto="text-orange-500"
+                          confirming={confirmingId === m.id}
+                          subrubro={subrubroDe(m)}
+                          onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
+                          selectable
+                          selected={selectedIds.has(m.id)}
+                          onToggleSelect={toggleSelection}
+                          hideMetodo
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
               ))}
             </>

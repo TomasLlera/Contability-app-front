@@ -423,4 +423,12 @@ export const cajaApi = {
   saveConfig: (data) => api.put('/caja/config', data).then(r => r.data),
   autoSync: (fecha) => api.post('/caja/auto-sync', null, { params: { fecha } }).then(r => r.data),
   getFacturasPendientes: (subrubro_id) => api.get('/caja/facturas-pendientes', { params: { subrubro_id } }).then(r => r.data),
+  // Confirmar/revertir son operaciones atómicas del backend: registran (o deshacen)
+  // el pago en el subrubro y, si hubo descuento, su Nota de Crédito automática.
+  // descuento = monto fijo · descuento_pct = porcentaje (el backend lo resuelve a pesos).
+  confirmar: (id, { descuento = 0, descuento_pct = null, fecha } = {}) =>
+    api.post(`/caja/${id}/confirmar`, { descuento, descuento_pct, fecha }).then(r => r.data),
+  revertir: (id) => api.post(`/caja/${id}/revertir`).then(r => r.data),
+  // Seguimiento de descuentos: totales + detalle. Sin params trae todo el histórico.
+  getDescuentos: (params = {}) => api.get('/caja/descuentos', { params }).then(r => r.data),
 };

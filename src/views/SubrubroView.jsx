@@ -7,6 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet, Banknote, ArrowLeftRight, Edit3 } from 'lucide-react';
 import ExportModal from '../components/ExportModal';
+import DescuentosPanel from '../components/DescuentosPanel';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
@@ -363,6 +364,12 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           )}
         </div>
       </div>
+
+      {/* Historial de descuentos por pago del proveedor (solo si aplica y hubo alguno).
+          Sin rango: muestra el histórico completo del subrubro. */}
+      {subrubro.aplica_descuento && (
+        <DescuentosPanel subrubroId={subrubro.id} titulo="Descuentos obtenidos" compact />
+      )}
 
       {viewMode === 'calendario' && <CalendarioSubrubro movimientos={todosMovs} />}
 

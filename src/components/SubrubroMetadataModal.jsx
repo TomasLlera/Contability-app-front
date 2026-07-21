@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet, HandCoins, Receipt } from 'lucide-react';
+import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet, HandCoins, Receipt, Percent } from 'lucide-react';
 import { EntityIcon, ICON_LIST } from '../icons';
+import InfoTooltip from './InfoTooltip';
 
 
 // Índice = Date.getDay() → 0=domingo … 6=sábado (debe coincidir con el backend).
@@ -35,6 +36,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
   const [notas, setNotas] = useState(subrubro?.notas || '');
   const [metodoPagoDefault, setMetodoPagoDefault] = useState(subrubro?.metodo_pago_default || 'ambas');
   const [tipoSubrubro, setTipoSubrubro] = useState(subrubro?.tipo_subrubro || 'factura');
+  const [aplicaDescuento, setAplicaDescuento] = useState(!!subrubro?.aplica_descuento);
   const [saving, setSaving] = useState(false);
   const esDeuda = tipoSubrubro === 'deuda';
 
@@ -53,6 +55,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     setNotas(subrubro?.notas || '');
     setMetodoPagoDefault(subrubro?.metodo_pago_default || 'ambas');
     setTipoSubrubro(subrubro?.tipo_subrubro || 'factura');
+    setAplicaDescuento(!!subrubro?.aplica_descuento);
   }, [subrubro?.id]);
 
   const handleSubmit = async (e) => {
@@ -108,6 +111,8 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         dia_mes_vencimiento: diaMes,
         metodo_pago_default: metodoPagoDefault,
         tipo_subrubro: tipoSubrubro,
+        // Una deuda a cobrar nunca lleva descuento por pago (el backend lo revalida).
+        aplica_descuento: tipoSubrubro === 'deuda' ? false : aplicaDescuento,
         notas: notas.trim(),
       });
     } finally {
@@ -186,6 +191,26 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
               : 'Registra facturas de proveedores a pagar y sus pagos (comportamiento clásico).'}
           </p>
         </div>
+
+        {/* Descuento por pago — solo para subrubros de facturas/gastos: una deuda a
+            cobrar no lleva descuento (el backend además fuerza el flag en false). */}
+        {!esDeuda && (
+          <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-purple-200 dark:border-purple-900 bg-purple-50 dark:bg-purple-950/30 px-3 py-2.5">
+            <input
+              type="checkbox"
+              className="accent-purple-600 mt-0.5"
+              checked={aplicaDescuento}
+              onChange={e => setAplicaDescuento(e.target.checked)}
+            />
+            <span className="min-w-0">
+              <span className="text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <Percent size={12} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                Este subrubro aplica descuentos por pago
+                <InfoTooltip text="Al confirmar un pago de este proveedor en la Caja del Día se habilita un acordeón para cargar el descuento. El monto descontado genera automáticamente una Nota de Crédito vinculada a la factura, para que el saldo cierre en cero." />
+              </span>
+            </span>
+          </label>
+        )}
 
         <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-1">
           <p className="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold">

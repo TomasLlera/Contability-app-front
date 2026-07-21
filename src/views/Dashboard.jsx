@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import { EntityIcon } from '../icons';
+import DescuentosPanel, { rangoMes } from '../components/DescuentosPanel';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
   ChevronRight, ChevronLeft, ChevronDown, Building2, CheckCircle2, AlertTriangle, Banknote,
@@ -347,6 +348,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           iconText={gastosPendientes.length > 0 ? 'text-amber-500' : 'text-green-500'}
           icon={<ClipboardList size={18} />} />
       </div>
+
+      {/* Descuentos por pago del mes. Se renderiza solo si hubo alguno. */}
+      <DescuentosPanel {...rangoMes()} titulo="Descuentos aplicados este mes" />
 
       {/* Caja + Vencimientos */}
       <div className={`grid gap-4 ${vencimientos.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
