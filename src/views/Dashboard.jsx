@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import { EntityIcon } from '../icons';
-import DescuentosPanel, { rangoMes } from '../components/DescuentosPanel';
+import InfoTooltip from '../components/InfoTooltip';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
   ChevronRight, ChevronLeft, ChevronDown, Building2, CheckCircle2, AlertTriangle, Banknote,
-  ArrowLeftRight, Check, Truck, CalendarClock
+  ArrowLeftRight, Check, Truck, CalendarClock, Percent
 } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
@@ -288,6 +288,11 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const totalIngresoExtra  = ingresosExtra.reduce((s, m) => s + m.monto, 0);
   const totalDeudas        = deudasPendientes.reduce((s, m) => s + m.monto, 0);
   const totalEmpleados     = empleados.reduce((s, m) => s + m.monto, 0);
+  // Descuentos por pago aplicados HOY. Salen de la caja del día, así que la fila
+  // aparece únicamente el día en que se confirmó el pago: cada descuento generó su
+  // Nota de Crédito en el subrubro esa misma fecha y no se arrastra a los siguientes.
+  const conDescuento       = cajaHoy.filter(m => Number(m.descuento) > 0);
+  const totalDescuentos    = conDescuento.reduce((s, m) => s + Number(m.descuento), 0);
 
   const tieneAlertas = vencidos.length > 0 || gastosPendientes.length > 0;
 
@@ -348,9 +353,6 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           iconText={gastosPendientes.length > 0 ? 'text-amber-500' : 'text-green-500'}
           icon={<ClipboardList size={18} />} />
       </div>
-
-      {/* Descuentos por pago del mes. Se renderiza solo si hubo alguno. */}
-      <DescuentosPanel {...rangoMes()} titulo="Descuentos aplicados este mes" />
 
       {/* Caja + Vencimientos */}
       <div className={`grid gap-4 ${vencimientos.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
@@ -416,6 +418,16 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                     <span className="text-sm font-semibold text-red-500">− {fmt(totalConfirmados)}</span>
                   </div>
                   <DesgloseMetodo movs={gastosConfirmados} />
+                </div>
+              )}
+              {conDescuento.length > 0 && (
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Percent size={11} className="text-purple-500" />
+                    {conDescuento.length} pago{conDescuento.length !== 1 ? 's' : ''} con descuento
+                    <InfoTooltip text="Descuentos por pago aplicados hoy. Cada uno generó una Nota de Crédito automática en su subrubro con la fecha de hoy, así que el saldo de esas facturas ya está en cero. Es un movimiento puntual: no reaparece en los días siguientes." />
+                  </span>
+                  <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">− {fmt(totalDescuentos)}</span>
                 </div>
               )}
               {gastosPendientes.length > 0 && (

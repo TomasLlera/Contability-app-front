@@ -4,7 +4,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import VentaSistemaGraficosModal from '../components/VentaSistemaGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
 import InfoTooltip from '../components/InfoTooltip';
-import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import ComparativaIvaModal from '../components/ComparativaIvaModal';
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, TrendingUp, TrendingDown, Minus, Scale } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -29,6 +30,7 @@ export default function VentaSistemaView({ role }) {
   const [loading, setLoading] = useState(true);
   const [showGraficos, setShowGraficos] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showComparativa, setShowComparativa] = useState(false);
   const [confirm, setConfirm] = useState(null);
 
   // Alta
@@ -122,6 +124,9 @@ export default function VentaSistemaView({ role }) {
           onClose={() => setShowExport(false)}
         />
       )}
+      {showComparativa && (
+        <ComparativaIvaModal mes={mes} onClose={() => setShowComparativa(false)} />
+      )}
 
       {/* Navegador de mes + gráficos */}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -145,6 +150,10 @@ export default function VentaSistemaView({ role }) {
           <button onClick={() => setShowExport(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
             <FileSpreadsheet size={14} /> Exportar Excel
+          </button>
+          <button onClick={() => setShowComparativa(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
+            <Scale size={14} /> Comparativa
           </button>
           <button onClick={() => setShowGraficos(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">

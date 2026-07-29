@@ -4,9 +4,10 @@ import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
 import TarjetasGraficosModal from '../components/TarjetasGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
+import ComparativaIvaModal from '../components/ComparativaIvaModal';
 import {
   QrCode, CreditCard, Landmark, Ticket, Plus, Pencil, Trash2, Check, X, Users, BarChart3, FileSpreadsheet,
-  ChevronLeft, ChevronRight, ChevronDown,
+  ChevronLeft, ChevronRight, ChevronDown, Scale,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -57,6 +58,7 @@ export default function TarjetasView({ role }) {
   const [expandido, setExpandido] = useState(null); // tipo con el detalle abierto
   const [showMensual, setShowMensual] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showComparativa, setShowComparativa] = useState(false);
 
   // Elegir un día lleva el resumen mensual a ese mes (evita tener dos navegadores desfasados).
   const setFecha = (f) => { setFechaState(f); setMes(f.slice(0, 7)); };
@@ -71,6 +73,10 @@ export default function TarjetasView({ role }) {
   const [editId, setEditId] = useState(null);
   const [edit, setEdit] = useState({ tipo: 'qr', fecha: '', monto: '', empleado: '' });
 
+  // Se incrementa después de cada alta/edición/baja: es la señal que usa la
+  // comparativa de IVA para volver a pedir el cruce, que cambia con cada ingreso.
+  const [recarga, setRecarga] = useState(0);
+
   const cargar = useCallback(async () => {
     try {
       const [d, m] = await Promise.all([
@@ -84,6 +90,12 @@ export default function TarjetasView({ role }) {
       setLoading(false);
     }
   }, [fecha, mes]);
+
+  // Recarga los datos del día/mes y avisa a la comparativa que quedó desactualizada.
+  const recargarTodo = useCallback(async () => {
+    await cargar();
+    setRecarga(k => k + 1);
+  }, [cargar]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -105,7 +117,7 @@ export default function TarjetasView({ role }) {
       const { next, cerroCiclo } = rotarTipo(anchorTipo, form.tipo);
       setForm(f => ({ ...f, monto: '', tipo: next }));
       if (cerroCiclo) setAnchorTipo(TIPOS[0].key); // cerrado el ciclo → orden natural desde el primero
-      await cargar();
+      await recargarTodo();
       toast.success('Ingreso registrado');
     } catch (err) {
       toast.error(getErrorMsg(err));
@@ -124,7 +136,7 @@ export default function TarjetasView({ role }) {
     try {
       await registroApi.tarjetas.update(editId, edit);
       setEditId(null);
-      await cargar();
+      await recargarTodo();
       toast.success('Ingreso actualizado');
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
@@ -135,7 +147,7 @@ export default function TarjetasView({ role }) {
       try {
         await registroApi.tarjetas.delete(t.id);
         setConfirm(null);
-        await cargar();
+        await recargarTodo();
         toast.success('Ingreso eliminado');
       } catch (err) { toast.error(getErrorMsg(err)); setConfirm(null); }
     },
@@ -167,6 +179,9 @@ export default function TarjetasView({ role }) {
           onClose={() => setShowExport(false)}
         />
       )}
+      {showComparativa && (
+        <ComparativaIvaModal mes={mes} reloadKey={recarga} onClose={() => setShowComparativa(false)} />
+      )}
 
       {/* Navegador de día */}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -196,6 +211,10 @@ export default function TarjetasView({ role }) {
           <button onClick={() => setShowExport(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
             <FileSpreadsheet size={14} /> Exportar Excel
+          </button>
+          <button onClick={() => setShowComparativa(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
+            <Scale size={14} /> Comparativa
           </button>
           {/* Registro mensual — se abre en ventana, igual que los gráficos de Venta Sistema */}
           <button onClick={() => setShowMensual(true)}
@@ -407,6 +426,7 @@ export default function TarjetasView({ role }) {
     </div>
   );
 }
+
 
 // Selector de empleado con la misma mecánica que la Caja del día: lista de la config
 // + opción "Otro" para escribir un nombre que no está cargado.

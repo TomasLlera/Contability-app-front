@@ -297,7 +297,7 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
                   </div>
                 ))}
               </div>
-              <button onClick={() => { onDone?.(); onClose(); }} className="w-full bg-blue-600 text-white py-2.5 rounded-xl text-sm hover:bg-blue-700 font-medium">Listo</button>
+              <button onClick={() => { onDone?.(result); onClose(); }} className="w-full bg-blue-600 text-white py-2.5 rounded-xl text-sm hover:bg-blue-700 font-medium">Listo</button>
             </div>
           )}
         </div>
