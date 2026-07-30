@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ivaApi, getErrorMsg } from '../api';
 import ComprasImportModal from '../components/ComprasImportModal';
 import Modal from '../components/Modal';
-import ComparativaIvaModal from '../components/ComparativaIvaModal';
 import InfoTooltip from '../components/InfoTooltip';
-import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, ArrowUp, Scale, CreditCard, Lock, Columns3 } from 'lucide-react';
+import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, ArrowUp, Columns3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -174,7 +173,6 @@ export default function IvaView({ initialTab = 'compras', role }) {
           vConcepto={vConcepto} setVConcepto={setVConcepto} onAdd={handleAddVenta}
           mesesVentas={mesesVentas} ventasPorMes={ventasPorMes} onDelete={handleDeleteVenta}
           totalVentas={resumen.totales.ventas}
-          mesesResumen={resumen.meses || []}
         />
       )}
 
@@ -891,19 +889,7 @@ function CompraManualForm({ onSubmit, onCancel }) {
 }
 
 
-function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, setVConcepto, onAdd, mesesVentas, ventasPorMes, onDelete, totalVentas, mesesResumen = [] }) {
-  // El cruce con Tarjetas se mira en ventana, no ocupa lugar en la vista. Arranca en
-  // el mes de la fecha que se está cargando, que es el que el usuario tiene en la cabeza.
-  const [showComparativa, setShowComparativa] = useState(false);
-
-  // Meses a listar: los que tienen carga manual MÁS los que solo tienen tarjetas
-  // (esos no aparecerían nunca si la lista saliera únicamente de las ventas cargadas).
-  const resumenDe = Object.fromEntries(mesesResumen.map(m => [m.mes, m]));
-  const mesesLista = [...new Set([
-    ...mesesVentas,
-    ...mesesResumen.filter(m => (m.ventas_tarjetas || 0) > 0).map(m => m.mes),
-  ])].sort((a, b) => b.localeCompare(a));
-
+function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, setVConcepto, onAdd, mesesVentas, ventasPorMes, onDelete, totalVentas }) {
   // Solo el mes en curso arranca abierto: los anteriores ya se revisaron, y tenerlos
   // desplegados es justamente lo que obligaba a scrollear.
   const [abiertos, setAbiertos] = useState(() => new Set([hoy().slice(0, 7)]));
@@ -915,10 +901,6 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
 
   return (
     <div className="space-y-5">
-      {showComparativa && (
-        <ComparativaIvaModal mes={(vFecha || hoy()).slice(0, 7)} onClose={() => setShowComparativa(false)} />
-      )}
-
       {!isViewer && (
         <form onSubmit={onAdd} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-end">
@@ -944,20 +926,12 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
         </form>
       )}
 
-      {/* Total y acceso al cruce comparten fila: el botón suelto a la derecha dejaba
-          la línea del total descolgada sola a la izquierda. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">Total ventas IVA: <strong className="text-blue-600 dark:text-blue-400">{fmt(totalVentas)}</strong></p>
-        <button onClick={() => setShowComparativa(true)}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40">
-          <Scale size={14} /> Comparativa
-        </button>
-      </div>
+      <p className="text-sm text-slate-500">Total ventas IVA: <strong className="text-blue-600 dark:text-blue-400">{fmt(totalVentas)}</strong></p>
 
       {/* Listado compacto: un solo encabezado de columnas para todos los meses, y cada
           mes como fila divisoria plegable en vez de una card propia. Las columnas se
           alinean con un grid compartido entre el encabezado y las filas. */}
-      {mesesLista.length === 0 ? (
+      {mesesVentas.length === 0 ? (
         <p className="text-sm text-slate-400 text-center py-8">Todavía no hay ventas cargadas.</p>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
@@ -968,15 +942,11 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
             <span />
           </div>
 
-          {mesesLista.map(mes => {
+          {mesesVentas.map(mes => {
             const filas = ventasPorMes[mes] || [];
-            const r = resumenDe[mes] || {};
-            // El subtotal del mes es el que entra al cruce: si hay tarjetas cargadas, es
-            // el IVA de tarjetas (reemplaza a la carga manual); si no, la suma manual.
-            const sub = r.ventas ?? filas.reduce((s, v) => s + (v.total || 0), 0);
-            const conTarjetas = (r.ventas_tarjetas || 0) > 0;
+            const sub = filas.reduce((s, v) => s + (v.total || 0), 0);
             const abierto = abiertos.has(mes);
-            const cantidad = filas.length + (conTarjetas ? 1 : 0);
+            const cantidad = filas.length;
 
             return (
               <div key={mes}>
@@ -991,36 +961,16 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
                 {/* grid-rows 1fr↔0fr: colapso animado sin medir alturas a mano. */}
                 <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${abierto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                   <div className="overflow-hidden">
-                    {conTarjetas && (
-                      <div className={`${GRID_VENTAS} items-center px-3 py-1.5 bg-blue-50/60 dark:bg-blue-900/15 border-t border-slate-100 dark:border-slate-700/60`}>
-                        <span className="text-xs text-slate-400 tabular-nums truncate">{mes}</span>
-                        <span className="flex items-center gap-1.5 min-w-0">
-                          <CreditCard size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                          <span className="text-sm font-medium text-blue-700 dark:text-blue-400 truncate">IVA 21% Tarjetas</span>
-                          <span className="hidden sm:inline-flex items-center gap-0.5 text-[11px] text-slate-400 bg-slate-100 dark:bg-slate-700/60 px-1 rounded shrink-0">
-                            <Lock size={9} /> Sinc.
-                          </span>
-                          <InfoTooltip size={14} text={`Calculado sobre ${fmt(r.tarjetas_total)} de tarjetas del mes. Se sincroniza desde Registro → Tarjetas y no se edita acá.${(r.ventas_manual || 0) > 0 ? ` Reemplaza la carga manual de ${fmt(r.ventas_manual)}: sumarlas contaría dos veces la misma facturación.` : ''}`} />
-                        </span>
-                        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400 text-right tabular-nums whitespace-nowrap">{fmt(r.ventas_tarjetas)}</span>
-                        <span />
-                      </div>
-                    )}
-
                     {filas.map(v => (
                       <div key={v.id}
-                        className={`${GRID_VENTAS} items-center px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 group ${
-                          conTarjetas ? 'text-slate-400 dark:text-slate-500' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
+                        className={`${GRID_VENTAS} items-center px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 group hover:bg-slate-50 dark:hover:bg-slate-700/30`}>
                         <span className="text-xs text-slate-400 tabular-nums truncate">{v.fecha}</span>
-                        <span className="flex items-center gap-1 min-w-0">
-                          <span className={`text-sm truncate ${conTarjetas ? '' : 'text-slate-700 dark:text-slate-200'}`}>
+                        <span className="min-w-0">
+                          <span className="text-sm truncate text-slate-700 dark:text-slate-200">
                             {v.concepto || '—'}
                           </span>
-                          {conTarjetas && (
-                            <InfoTooltip size={14} text="Esta carga manual no suma: el mes toma el IVA de tarjetas, que ya incluye esta facturación. Se conserva como registro." />
-                          )}
                         </span>
-                        <span className={`text-sm text-right tabular-nums whitespace-nowrap ${conTarjetas ? 'line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                        <span className="text-sm text-right tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
                           {fmt(v.total)}
                         </span>
                         <span className="text-right">

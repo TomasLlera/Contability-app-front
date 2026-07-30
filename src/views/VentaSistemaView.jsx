@@ -4,8 +4,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import VentaSistemaGraficosModal from '../components/VentaSistemaGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
 import InfoTooltip from '../components/InfoTooltip';
-import ComparativaIvaModal from '../components/ComparativaIvaModal';
-import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, TrendingUp, TrendingDown, Minus, Scale } from 'lucide-react';
+import ComparativaVentasModal from '../components/ComparativaVentasModal';
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, Scale, Receipt, FileText, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,6 +23,15 @@ const shiftMes = (mes, d) => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
 };
 
+// Las 2 columnas fijas de la carga. Solo `facturado` genera IVA débito fiscal y es el
+// único que entra en la comparativa contra tarjetas. `color` se usa en el gráfico
+// apilado del modal de gráficas.
+const TIPOS_VENTA = [
+  { key: 'ticket',    label: 'Ticket',    Icon: Receipt,  color: '#8b5cf6', text: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-900/20', border: 'border-violet-200 dark:border-violet-800' },
+  { key: 'facturado', label: 'Facturado', Icon: FileText, color: '#3b82f6', text: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-900/20',     border: 'border-blue-200 dark:border-blue-800' },
+];
+const tipoDef = (key) => TIPOS_VENTA.find(t => t.key === key) || TIPOS_VENTA[0];
+
 export default function VentaSistemaView({ role }) {
   const isViewer = role === 'viewer';
   const [mes, setMes] = useState(mesActual());
@@ -33,15 +42,18 @@ export default function VentaSistemaView({ role }) {
   const [showComparativa, setShowComparativa] = useState(false);
   const [confirm, setConfirm] = useState(null);
 
-  // Alta
+  // Alta. El tipo queda pegado entre cargas: se suelen cargar varios tickets seguidos
+  // (o varias facturas), así que rotarlo automáticamente obligaría a corregirlo casi
+  // siempre.
+  const [tipo, setTipo] = useState('ticket');
   const [fecha, setFecha] = useState(hoy());
   const [monto, setMonto] = useState('');
-  const [concepto, setConcepto] = useState('');
   const [saving, setSaving] = useState(false);
+  const [expandido, setExpandido] = useState(null); // tipo con el detalle del día abierto
 
   // Edición inline
   const [editId, setEditId] = useState(null);
-  const [edit, setEdit] = useState({ fecha: '', monto: '', concepto: '' });
+  const [edit, setEdit] = useState({ tipo: 'ticket', fecha: '', monto: '', concepto: '' });
 
   const cargar = useCallback(async () => {
     try {
@@ -61,8 +73,8 @@ export default function VentaSistemaView({ role }) {
     if (!monto || Number(monto) <= 0) { toast.error('Ingresá un monto mayor a 0'); return; }
     setSaving(true);
     try {
-      await registroApi.ventas.create({ fecha, monto, concepto });
-      setMonto(''); setConcepto('');
+      await registroApi.ventas.create({ tipo, fecha, monto });
+      setMonto('');
       // Si la venta cae en otro mes, saltamos a ese mes para que el usuario la vea.
       const mesVenta = fecha.slice(0, 7);
       if (mesVenta !== mes) setMes(mesVenta); else await cargar();
@@ -76,7 +88,7 @@ export default function VentaSistemaView({ role }) {
 
   const startEdit = (v) => {
     setEditId(v.id);
-    setEdit({ fecha: v.fecha, monto: String(v.monto ?? ''), concepto: v.concepto || '' });
+    setEdit({ tipo: v.tipo || 'ticket', fecha: v.fecha, monto: String(v.monto ?? ''), concepto: v.concepto || '' });
   };
 
   const saveEdit = async () => {
@@ -90,7 +102,7 @@ export default function VentaSistemaView({ role }) {
   };
 
   const handleDelete = (v) => setConfirm({
-    message: `¿Eliminar la venta del ${v.fecha} por ${fmt(v.monto)}?`,
+    message: `¿Eliminar la venta de ${tipoDef(v.tipo).label} del ${v.fecha} por ${fmt(v.monto)}?`,
     onConfirm: async () => {
       try {
         await registroApi.ventas.delete(v.id);
@@ -103,18 +115,22 @@ export default function VentaSistemaView({ role }) {
 
   if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando…</div>;
 
-  const { total = 0, mes_anterior = {}, comparativa = {}, stats = {}, ventas = [] } = data || {};
+  const { ventas = [] } = data || {};
   const ventasDelDia = ventas.filter(v => v.fecha === fecha);
   const totalDia = ventasDelDia.reduce((s, v) => s + (v.monto || 0), 0);
-  const sube = (comparativa.diferencia || 0) > 0;
-  const igual = (comparativa.diferencia || 0) === 0;
+  // Subtotales del día por tipo, derivados del detalle que ya trae el mes (no hay que
+  // pedir el día aparte).
+  const porTipoDia = Object.fromEntries(TIPOS_VENTA.map(({ key }) => {
+    const lista = ventasDelDia.filter(v => (v.tipo || 'ticket') === key);
+    return [key, { total: lista.reduce((s, v) => s + (v.monto || 0), 0), cantidad: lista.length, lista }];
+  }));
 
   const inputCls = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500';
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       {confirm && <ConfirmModal message={confirm.message} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
-      {showGraficos && <VentaSistemaGraficosModal data={data} onClose={() => setShowGraficos(false)} />}
+      {showGraficos && <VentaSistemaGraficosModal data={data} tipos={TIPOS_VENTA} onClose={() => setShowGraficos(false)} />}
       {showExport && (
         <RegistroExportModal
           titulo="Exportar ventas"
@@ -125,7 +141,7 @@ export default function VentaSistemaView({ role }) {
         />
       )}
       {showComparativa && (
-        <ComparativaIvaModal mes={mes} onClose={() => setShowComparativa(false)} />
+        <ComparativaVentasModal mes={mes} onClose={() => setShowComparativa(false)} />
       )}
 
       {/* Navegador de mes + gráficos */}
@@ -162,27 +178,59 @@ export default function VentaSistemaView({ role }) {
         </div>
       </div>
 
-      {/* Resumen del mes */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card label={labelMes(mes)} value={fmt(total)} tone="blue" hint={`${stats.cantidad || 0} ventas`} />
-        <Card label={labelMes(mes_anterior.mes)} value={fmt(mes_anterior.total)} hint="Mes anterior" />
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3">
-          {/* div, no <p>: InfoTooltip renderiza un <div> y anidarlo en <p> rompe el HTML. */}
-          <div className="text-xs text-slate-400 flex items-center gap-1">
-            Diferencia
-            <InfoTooltip text="Variación contra el mes anterior. El porcentaje no se muestra si el mes anterior cerró en cero." />
-          </div>
-          <p className={`text-lg font-semibold ${igual ? 'text-slate-500' : sube ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {fmt(comparativa.diferencia)}
-          </p>
-          <p className="text-xs flex items-center gap-1 text-slate-400">
-            {igual ? <Minus size={12} /> : sube ? <TrendingUp size={12} className="text-green-500" /> : <TrendingDown size={12} className="text-red-500" />}
-            {comparativa.porcentaje === null || comparativa.porcentaje === undefined
-              ? 'Sin base de comparación'
-              : `${comparativa.porcentaje > 0 ? '+' : ''}${comparativa.porcentaje.toFixed(1)}%`}
-          </p>
+      {/* El resumen del mes (total, mes anterior, diferencia, promedio) vive en el modal
+          de gráficas: acá arriba solo duplicaba lo que ya se ve ahí. */}
+
+      {/* 2 columnas del día: ticket y facturado, con el detalle plegable */}
+      <div className="grid grid-cols-2 gap-3">
+        {TIPOS_VENTA.map((def) => {
+          const { key, label, text, bg, border } = def;
+          const g = porTipoDia[key];
+          const abierto = expandido === key;
+          return (
+            <div key={key} className={`rounded-xl border ${border} ${bg} overflow-hidden`}>
+              <button onClick={() => setExpandido(abierto ? null : key)} className="w-full text-left px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className={`flex items-center gap-1.5 text-xs font-medium ${text}`}><def.Icon size={14} /> {label}</span>
+                  <ChevronDown size={13} className={`text-slate-400 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+                </div>
+                <p className={`mt-1 text-lg font-bold ${text}`}>{fmt(g.total)}</p>
+                <p className="text-xs text-slate-400">{g.cantidad} {g.cantidad === 1 ? 'venta' : 'ventas'}</p>
+              </button>
+              {abierto && (
+                <div className="border-t border-slate-200/70 dark:border-slate-700/70 bg-white/60 dark:bg-slate-800/40 px-3 py-2 space-y-1">
+                  {g.lista.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-1">Sin cargas para este día.</p>
+                  ) : g.lista.map(v => (
+                    <div key={v.id} className="flex items-center justify-between gap-2 text-xs group">
+                      {/* El concepto ya no se carga desde el alta: solo se muestra
+                          cuando la venta lo tiene (cargas viejas o editadas a mano). */}
+                      <span className="truncate text-slate-600 dark:text-slate-300">
+                        {fmt(v.monto)}
+                        {v.concepto && <span className="text-slate-400"> · {v.concepto}</span>}
+                      </span>
+                      {!isViewer && (
+                        <span className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                          <button onClick={() => startEdit(v)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
+                          <button onClick={() => handleDelete(v)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Total consolidado del día */}
+      <div className="flex items-center justify-between bg-slate-900 dark:bg-slate-800 border border-slate-700 rounded-xl px-5 py-4">
+        <div className="text-sm font-medium text-slate-300 flex items-center gap-1.5">
+          Total consolidado del {fecha}
+          <InfoTooltip text="Ticket + facturado. Solo la parte facturada genera IVA débito fiscal (21%) y es la que se cruza contra el total de tarjetas en la Comparativa." />
         </div>
-        <Card label="Promedio diario" value={fmt(stats.promedio_diario)} hint={`${stats.dias_con_ventas || 0} días con ventas`} />
+        <span className="text-2xl font-bold text-white">{fmt(totalDia)}</span>
       </div>
 
       {/* Alta */}
@@ -198,8 +246,13 @@ export default function VentaSistemaView({ role }) {
               <input type="number" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Concepto (opcional)</label>
-              <input type="text" value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Detalle" className={inputCls} />
+              <label className="flex items-center gap-1 text-xs text-slate-400 mb-1">
+                Tipo
+                <InfoTooltip text="Ticket = venta sin comprobante fiscal. Facturado = factura emitida. Solo lo facturado genera IVA 21% y entra en la comparativa contra tarjetas." />
+              </label>
+              <select value={tipo} onChange={e => setTipo(e.target.value)} className={inputCls}>
+                {TIPOS_VENTA.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
             </div>
             <button type="submit" disabled={saving}
               className="inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors disabled:opacity-40">
@@ -225,36 +278,6 @@ export default function VentaSistemaView({ role }) {
         )}
       </div>
 
-      {/* Todas las ventas del mes */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
-          <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">{labelMes(mes)} — todas las ventas</span>
-          <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-            {fmt(total)} <span className="text-xs font-normal text-slate-400">({ventas.length})</span>
-          </span>
-        </div>
-        {ventas.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-8">Todavía no hay ventas cargadas en {labelMes(mes)}.</p>
-        ) : (
-          <Tabla ventas={[...ventas].sort((a, b) => b.fecha.localeCompare(a.fecha))} isViewer={isViewer}
-            editId={editId} edit={edit} setEdit={setEdit}
-            onStartEdit={startEdit} onSaveEdit={saveEdit} onCancelEdit={() => setEditId(null)} onDelete={handleDelete} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Card({ label, value, hint, tone = 'slate' }) {
-  const tones = {
-    slate: 'text-slate-700 dark:text-slate-200',
-    blue: 'text-blue-600 dark:text-blue-400',
-  };
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className={`text-lg font-semibold ${tones[tone]}`}>{value}</p>
-      {hint && <p className="text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
@@ -266,6 +289,7 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
       <table className="w-full text-sm">
         <thead className="text-slate-400 text-xs">
           <tr>
+            <th className="text-left px-4 py-1.5 font-medium w-32">Tipo</th>
             <th className="text-left px-4 py-1.5 font-medium w-36">Fecha</th>
             <th className="text-left px-4 py-1.5 font-medium">Concepto</th>
             <th className="text-right px-4 py-1.5 font-medium w-36">Monto</th>
@@ -275,6 +299,11 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
           {ventas.map(v => editId === v.id ? (
             <tr key={v.id} className="bg-blue-50/50 dark:bg-blue-900/10">
+              <td className="px-4 py-1.5">
+                <select value={edit.tipo} onChange={e => setEdit(p => ({ ...p, tipo: e.target.value }))} className={cellInput}>
+                  {TIPOS_VENTA.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+              </td>
               <td className="px-4 py-1.5">
                 <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className={cellInput} />
               </td>
@@ -295,6 +324,12 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
             </tr>
           ) : (
             <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
+              <td className="px-4 py-2">
+                {(() => {
+                  const def = tipoDef(v.tipo);
+                  return <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>;
+                })()}
+              </td>
               <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{v.fecha}</td>
               <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{v.concepto || <span className="text-slate-400">—</span>}</td>
               <td className="px-4 py-2 text-right font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">{fmt(v.monto)}</td>

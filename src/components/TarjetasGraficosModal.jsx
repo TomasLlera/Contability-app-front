@@ -25,9 +25,6 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
   const {
     por_tipo = {}, total = 0, mes_anterior = {}, comparativa = {},
     comparativa_tipos = {}, serie = [], por_empleado = [],
-    // IVA 21% sobre el total del mes. Lo calcula el backend a partir de las
-    // transacciones, así que sigue a las cargas sin necesidad de recalcular acá.
-    iva_21 = 0, alicuota = 0.21,
   } = data || {};
 
   const sube = (comparativa.diferencia || 0) > 0;
@@ -47,8 +44,8 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
           </div>
         </div>
 
-        {/* Totales por tipo + total del mes + IVA */}
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+        {/* Totales por tipo + total del mes */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {tipos.map(({ key, label, text }) => {
             const g = por_tipo[key] || { total: 0 };
             const c = comparativa_tipos[key] || {};
@@ -73,11 +70,6 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
                 ? `Anterior: ${fmt(mes_anterior.total)}`
                 : `${comparativa.porcentaje > 0 ? '+' : ''}${comparativa.porcentaje.toFixed(1)}%`}
             </p>
-          </div>
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-3 py-2">
-            <p className="text-[11px] text-slate-400">IVA {(alicuota * 100).toFixed(0)}%</p>
-            <p className="text-sm font-bold text-blue-700 dark:text-blue-400">{fmt(iva_21)}</p>
-            <p className="text-[11px] text-slate-400">Anterior: {fmt(mes_anterior.iva_21)}</p>
           </div>
         </div>
 

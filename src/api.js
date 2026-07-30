@@ -392,15 +392,13 @@ export const registroApi = {
   tarjetas: {
     getMes: (mes) => api.get(`/registro/tarjetas/mes/${mes}`).then(r => r.data),
     getDia: (fecha) => api.get(`/registro/tarjetas/dia/${fecha}`).then(r => r.data),
-    // IVA 21% del mes. Derivado de las transacciones (no hay copia guardada), por eso
-    // IVA → Ventas puede pedirlo sin riesgo de mostrar un valor viejo.
-    getIva: (mes) => api.get(`/registro/tarjetas/iva/${mes}`).then(r => r.data),
     create: (data) => api.post('/registro/tarjetas', data).then(r => r.data),
     update: (id, data) => api.put(`/registro/tarjetas/${id}`, data).then(r => r.data),
     delete: (id) => api.delete(`/registro/tarjetas/${id}`).then(r => r.data),
   },
-  // Cruce del IVA de Tarjetas contra el de Venta Sistema para un mes 'YYYY-MM'.
-  comparativaIva: (mes) => api.get(`/registro/comparativa-iva/${mes}`).then(r => r.data),
+  // Cruce del total facturado en Venta Sistema contra el total cobrado con tarjeta,
+  // para un mes 'YYYY-MM'.
+  comparativaVentas: (mes) => api.get(`/registro/comparativa-ventas/${mes}`).then(r => r.data),
 };
 
 export const appConfigApi = {

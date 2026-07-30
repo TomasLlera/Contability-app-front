@@ -37,10 +37,13 @@ const ESTILOS = {
 };
 
 /**
- * Cruce del IVA 21% de Tarjetas contra el de Venta Sistema para un mes.
+ * Cruce del total FACTURADO en Venta Sistema contra el total cobrado con tarjeta, para
+ * un mes. Sirve para verificar si lo que se facturó se condice con lo que efectivamente
+ * entró por tarjeta. El ticket no entra en la comparación (no es facturación), pero se
+ * informa aparte: una diferencia suele explicarse justo ahí.
  *
- * Se usa en Registro → Tarjetas y en IVA → Ventas: los dos leen el mismo endpoint,
- * así que muestran el mismo número sin copiarlo ni sincronizarlo a mano.
+ * Se usa en Registro → Tarjetas y en Registro → Venta Sistema: los dos leen el mismo
+ * endpoint, así que muestran el mismo número sin copiarlo ni sincronizarlo a mano.
  *
  * `reloadKey` fuerza el refetch: la vista de Tarjetas lo incrementa al cargar o
  * borrar un ingreso, que es lo que mueve el total del mes.
@@ -48,7 +51,7 @@ const ESTILOS = {
  * `bare` saca el marco y el encabezado propios, para cuando ya va dentro de un modal
  * que aporta su propio título (si no, el mes queda escrito dos veces).
  */
-export default function ComparativaIvaPanel({ mes, reloadKey = 0, titulo = 'Comparativa con Venta Sistema', bare = false }) {
+export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'Comparativa mensual', bare = false }) {
   // La respuesta se guarda junto al mes que la originó. Así el panel sabe cuándo lo
   // que tiene en pantalla todavía no corresponde al mes pedido y muestra el spinner,
   // en vez de rotular los números del mes anterior con el nuevo título.
@@ -57,7 +60,7 @@ export default function ComparativaIvaPanel({ mes, reloadKey = 0, titulo = 'Comp
 
   useEffect(() => {
     let vivo = true;
-    registroApi.comparativaIva(mes)
+    registroApi.comparativaVentas(mes)
       .then(d => { if (vivo) setRes({ mes, data: d }); })
       .catch(() => { if (vivo) setRes({ mes, data: null }); });
     return () => { vivo = false; };
@@ -85,23 +88,44 @@ export default function ComparativaIvaPanel({ mes, reloadKey = 0, titulo = 'Comp
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
           <span className="font-semibold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
             <Scale size={14} className="text-slate-400" /> {titulo} — {labelMes(data.mes)}
-            <InfoTooltip text="Compara el IVA 21% de lo cobrado con tarjeta contra el IVA 21% de lo registrado en Venta Sistema. Sirve para detectar facturación que quedó cargada de un solo lado. Diferencias de hasta $1 se toman como redondeo." />
+            <InfoTooltip text="Compara el total FACTURADO del mes en Venta Sistema contra el total cobrado con tarjeta. El ticket no entra: no es facturación. Sirve para detectar cobros con tarjeta que quedaron sin facturar. Diferencias de hasta $1 se toman como redondeo." />
           </span>
         </div>
       )}
 
       <div className={bare ? 'space-y-3' : 'p-4 space-y-3'}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Celda label="IVA Tarjetas" valor={data.tarjetas.iva} sub={`${fmt(data.tarjetas.total)} facturado`} color="text-blue-600 dark:text-blue-400" />
-          <Celda label="IVA Venta Sistema" valor={data.venta_sistema.iva} sub={`${fmt(data.venta_sistema.total)} registrado`} color="text-slate-700 dark:text-slate-200" />
+          <Celda
+            label="Total Facturado"
+            valor={data.total_facturado}
+            sub={`IVA 21%: ${fmt(data.venta_sistema.iva_21)}`}
+            color="text-blue-600 dark:text-blue-400"
+          />
+          <Celda
+            label="Total Ventas Tarjeta"
+            valor={data.total_tarjetas}
+            sub={`${data.tarjetas.transacciones} ${data.tarjetas.transacciones === 1 ? 'ingreso' : 'ingresos'}`}
+            color="text-slate-700 dark:text-slate-200"
+          />
+          {/* Diferencia en valor absoluto: de qué lado falta la carga lo dice el
+              cartel de estado de abajo, no el signo. */}
           <Celda
             label="Diferencia"
-            valor={data.diferencia}
-            sub={data.porcentaje !== null ? `${data.porcentaje > 0 ? '+' : ''}${data.porcentaje.toFixed(1)}% sobre el mayor` : 'Sin base de comparación'}
+            valor={Math.abs(data.diferencia)}
+            sub={data.porcentaje !== null ? `${Math.abs(data.porcentaje).toFixed(1)}% sobre el mayor` : 'Sin base de comparación'}
             color={est.texto}
-            signo
           />
         </div>
+
+        {/* El ticket queda fuera del cruce, pero es el primer lugar donde mirar cuando
+            las tarjetas superan lo facturado: puede haber cobros con tarjeta cargados
+            como ticket. */}
+        {data.venta_sistema.total_ticket > 0 && (
+          <p className="text-xs text-slate-400">
+            Fuera del cruce — Ticket del mes: <span className="font-medium text-violet-600 dark:text-violet-400 tabular-nums">{fmt(data.venta_sistema.total_ticket)}</span>
+            {' · '}Total Venta Sistema: <span className="font-medium text-slate-500 dark:text-slate-300 tabular-nums">{fmt(data.venta_sistema.total)}</span>
+          </p>
+        )}
 
         <div className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 ${est.box}`}>
           <est.Icon size={15} className={`${est.texto} shrink-0 mt-0.5`} />
@@ -126,8 +150,9 @@ export default function ComparativaIvaPanel({ mes, reloadKey = 0, titulo = 'Comp
                   <thead className="text-slate-400">
                     <tr>
                       <th className="text-left py-1 font-medium">Día</th>
-                      <th className="text-right py-1 font-medium">IVA Tarjetas</th>
-                      <th className="text-right py-1 font-medium">IVA Sistema</th>
+                      <th className="text-right py-1 font-medium">Facturado</th>
+                      <th className="text-right py-1 font-medium">Tarjetas</th>
+                      <th className="text-right py-1 font-medium">Ticket</th>
                       <th className="text-right py-1 font-medium">Dif.</th>
                     </tr>
                   </thead>
@@ -135,8 +160,9 @@ export default function ComparativaIvaPanel({ mes, reloadKey = 0, titulo = 'Comp
                     {diasConDif.map(d => (
                       <tr key={d.fecha}>
                         <td className="py-1 text-slate-500 tabular-nums">{d.fecha}</td>
-                        <td className="py-1 text-right text-slate-600 dark:text-slate-300 tabular-nums">{fmt(d.iva_tarjetas)}</td>
-                        <td className="py-1 text-right text-slate-600 dark:text-slate-300 tabular-nums">{fmt(d.iva_venta_sistema)}</td>
+                        <td className="py-1 text-right text-slate-600 dark:text-slate-300 tabular-nums">{fmt(d.total_facturado)}</td>
+                        <td className="py-1 text-right text-slate-600 dark:text-slate-300 tabular-nums">{fmt(d.total_tarjetas)}</td>
+                        <td className="py-1 text-right text-slate-400 tabular-nums">{d.total_ticket ? fmt(d.total_ticket) : '—'}</td>
                         <td className={`py-1 text-right font-medium tabular-nums ${d.diferencia > 0 ? 'text-red-500' : 'text-amber-600 dark:text-amber-400'}`}>
                           {d.diferencia > 0 ? '+' : ''}{fmt(d.diferencia)}
                         </td>
@@ -153,13 +179,11 @@ export default function ComparativaIvaPanel({ mes, reloadKey = 0, titulo = 'Comp
   );
 }
 
-function Celda({ label, valor, sub, color, signo = false }) {
+function Celda({ label, valor, sub, color }) {
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5">
       <p className="text-xs text-slate-400">{label}</p>
-      <p className={`text-lg font-bold ${color} tabular-nums`}>
-        {signo && valor > 0 ? '+' : ''}{fmt(valor)}
-      </p>
+      <p className={`text-lg font-bold ${color} tabular-nums`}>{fmt(valor)}</p>
       <p className="text-xs text-slate-400 mt-0.5 truncate">{sub}</p>
     </div>
   );

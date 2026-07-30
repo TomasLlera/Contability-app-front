@@ -4,7 +4,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
 import TarjetasGraficosModal from '../components/TarjetasGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
-import ComparativaIvaModal from '../components/ComparativaIvaModal';
+import ComparativaVentasModal from '../components/ComparativaVentasModal';
 import {
   QrCode, CreditCard, Landmark, Ticket, Plus, Pencil, Trash2, Check, X, Users, BarChart3, FileSpreadsheet,
   ChevronLeft, ChevronRight, ChevronDown, Scale,
@@ -74,7 +74,7 @@ export default function TarjetasView({ role }) {
   const [edit, setEdit] = useState({ tipo: 'qr', fecha: '', monto: '', empleado: '' });
 
   // Se incrementa después de cada alta/edición/baja: es la señal que usa la
-  // comparativa de IVA para volver a pedir el cruce, que cambia con cada ingreso.
+  // comparativa para volver a pedir el cruce, que cambia con cada ingreso.
   const [recarga, setRecarga] = useState(0);
 
   const cargar = useCallback(async () => {
@@ -180,7 +180,7 @@ export default function TarjetasView({ role }) {
         />
       )}
       {showComparativa && (
-        <ComparativaIvaModal mes={mes} reloadKey={recarga} onClose={() => setShowComparativa(false)} />
+        <ComparativaVentasModal mes={mes} reloadKey={recarga} onClose={() => setShowComparativa(false)} />
       )}
 
       {/* Navegador de día */}

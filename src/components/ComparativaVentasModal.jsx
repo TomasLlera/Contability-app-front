@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
-import ComparativaIvaPanel from './ComparativaIvaPanel';
+import ComparativaVentasPanel from './ComparativaVentasPanel';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -16,19 +16,20 @@ const shiftMes = (mes, d) => {
 };
 
 /**
- * Cruce del IVA de Tarjetas contra Venta Sistema, en ventana.
+ * Cruce del total FACTURADO en Venta Sistema contra el total cobrado con tarjeta, en
+ * ventana. El ticket no entra en la comparación (no es facturación).
  *
- * Se abre desde Registro → Tarjetas, Registro → Venta Sistema e IVA → Ventas: los
- * tres muestran el mismo cruce del mismo mes, leído del mismo endpoint.
+ * Se abre desde Registro → Tarjetas y Registro → Venta Sistema: los dos muestran el
+ * mismo cruce del mismo mes, leído del mismo endpoint.
  *
  * El mes arranca en el que venía mirando la vista que lo abrió y después se navega
  * acá adentro, sin arrastrar a la vista de atrás a otro mes.
  */
-export default function ComparativaIvaModal({ mes: mesInicial, reloadKey = 0, onClose }) {
+export default function ComparativaVentasModal({ mes: mesInicial, reloadKey = 0, onClose }) {
   const [mes, setMes] = useState(mesInicial);
 
   return (
-    <Modal title="Comparativa IVA — Tarjetas vs Venta Sistema" onClose={onClose} size="3xl">
+    <Modal title="Comparativa mensual — Facturado vs Tarjetas" onClose={onClose} size="3xl">
       <div className="space-y-4">
         <div className="flex items-center justify-center">
           <div className="inline-flex items-center h-8 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden text-xs">
@@ -40,7 +41,7 @@ export default function ComparativaIvaModal({ mes: mesInicial, reloadKey = 0, on
           </div>
         </div>
 
-        <ComparativaIvaPanel mes={mes} reloadKey={reloadKey} bare />
+        <ComparativaVentasPanel mes={mes} reloadKey={reloadKey} bare />
       </div>
     </Modal>
   );

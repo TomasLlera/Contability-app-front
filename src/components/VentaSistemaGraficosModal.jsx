@@ -28,9 +28,14 @@ const TABS = [
 
 // Gráficos detallados del mes: evolución diaria, cruce contra el mes anterior y
 // comparativa por quincenas/semanas. Recibe el payload de registroApi.ventas.getMes.
-export default function VentaSistemaGraficosModal({ data, onClose }) {
+export default function VentaSistemaGraficosModal({ data, tipos, onClose }) {
   const [tab, setTab] = useState('evolucion');
-  const { mes, serie = [], mes_anterior = {}, quincenas = [], semanas = [], stats = {}, total = 0 } = data || {};
+  const {
+    mes, serie = [], mes_anterior = {}, quincenas = [], semanas = [],
+    // total = ticket + facturado. El IVA 21% sale SOLO del facturado: el ticket no
+    // genera débito fiscal. Los tres los calcula el backend sobre las ventas del mes.
+    total = 0, total_ticket = 0, total_facturado = 0, iva_21 = 0, alicuota = 0.21,
+  } = data || {};
 
   // Serie combinada actual vs anterior, alineada por día del mes.
   const seriePrev = mes_anterior.serie || [];
@@ -55,13 +60,14 @@ export default function VentaSistemaGraficosModal({ data, onClose }) {
   return (
     <Modal title={`Ventas del sistema — ${labelMes(mes)}`} onClose={onClose} size="2xl">
       <div className="space-y-4">
-        {/* Estadísticas */}
+        {/* Totales del mes por tipo + IVA del facturado + total consolidado */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <Stat label="Total del mes" value={fmt(total)} tone="blue" />
-          <Stat label="Promedio diario" value={fmt(stats.promedio_diario)} hint={`${stats.dias_con_ventas || 0} días con ventas`} />
-          <Stat label="Máximo" value={fmt(stats.maximo?.total)} hint={stats.maximo ? `Día ${stats.maximo.dia}` : '—'} tone="green" />
-          <Stat label="Mínimo" value={fmt(stats.minimo?.total)} hint={stats.minimo ? `Día ${stats.minimo.dia}` : '—'} tone="amber" />
+          <Stat label="Total Ticket" value={fmt(total_ticket)} hint={`Anterior: ${fmt(mes_anterior.total_ticket)}`} tone="violet" />
+          <Stat label="Total Facturado" value={fmt(total_facturado)} hint={`Anterior: ${fmt(mes_anterior.total_facturado)}`} tone="blue" />
+          <Stat label={`Total IVA ${(alicuota * 100).toFixed(0)}%`} value={fmt(iva_21)} hint="Solo sobre lo facturado" tone="sky" />
+          <Stat label="Total del mes" value={fmt(total)} hint="Ticket + facturado" tone="strong" />
         </div>
+
 
         <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
           {TABS.map(([key, label]) => (
@@ -74,6 +80,8 @@ export default function VentaSistemaGraficosModal({ data, onClose }) {
         </div>
 
         <div className="h-72 text-slate-400">
+          {/* Evolución diaria apilada por tipo: la altura total sigue siendo la venta
+              del día, pero se ve qué parte se facturó. */}
           {tab === 'evolucion' && (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={serie} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
@@ -81,7 +89,11 @@ export default function VentaSistemaGraficosModal({ data, onClose }) {
                 <XAxis dataKey="dia" tick={axisCls} tickLine={false} axisLine={false} interval={2} />
                 <YAxis tick={axisCls} tickLine={false} axisLine={false} tickFormatter={fmtCorto} width={52} />
                 <Tooltip {...tooltipStyle} labelFormatter={(d) => `Día ${d}`} />
-                <Bar dataKey="total" name="Ventas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {tipos.map(({ key, label, color }, i) => (
+                  <Bar key={key} dataKey={key} name={label} stackId="ventas" fill={color}
+                    radius={i === tipos.length - 1 ? [4, 4, 0, 0] : undefined} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -123,8 +135,9 @@ function Stat({ label, value, hint, tone = 'slate' }) {
   const tones = {
     slate: 'text-slate-700 dark:text-slate-200',
     blue: 'text-blue-600 dark:text-blue-400',
-    green: 'text-green-600 dark:text-green-400',
-    amber: 'text-amber-600 dark:text-amber-400',
+    violet: 'text-violet-600 dark:text-violet-400',
+    sky: 'text-sky-600 dark:text-sky-400',
+    strong: 'text-slate-900 dark:text-white font-bold',
   };
   return (
     <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
