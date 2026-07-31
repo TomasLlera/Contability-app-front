@@ -363,7 +363,9 @@ export default function App() {
         <div className="px-4 py-4 border-b border-slate-700/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">K</div>
+              {/* El PNG trae fondo oscuro propio: el rounded-lg lo integra al sidebar
+                  en vez de dejar un rectángulo duro recortado contra el fondo. */}
+              <img src="/favicon.png" alt="Kontia" className="w-8 h-8 rounded-lg shrink-0" />
               <div>
                 <p className="text-white font-bold text-sm leading-tight">Kontia</p>
                 <p className="text-slate-400 text-xs">Gestión de cuentas</p>

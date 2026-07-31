@@ -364,6 +364,14 @@ export const ivaApi = {
   createVenta: (data) => api.post('/iva/ventas', data).then(r => r.data),
   updateVenta: (id, data) => api.put(`/iva/ventas/${id}`, data).then(r => r.data),
   deleteVenta: (id) => api.delete(`/iva/ventas/${id}`).then(r => r.data),
+  // Créditos fiscales (carga manual; restan del saldo mensual)
+  getCreditos: () => api.get('/iva/creditos').then(r => r.data),
+  createCredito: (data) => api.post('/iva/creditos', data).then(r => r.data),
+  updateCredito: (id, data) => api.put(`/iva/creditos/${id}`, data).then(r => r.data),
+  deleteCredito: (id) => api.delete(`/iva/creditos/${id}`).then(r => r.data),
+  // Ajuste manual del saldo del mes ('YYYY-MM'); borrarlo restaura el calculado
+  saveAjuste: (mes, monto) => api.put(`/iva/ajuste/${mes}`, { monto }).then(r => r.data),
+  deleteAjuste: (mes) => api.delete(`/iva/ajuste/${mes}`).then(r => r.data),
   // Cruce mensual
   getResumen: () => api.get('/iva/resumen').then(r => r.data),
   exportResumenExcel: async () => {

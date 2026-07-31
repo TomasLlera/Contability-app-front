@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { authApi } from '../api';
-import { Wallet, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function Login({ onLogin }) {
   const [usuario, setUsuario] = useState('');
@@ -36,10 +36,8 @@ export default function Login({ onLogin }) {
 
       <div className="relative w-full max-w-sm animate-[fadeIn_400ms_ease-out]">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-blue-500 to-indigo-600
-                          flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4">
-            <Wallet size={28} className="text-white" strokeWidth={2.25} />
-          </div>
+          <img src="/favicon.png" alt="Kontia"
+            className="w-14 h-14 rounded-2xl shadow-lg shadow-blue-500/30 mb-4" />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Kontia</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Aplicación contable</p>
         </div>
