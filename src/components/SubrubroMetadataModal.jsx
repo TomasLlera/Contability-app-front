@@ -260,7 +260,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
             {modoVencimiento === 'dias' && (
               <>
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   min="1"
                   max="365"
                   step="1"

@@ -237,7 +237,7 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
           <label className={labelCls}>{inicial ? 'Stock actual' : 'Stock inicial'}</label>
           <input
             className={inputCls + (inicial ? ' bg-slate-100 dark:bg-slate-600 cursor-not-allowed text-slate-500 dark:text-slate-300' : '')}
-            type="number"
+            type="number" inputMode="decimal"
             min="0"
             readOnly={!!inicial}
             value={form.stock_actual}
@@ -247,7 +247,7 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
         </div>
         <div>
           <label className={labelCls}>Stock mínimo</label>
-          <input className={inputCls} type="number" min="0" value={form.stock_minimo} onChange={e => set('stock_minimo', e.target.value)} placeholder="0" />
+          <input className={inputCls} type="number" inputMode="decimal" min="0" value={form.stock_minimo} onChange={e => set('stock_minimo', e.target.value)} placeholder="0" />
         </div>
       </div>
 
@@ -265,14 +265,14 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className={labelCls}>Costo</label>
-                  <input className={inputCls} type="number" min="0" value={form.precio_costo} onChange={e => handleCostoChange(e.target.value)} placeholder="0" />
+                  <input className={inputCls} type="number" inputMode="decimal" min="0" value={form.precio_costo} onChange={e => handleCostoChange(e.target.value)} placeholder="0" />
                 </div>
                 <div>
                   <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                     <Percent size={11} /> IVA
                   </label>
                   <div className="relative">
-                    <input className={inputCls + ' pr-6'} type="number" min="0" value={form.iva} onChange={e => handleIvaChange(e.target.value)} placeholder="0" />
+                    <input className={inputCls + ' pr-6'} type="number" inputMode="decimal" min="0" value={form.iva} onChange={e => handleIvaChange(e.target.value)} placeholder="0" />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
                   </div>
                 </div>
@@ -287,13 +287,13 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
                     <Percent size={11} /> Ganancia
                   </label>
                   <div className="relative">
-                    <input className={inputCls + ' pr-6'} type="number" min="0" value={margen} onChange={e => handleMargenChange(e.target.value)} placeholder="0" />
+                    <input className={inputCls + ' pr-6'} type="number" inputMode="decimal" min="0" value={margen} onChange={e => handleMargenChange(e.target.value)} placeholder="0" />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
                   </div>
                 </div>
                 <div>
                   <label className={labelCls}>Precio final</label>
-                  <input className={inputCls} type="number" min="0" value={form.precio_venta} onChange={e => handlePrecioFinalChange(e.target.value)} placeholder="0" />
+                  <input className={inputCls} type="number" inputMode="decimal" min="0" value={form.precio_venta} onChange={e => handlePrecioFinalChange(e.target.value)} placeholder="0" />
                 </div>
               </div>
               {precioConIva > 0 && precioFinal > 0 && (
@@ -426,7 +426,7 @@ function PreciosTab({ productos, onActualizar }) {
           <div>
             <label className={labelCls}>Valor</label>
             <div className="relative">
-              <input type="number" min="0" value={ajusteValor} onChange={e => setAjusteValor(e.target.value)}
+              <input type="number" inputMode="decimal" min="0" value={ajusteValor} onChange={e => setAjusteValor(e.target.value)}
                 placeholder="0"
                 className="w-28 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-7 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">
@@ -551,7 +551,7 @@ function MovimientoModal({ producto, onClose, onDone }) {
           </div>
           <div>
             <label className={labelCls}>{tipo === 'ajuste' ? 'Nuevo stock total' : 'Cantidad'}</label>
-            <input className={inputCls} type="number" min="0" value={cantidad} onChange={e => setCantidad(e.target.value)} placeholder="0" autoFocus />
+            <input className={inputCls} type="number" inputMode="decimal" min="0" value={cantidad} onChange={e => setCantidad(e.target.value)} placeholder="0" autoFocus />
           </div>
           <div>
             <label className={labelCls}>Observación (opcional)</label>

@@ -13,6 +13,7 @@ import Login from './views/Login';
 import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
+import BottomNav from './components/BottomNav';
 import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt, ClipboardList } from 'lucide-react';
 import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
 import toast, { Toaster } from 'react-hot-toast';
@@ -380,7 +381,7 @@ export default function App() {
         <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
           <button
             onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); cargarVencCount(); }}
-            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
               activeView === 'inicio' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
@@ -390,7 +391,7 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('graficas'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
               activeView === 'graficas' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
@@ -400,7 +401,7 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('caja'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
               activeView === 'caja' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
@@ -410,7 +411,7 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('stock'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
               activeView === 'stock' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
@@ -421,7 +422,7 @@ export default function App() {
           <div>
             <button
               onClick={() => setIvaSectionOpen(v => !v)}
-              className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
                 activeView === 'iva-compras' || activeView === 'iva-ventas'
                   ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30'
                   : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
@@ -435,13 +436,13 @@ export default function App() {
               <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-700/40 pl-2">
                 <button
                   onClick={() => { setActiveView('iva-compras'); setInitialSubrubro(null); closeSidebar(); }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 min-h-11 md:min-h-0 rounded-lg text-sm md:text-xs transition-colors ${
                     activeView === 'iva-compras' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
                   }`}
                 >Compras</button>
                 <button
                   onClick={() => { setActiveView('iva-ventas'); setInitialSubrubro(null); closeSidebar(); }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 min-h-11 md:min-h-0 rounded-lg text-sm md:text-xs transition-colors ${
                     activeView === 'iva-ventas' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
                   }`}
                 >Ventas</button>
@@ -452,7 +453,7 @@ export default function App() {
           <div>
             <button
               onClick={() => setRegistroSectionOpen(v => !v)}
-              className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
                 activeView === 'registro-ventas' || activeView === 'registro-tarjetas'
                   ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30'
                   : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
@@ -466,13 +467,13 @@ export default function App() {
               <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-700/40 pl-2">
                 <button
                   onClick={() => { setActiveView('registro-ventas'); setInitialSubrubro(null); closeSidebar(); }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 min-h-11 md:min-h-0 rounded-lg text-sm md:text-xs transition-colors ${
                     activeView === 'registro-ventas' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
                   }`}
                 >Venta Sistema</button>
                 <button
                   onClick={() => { setActiveView('registro-tarjetas'); setInitialSubrubro(null); closeSidebar(); }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 min-h-11 md:min-h-0 rounded-lg text-sm md:text-xs transition-colors ${
                     activeView === 'registro-tarjetas' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
                   }`}
                 >Tarjetas</button>
@@ -482,7 +483,7 @@ export default function App() {
 
           <button
             onClick={() => { setActiveView('config'); setInitialSubrubro(null); closeSidebar(); }}
-            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
+            className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
               activeView === 'config' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
           >
@@ -493,7 +494,7 @@ export default function App() {
           <div className="pt-1">
             <button
               onClick={() => setLocalesSectionOpen(v => !v)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700/60 hover:text-white"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-700/60 hover:text-white"
             >
               <Building2 size={15} />
               <span className="flex-1 text-left">Locales</span>
@@ -539,21 +540,24 @@ export default function App() {
                     <div className="group relative">
                       <button
                         onClick={() => toggleLocal(local.id)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-slate-300 hover:bg-slate-700/50 hover:text-slate-200"
+                        className="w-full flex items-center gap-2 px-3 py-2 min-h-11 md:min-h-0 rounded-lg transition-colors text-slate-300 hover:bg-slate-700/50 hover:text-slate-200"
                       >
                         {isExpanded ? <ChevronDown size={11} className="shrink-0" /> : <ChevronRight size={11} className="shrink-0" />}
                         <span className="shrink-0"><EntityIcon value={local.icon} fallback="home" size={14} /></span>
-                        <span className="flex-1 text-left truncate text-xs font-medium">{local.nombre}</span>
-                        <span className="text-xs text-slate-600 group-hover:hidden">{localRubros.length}</span>
-                        <span className="hidden group-hover:flex items-center gap-0.5">
-                          <span role="button"
+                        <span className="flex-1 text-left truncate text-sm md:text-xs font-medium">{local.nombre}</span>
+                        {/* Con mouse el contador cede el lugar a las acciones al pasar por
+                            encima. En touch no hay hover: las acciones están siempre y el
+                            contador se omite para no competir por el ancho. */}
+                        <span className="text-xs text-slate-600 [@media(hover:none)]:hidden group-hover:hidden">{localRubros.length}</span>
+                        <span className="flex items-center gap-0.5 [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex">
+                          <span role="button" aria-label="Editar local"
                             onClick={e => { e.stopPropagation(); setEditingLocal(local.id); setEditLocalNombre(local.nombre); setEditLocalIcon(resolveIconKey(local.icon) || 'home'); setShowLocalIconPicker(false); }}
-                            className="text-slate-400 hover:text-blue-400 transition-colors p-0.5 rounded"
-                          ><Pencil size={11} /></span>
-                          <span role="button"
+                            className="tap text-slate-400 hover:text-blue-400 transition-colors p-1.5 md:p-0.5 rounded"
+                          ><Pencil size={14} className="md:w-2.75 md:h-2.75" /></span>
+                          <span role="button" aria-label="Borrar local"
                             onClick={e => handleDeleteLocal(local.id, e)}
-                            className="text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded"
-                          ><Trash2 size={11} /></span>
+                            className="tap text-slate-400 hover:text-red-400 transition-colors p-1.5 md:p-0.5 rounded"
+                          ><Trash2 size={14} className="md:w-2.75 md:h-2.75" /></span>
                         </span>
                       </button>
                     </div>
@@ -594,24 +598,24 @@ export default function App() {
                           ) : (
                             <button
                               onClick={() => { setActiveView(rubro); setInitialSubrubro(null); closeSidebar(); }}
-                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                              className={`w-full flex items-center gap-2 px-2 py-1.5 min-h-11 md:min-h-0 rounded-lg text-sm transition-colors ${
                                 isRubroActive && activeView.id === rubro.id
                                   ? 'bg-slate-700 text-white'
                                   : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
                               }`}
                             >
                               <span className="shrink-0"><EntityIcon value={getRubroIcon(rubro)} size={14} /></span>
-                              <span className="flex-1 text-left truncate text-xs">{rubro.nombre}</span>
-                              <span className="text-xs text-slate-600 group-hover:hidden">{rubroStats[rubro.id] ?? 0}</span>
-                              <span className="hidden group-hover:flex items-center gap-0.5">
-                                <span role="button"
+                              <span className="flex-1 text-left truncate text-sm md:text-xs">{rubro.nombre}</span>
+                              <span className="text-xs text-slate-600 [@media(hover:none)]:hidden group-hover:hidden">{rubroStats[rubro.id] ?? 0}</span>
+                              <span className="flex items-center gap-0.5 [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex">
+                                <span role="button" aria-label="Editar rubro"
                                   onClick={e => { e.stopPropagation(); setEditingRubro(rubro.id); setEditNombre(rubro.nombre); setEditIcon(getRubroIcon(rubro)); setShowIconPicker(false); }}
-                                  className="text-slate-400 hover:text-blue-400 transition-colors p-0.5 rounded"
-                                ><Pencil size={11} /></span>
-                                <span role="button"
+                                  className="tap text-slate-400 hover:text-blue-400 transition-colors p-1.5 md:p-0.5 rounded"
+                                ><Pencil size={14} className="md:w-2.75 md:h-2.75" /></span>
+                                <span role="button" aria-label="Borrar rubro"
                                   onClick={e => handleDeleteRubro(rubro.id, e)}
-                                  className="text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded"
-                                ><Trash2 size={11} /></span>
+                                  className="tap text-slate-400 hover:text-red-400 transition-colors p-1.5 md:p-0.5 rounded"
+                                ><Trash2 size={14} className="md:w-2.75 md:h-2.75" /></span>
                               </span>
                             </button>
                           )}
@@ -640,7 +644,7 @@ export default function App() {
                       ) : (
                         <button
                           onClick={() => setShowNewRubro(local.id)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-700/40"
+                          className="w-full flex items-center gap-2 px-2 py-1.5 min-h-11 md:min-h-0 text-sm md:text-xs text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-700/40"
                         >
                           <Plus size={12} /> Nuevo rubro
                         </button>
@@ -673,7 +677,7 @@ export default function App() {
             ) : (
               <button
                 onClick={() => setShowNewLocal(true)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-700/40 mt-1"
+                className="w-full flex items-center gap-2 px-3 py-1.5 min-h-11 md:min-h-0 text-sm md:text-xs text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-700/40 mt-1"
               >
                 <Plus size={12} /> Nuevo local
               </button>
@@ -689,22 +693,24 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setDarkMode(v => !v)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 min-h-11 md:min-h-0 text-xs text-slate-400 hover:text-white transition-colors"
               title={darkMode ? 'Modo claro' : 'Modo oscuro'}
             >
               {darkMode ? <Sun size={13} /> : <Moon size={13} />}
               {darkMode ? 'Claro' : 'Oscuro'}
             </button>
-            <span className="text-slate-700">·</span>
+            {/* Lado de la barra y ocultarla son preferencias de escritorio: en mobile
+                el sidebar es un drawer y ninguna de las dos hace nada útil. */}
+            <span className="hidden md:inline text-slate-700">·</span>
             <button
               onClick={toggleSidebarSide}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              className="hidden md:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
               title={sidebarRight ? 'Mover a la izquierda' : 'Mover a la derecha'}
             >
               {sidebarRight ? <PanelLeft size={13} /> : <PanelRight size={13} />}
               {sidebarRight ? 'Izquierda' : 'Derecha'}
             </button>
-            <span className="text-slate-700">·</span>
+            <span className="hidden md:inline text-slate-700">·</span>
             <button
               onClick={toggleSidebarCollapsed}
               className="hidden md:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
@@ -722,8 +728,9 @@ export default function App() {
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <header className={`bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3.5 flex items-center gap-3 sticky top-0 z-10 transition-transform duration-300 ${headerHidden ? '-translate-y-full md:translate-y-0' : 'translate-y-0'}`}>
           {!sidebarRight && (
-            <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
-              <Menu size={20} />
+            <button onClick={() => setSidebarOpen(o => !o)} aria-label="Abrir menú"
+              className="md:hidden shrink-0 w-11 h-11 -ml-2 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 active:bg-slate-100 dark:active:bg-slate-700/60 transition">
+              <Menu size={22} />
             </button>
           )}
           {isRubroActive ? (
@@ -787,25 +794,28 @@ export default function App() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => setShowSearch(true)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+              aria-label="Buscar"
+              className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg w-11 h-11 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 transition-colors bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
               title="Buscar (Ctrl+K)"
             >
-              <Search size={13} />
+              <Search size={18} className="sm:w-3.25 sm:h-3.25" />
               <span className="hidden sm:block">Buscar</span>
               <kbd className="hidden sm:block font-sans opacity-60">Ctrl K</kbd>
             </button>
             <button
               onClick={() => setShowCargaRapida(true)}
-              className="flex items-center gap-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-2.5 py-1.5 transition-colors font-medium shadow-sm"
+              aria-label="Carga rápida"
+              className="flex items-center justify-center gap-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-lg w-11 h-11 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 transition-colors font-medium shadow-sm"
               title="Carga rápida"
             >
-              <Zap size={13} />
+              <Zap size={18} className="sm:w-3.25 sm:h-3.25" />
               <span className="hidden sm:block">Carga rápida</span>
             </button>
           </div>
           {sidebarRight && (
-            <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
-              <Menu size={20} />
+            <button onClick={() => setSidebarOpen(o => !o)} aria-label="Abrir menú"
+              className="md:hidden shrink-0 w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 active:bg-slate-100 dark:active:bg-slate-700/60 transition">
+              <Menu size={22} />
             </button>
           )}
         </header>
@@ -815,7 +825,7 @@ export default function App() {
             En mobile se abre únicamente con el botón de las tres líneas. */}
         <main
           ref={mainRef}
-          className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto"
+          className="flex-1 px-3 md:px-6 py-4 md:py-6 overflow-auto pb-bottomnav"
         >
           {loading ? (
             <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>
@@ -856,13 +866,29 @@ export default function App() {
 
     </div>
 
+    {/* La barra vive fuera del shell (hermana del div de arriba, hija directa del
+        fragmento raíz) para que su `position: fixed` se resuelva contra el
+        viewport: cualquier ancestro con transform/filter la convertiría en
+        `absolute` y la dejaría flotando en medio del contenido.
+        Se oculta con el drawer abierto: la barra es z-40 y el drawer z-30, así
+        que si no quedaba pisándolo. */}
+    {!sidebarOpen && (
+      <BottomNav
+        activeView={activeView}
+        onNavigate={(view) => { setActiveView(view); setInitialSubrubro(null); closeSidebar(); if (view === 'inicio') cargarVencCount(); }}
+        onOpenDrawer={() => setSidebarOpen(true)}
+      />
+    )}
+
     {showScrollTop && (
       <button
         onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-        className={`fixed bottom-6 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-xl transition-all ${sidebarRight ? 'left-6' : 'right-6'}`}
+        // En mobile sube por encima de la bottom nav (56px + safe area) para no
+        // quedar tapado por ella.
+        className={`fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg rounded-full w-11 h-11 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:shadow-xl transition-all ${sidebarRight ? 'left-4 md:left-6' : 'right-4 md:right-6'}`}
         title="Volver arriba"
       >
-        <ChevronUp size={18} />
+        <ChevronUp size={20} />
       </button>
     )}
 

@@ -3,7 +3,10 @@ import { ivaApi, getErrorMsg } from '../api';
 import ComprasImportModal from '../components/ComprasImportModal';
 import Modal from '../components/Modal';
 import InfoTooltip from '../components/InfoTooltip';
-import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, ArrowUp, Columns3, Pencil, RotateCcw, Check } from 'lucide-react';
+import RowActions from '../components/RowActions';
+import FiltroSheet from '../components/FiltroSheet';
+import TableScroll from '../components/TableScroll';
+import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, ArrowUp, Columns3, Pencil, RotateCcw, Check, ListFilter } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -357,7 +360,7 @@ function AjusteSaldoModal({ mes, calculado, actual, ajustado, onClose, onGuardar
             <span className="ml-1 text-slate-400">(positivo = a pagar, negativo = saldo libre)</span>
           </label>
           <input
-            type="number" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} autoFocus
+            type="number" inputMode="decimal" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} autoFocus
             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <p className="mt-1.5 text-[11px] text-slate-400">
@@ -391,6 +394,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
   const sinDatos = meses.length === 0;
   const [tiposSel, setTiposSel] = useState([]); // [] = todos
   const [ajustando, setAjustando] = useState(null); // mes en edición | null
+  const [sheetTipos, setSheetTipos] = useState(false); // hoja de filtro (mobile)
 
   const incluido = (tipo) => tiposSel.length === 0 || tiposSel.includes(tipo);
   const toggleTipo = (tipo) =>
@@ -462,10 +466,18 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-          Diferencia mensual IVA
-        </h2>
-        <div className="flex items-center gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Diferencia mensual IVA
+          </h2>
+          {/* Este bloque muestra SIEMPRE todos los meses cargados: decirlo evita
+              leerlo como desincronizado con el selector de mes de más abajo, que
+              filtra el listado de comprobantes y no este resumen. */}
+          <p className="text-[11px] text-slate-400">Todos los meses cargados</p>
+        </div>
+
+        {/* Desktop: los dos exports a la vista. */}
+        <div className="hidden sm:flex items-center gap-2">
           <button onClick={exportExcel} disabled={sinDatos}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-40 disabled:cursor-not-allowed">
             <FileSpreadsheet size={14} /> Exportar Excel
@@ -475,34 +487,84 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
             <FileText size={14} /> Exportar PDF
           </button>
         </div>
+
+        {/* Mobile: al menú ⋮ del header. Exportar es una acción ocasional y esa
+            fila entera es espacio vertical que en 375px hace falta para los datos. */}
+        <div className="sm:hidden -mr-1.5">
+          <RowActions
+            title="Diferencia mensual IVA"
+            acciones={[
+              { key: 'excel', label: 'Exportar Excel', icon: <FileSpreadsheet size={16} />, disabled: sinDatos, onClick: exportExcel },
+              { key: 'pdf', label: 'Exportar PDF', icon: <FileText size={16} />, disabled: sinDatos, onClick: exportPdf },
+            ]}
+          />
+        </div>
       </div>
 
-      {/* Filtro por tipo de comprobante. Cada chip lleva su contador: un 0 dice
+      {/* Filtro por tipo de comprobante. Cada opción lleva su contador: un 0 dice
           "no hay comprobantes de este tipo", que es distinto de estar deshabilitado. */}
       {tipos.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 mb-2">
-          <button onClick={() => setTiposSel([])}
-            className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
-              !filtrando ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}>
-            Todas
+        <>
+          {/* Desktop: los chips en línea, que se leen de un vistazo. */}
+          <div className="hidden sm:flex flex-wrap items-center gap-1 mb-2">
+            <button onClick={() => setTiposSel([])}
+              className={`text-[11px] px-2.5 py-1 min-h-9 rounded-full border transition-colors ${
+                !filtrando ? 'bg-blue-600 text-white border-blue-600'
+                  : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}>
+              Todas
+            </button>
+            {tipos.map(({ tipo, es_nc }) => {
+              const n = itemsPorTipo[tipo] || 0;
+              const activo = incluido(tipo) && filtrando;
+              return (
+                <button key={tipo} onClick={() => toggleTipo(tipo)}
+                  title={n === 0 ? 'Sin comprobantes de este tipo en los meses cargados' : `${n} comprobante${n === 1 ? '' : 's'}${es_nc ? ' · resta del total' : ''}`}
+                  className={`text-[11px] px-2.5 py-1 min-h-9 rounded-full border transition-colors ${
+                    activo ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}>
+                  {tipo}
+                  {es_nc && <span className="ml-1 opacity-60">−</span>}
+                  <span className={`ml-1 ${activo ? 'opacity-70' : 'text-slate-400'}`}>{n}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mobile: un disparador de una línea. Los mismos chips se iban a tres
+              líneas en 375px antes de mostrar un solo número. */}
+          <button type="button" onClick={() => setSheetTipos(true)}
+            aria-haspopup="dialog"
+            className={`sm:hidden w-full flex items-center gap-2 h-11 px-3 mb-2 rounded-lg border transition-colors ${
+              filtrando
+                ? 'bg-blue-50 border-blue-400 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500 dark:text-blue-300'
+                : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+            <ListFilter size={15} className="shrink-0" />
+            <span className="flex-1 text-left text-sm truncate">Filtrar por comprobante</span>
+            {filtrando && (
+              <span className="shrink-0 min-w-5 px-1.5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-semibold tabular-nums">
+                {tiposSel.length}
+              </span>
+            )}
+            <ChevronDown size={15} className="shrink-0 opacity-60" />
           </button>
-          {tipos.map(({ tipo, es_nc }) => {
-            const n = itemsPorTipo[tipo] || 0;
-            const activo = incluido(tipo) && filtrando;
-            return (
-              <button key={tipo} onClick={() => toggleTipo(tipo)}
-                title={n === 0 ? 'Sin comprobantes de este tipo en los meses cargados' : `${n} comprobante${n === 1 ? '' : 's'}${es_nc ? ' · resta del total' : ''}`}
-                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
-                  activo ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}>
-                {tipo}
-                {es_nc && <span className="ml-1 opacity-60">−</span>}
-                <span className={`ml-1 ${activo ? 'opacity-70' : 'text-slate-400'}`}>{n}</span>
-              </button>
-            );
-          })}
-        </div>
+
+          {sheetTipos && (
+            <FiltroSheet
+              title="Filtrar por comprobante"
+              todasLabel="Todas"
+              seleccion={tiposSel}
+              opciones={tipos.map(({ tipo, es_nc }) => ({
+                key: tipo,
+                label: tipo,
+                count: itemsPorTipo[tipo] || 0,
+                hint: es_nc ? 'Nota de crédito · resta del total' : undefined,
+              }))}
+              onToggle={toggleTipo}
+              onTodas={() => setTiposSel([])}
+              onClose={() => setSheetTipos(false)}
+            />
+          )}
+        </>
       )}
 
       {/* Filtrando por tipo la Diferencia se recalcula sobre el subconjunto, así que
@@ -519,7 +581,23 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
           Cargá compras, ventas o créditos fiscales para ver el saldo mensual.
         </p>
       ) : (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-x-auto">
+        <>
+        {/* Mobile: una card por mes (ver MesCard). La tabla tiene 8 columnas y en
+            375px entraban tres: Ventas y Diferencia —los dos datos que se vienen
+            a buscar— quedaban fuera de pantalla detrás de un scroll horizontal. */}
+        <div className="sm:hidden space-y-2">
+          {vista.map(m => (
+            <MesCard
+              key={m.mes} m={m} esActual={m.mes === mesActual}
+              puedeAjustar={puedeAjustar} onAjustar={() => setAjustando(m.mes)}
+            />
+          ))}
+        </div>
+
+        {/* Desktop: la tabla completa, que es donde comparar meses entre sí
+            funciona. TableScroll aporta el degradé de borde si llega a faltar ancho. */}
+        <div className="hidden sm:block">
+        <TableScroll className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
           <table className="w-full text-sm whitespace-nowrap">
             {/* Cada bloque de columnas tiene su color: compras ámbar, IVA celeste,
                 percepciones violeta (no suman), resultado verde/rojo. */}
@@ -622,7 +700,9 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
               })}
             </tbody>
           </table>
+        </TableScroll>
         </div>
+        </>
       )}
 
       {ajustando && (() => {
@@ -646,9 +726,160 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
   );
 }
 
+// ── Mes del cruce como card (solo mobile) ────────────────────────────────────
+// La tabla de Diferencia tiene 8 columnas (~900px) contra los 351px útiles de un
+// teléfono: entraban Mes, Compras e IVA Compras, y Ventas y Diferencia —los dos
+// datos que se vienen a buscar— quedaban detrás de un scroll horizontal. La card
+// pone esos dos arriba y guarda el desglose detrás del acordeón.
+function MesCard({ m, esActual, puedeAjustar, onAjustar }) {
+  const [abierto, setAbierto] = useState(false);
+  const nada = <span className="text-slate-300 dark:text-slate-600">—</span>;
+
+  return (
+    <div className={`bg-white dark:bg-slate-800 border rounded-xl overflow-hidden ${
+      esActual ? 'border-blue-400 dark:border-blue-500' : 'border-slate-200 dark:border-slate-700'}`}>
+      <button
+        type="button"
+        onClick={() => setAbierto(v => !v)}
+        aria-expanded={abierto}
+        className="w-full text-left px-3 py-2.5 active:bg-slate-50 dark:active:bg-slate-700/40 transition-colors"
+      >
+        <div className="flex items-center gap-1.5">
+          <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{labelMes(m.mes)}</span>
+          {esActual && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+              En curso
+            </span>
+          )}
+          {m.ajustado && (
+            <span title={tituloAjuste(m)}
+              className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              <Pencil size={9} /> Ajustado
+            </span>
+          )}
+        </div>
+
+        {/* Los dos datos clave, uno al lado del otro: Ventas es el número que se
+            compara y Diferencia el que se decide. El resto va en el acordeón. */}
+        <div className="mt-2 flex items-end justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block text-[11px] uppercase tracking-wide text-slate-400">Ventas</span>
+            <span className="block text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">{fmt(m.ventas)}</span>
+          </span>
+          <span className="text-right shrink-0">
+            <span className="block text-[11px] uppercase tracking-wide text-slate-400">Diferencia</span>
+            <span className="block text-sm font-semibold"><Resultado valor={m.diferencia} /></span>
+          </span>
+        </div>
+      </button>
+
+      {abierto && (
+        <div className="px-3 pb-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60">
+          <Dato label="Compras (Imp. Total)" valor={fmt(m.imp)} tono="text-amber-600 dark:text-amber-400" />
+          <Dato label="IVA compras" valor={fmt(m.iva)} tono="text-sky-600 dark:text-sky-400" />
+          {/* Violeta: percepciones e IIBB no suman al Imp. Total. IIBB además no
+              entra en la Diferencia (es provincial), por eso lleva la aclaración. */}
+          <Dato label="Percep. IVA" valor={m.percepcion_iva ? fmt(m.percepcion_iva) : nada} tono="text-violet-600 dark:text-violet-400" />
+          <Dato label="Ing. Brutos (no opera)" valor={m.ingresos_brutos ? fmt(m.ingresos_brutos) : nada} tono="text-violet-600 dark:text-violet-400" />
+          <Dato label="Créditos fiscales" valor={m.creditos_fiscales ? fmt(m.creditos_fiscales) : nada} tono="text-indigo-600 dark:text-indigo-400" />
+
+          {/* En la tabla el disparador del ajuste es el monto; acá el tap de la
+              card ya está tomado por el acordeón, así que el ajuste va explícito. */}
+          {puedeAjustar && (
+            <button type="button" onClick={onAjustar}
+              className="mt-2 w-full inline-flex items-center justify-center gap-1.5 min-h-11 rounded-lg border border-slate-300 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 active:bg-slate-100 dark:active:bg-slate-700/60 transition-colors">
+              <Pencil size={14} /> {m.ajustado ? 'Editar o restaurar el saldo' : 'Ajustar saldo a mano'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Un mes puede traer cientos de comprobantes: se listan de a tandas para no
 // montar miles de <tr> ni obligar a scrollear el mes entero para llegar al que sigue.
 const FILAS_POR_PAGINA = 50;
+
+// ── Comprobante como card (solo mobile) ──────────────────────────────────────
+// La tabla de compras tiene 11 columnas (14 con el detalle completo): unos 990px
+// contra los 351px útiles de un teléfono. Scrollear tres pantallas por fila no es
+// leer una tabla, así que debajo de sm cada comprobante se muestra como card con
+// los cuatro datos que se consultan siempre —proveedor, fecha, Imp. Total y
+// Total IVA— y el resto detrás de un acordeón.
+// Fuera de CompraCard: definido adentro, React lo trataría como un tipo nuevo en
+// cada render y remontaría toda la lista del acordeón.
+function Dato({ label, valor, tono = 'text-slate-700 dark:text-slate-200' }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1">
+      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">{label}</span>
+      <span className={`text-sm tabular-nums text-right ${tono}`}>{valor}</span>
+    </div>
+  );
+}
+
+function CompraCard({ c, detalle, isViewer, onDelete }) {
+  const [abierto, setAbierto] = useState(false);
+
+  return (
+    <div className="px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={() => setAbierto(v => !v)}
+          aria-expanded={abierto}
+          className="flex-1 min-w-0 text-left"
+        >
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug break-words">
+            {c.razon_social || '—'}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+            <span className="tabular-nums">{c.fecha}</span>
+            {c.tipo && <><span aria-hidden>·</span><span className="truncate">{c.tipo}</span></>}
+            <ChevronDown size={12} className={`shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+          </p>
+        </button>
+
+        <div className="shrink-0 text-right">
+          <p className="text-base font-bold text-amber-600 dark:text-amber-400 tabular-nums whitespace-nowrap">
+            {fmtNum(c.imp_total)}
+          </p>
+          <p className="text-xs text-sky-600 dark:text-sky-400 tabular-nums whitespace-nowrap">
+            IVA {fmtNum(c.total_iva || c.iva_21)}
+          </p>
+        </div>
+
+        {!isViewer && (
+          <RowActions
+            title={c.razon_social || 'Comprobante'}
+            acciones={[{
+              key: 'eliminar',
+              label: 'Eliminar comprobante',
+              icon: <Trash2 size={16} />,
+              tone: 'danger',
+              onClick: () => onDelete(c.id),
+            }]}
+          />
+        )}
+      </div>
+
+      {abierto && (
+        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+          <Dato label="Documento" valor={c.documento || '—'} />
+          <Dato label="Nro Doc Emisor" valor={c.nro_doc || '—'} />
+          <Dato label="Neto Gravado" valor={fmtNum(c.neto_gravado || c.neto_grav_21)} />
+          {detalle && <Dato label="Neto Grav. 21%" valor={fmtNum(c.neto_grav_21)} />}
+          {detalle && <Dato label="IVA 21%" valor={fmtNum(c.iva_21)} tono="text-sky-600 dark:text-sky-400" />}
+          {detalle && c.otros_atributos && <Dato label="Otros Atrib." valor={c.otros_atributos} />}
+          {/* Percepciones en violeta: son pago a cuenta, no suman al Imp. Total. */}
+          {(c.percepcion_iva || 0) > 0 && <Dato label="Percep. IVA" valor={fmtNum(c.percepcion_iva)} tono="text-violet-600 dark:text-violet-400" />}
+          {(c.ingresos_brutos || 0) > 0 && <Dato label="Ing. Brutos" valor={fmtNum(c.ingresos_brutos)} tono="text-violet-600 dark:text-violet-400" />}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Tooltip nativo solo cuando el texto quedó cortado: si entra completo, el title
 // repetiría lo que ya se lee.
@@ -861,50 +1092,13 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth' })}
           title="Volver arriba"
           aria-label="Volver arriba"
-          className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-[fadeIn_150ms_ease-out]"
+          // En mobile sube por encima de la bottom nav (56px + safe area): en
+          // `bottom-6` quedaba justo debajo de la barra y era intocable.
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-[fadeIn_150ms_ease-out]"
         >
           <ArrowUp size={18} strokeWidth={2.5} />
         </button>
       )}
-      {/* Resumen + filtro por tipo */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">
-          Imp. Total {tipoSel ? `(${tipoSel})` : 'acumulado'}: <strong className="text-amber-600 dark:text-amber-400">{fmt(impAcum)}</strong>
-          {' · '}IVA total: <strong className="text-slate-600 dark:text-slate-300">{fmt(ivaAcum)}</strong>
-        </p>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 min-w-36 sm:flex-none">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              placeholder="Buscar monto, razón social o factura…"
-              className="w-full sm:w-56 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 rounded-lg pl-7 pr-7 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
-            {busqueda && (
-              <button onClick={() => setBusqueda('')} title="Limpiar"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">×</button>
-            )}
-          </div>
-          {tiposDisponibles.length > 0 && (
-            <select value={tipoSel} onChange={e => setTipoSel(e.target.value)}
-              className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
-              <option value="">Todas las boletas</option>
-              {tiposDisponibles.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          )}
-          {!isViewer && (
-            <button onClick={() => setShowManual(v => !v)} title="Cargar un comprobante a mano"
-              className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-xs">
-              <Plus size={13} /> <span className="hidden sm:inline">Cargar manual</span>
-            </button>
-          )}
-          {!isViewer && (
-            <button onClick={() => onOpenWizard([])} title="Importar Excel y mapear columnas"
-              className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-xs">
-              <Upload size={13} /> <span className="hidden sm:inline">Importar</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Formulario de carga manual (modal) */}
       {showManual && !isViewer && (
         <Modal title="Cargar comprobante manual" onClose={() => setShowManual(false)} size="2xl">
@@ -915,24 +1109,30 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
         </Modal>
       )}
 
-      {/* Navegación por mes + acordeón de rango de fechas */}
+      {/* ── Grupo 1 · Período ─────────────────────────────────────────────────
+          El mes abre la zona de carga porque es el filtro de uso diario. Va
+          etiquetado para no confundirse con el resumen de arriba, que muestra
+          todos los meses: sin etiqueta parecían el mismo control desincronizado. */}
       <div className="text-xs">
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Mes del listado</p>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Navegador de mes (segmented) — siempre visible: es el filtro de uso diario */}
-          <div className="inline-flex items-center h-8 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 overflow-hidden">
+          {/* Navegador de mes (segmented) — siempre visible: es el filtro de uso
+              diario, y por eso en mobile va a ancho completo. */}
+          <div className="flex sm:inline-flex w-full sm:w-auto items-center h-11 sm:h-8 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 overflow-hidden">
             <button onClick={() => irMes(-1)} title="Mes anterior"
-              className="h-full px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
+              className="h-full px-3 sm:px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
               <ChevronLeft size={14} />
             </button>
-            <div className="relative h-full flex items-center justify-center border-x border-slate-300 dark:border-slate-600 px-2 min-w-18 cursor-pointer">
-              <span className="text-slate-700 dark:text-slate-200 tabular-nums">
+            <div className="relative flex-1 sm:flex-none h-full flex items-center justify-center border-x border-slate-300 dark:border-slate-600 px-2 min-w-18 cursor-pointer">
+              {/* El mes es el dato del control, no un label: en mobile no baja de 14px. */}
+              <span className="text-sm sm:text-xs font-medium sm:font-normal text-slate-700 dark:text-slate-200 tabular-nums">
                 {mesSel ? `${mesSel.slice(5, 7)}/${mesSel.slice(0, 4)}` : 'Todos'}
               </span>
               <input type="month" value={mesSel} onChange={e => setMesSel(e.target.value)} title="Elegir mes"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
             </div>
             <button onClick={() => irMes(1)} title="Mes siguiente"
-              className="h-full px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
+              className="h-full px-3 sm:px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
               <ChevronRight size={14} />
             </button>
           </div>
@@ -943,30 +1143,48 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           <button type="button" onClick={() => setFechasAbierto(v => !v)}
             aria-expanded={fechasAbierto} aria-controls="filtro-rango-fechas"
             title={hayRango ? `Rango activo: ${resumenRango}` : 'Filtrar por rango de fechas'}
-            className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-11 sm:h-8 px-2.5 rounded-lg border transition-colors ${
               hayRango
                 ? 'bg-blue-50 border-blue-400 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500 dark:text-blue-300'
                 : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
             <ChevronDown size={13} className={`shrink-0 transition-transform ${fechasAbierto ? 'rotate-180' : ''}`} />
             <CalendarDays size={13} className="shrink-0" />
-            <span className="hidden sm:inline">Rango de fechas</span>
+            {/* Con `detalle` mudado al menú ⋮ hay lugar para la etiqueta también en
+                mobile: dos íconos sueltos no decían qué abría este chip. */}
+            <span>Rango de fechas</span>
             {hayRango && (
               <span className="inline-flex items-center gap-1 tabular-nums">
-                <span className="opacity-50 hidden sm:inline">•</span>
+                <span className="opacity-50">•</span>
                 {resumenRango}
               </span>
             )}
           </button>
 
-          {/* Vista compacta ↔ todas las columnas */}
-          <div className="ml-auto flex items-center gap-1.5">
+          {/* Vista compacta ↔ todas las columnas. Desktop: botón con etiqueta + ⓘ. */}
+          <div className="ml-auto hidden sm:flex items-center gap-1.5">
             <button onClick={() => setDetalle(v => !v)} aria-pressed={detalle} title="Ver detalle completo"
               className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border transition-colors ${
                 detalle ? 'bg-slate-700 text-white border-slate-700 dark:bg-slate-600 dark:border-slate-500'
                   : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
-              <Columns3 size={13} /> <span className="hidden sm:inline">Ver detalle completo</span>
+              <Columns3 size={13} /> Ver detalle completo
             </button>
             <InfoTooltip width="w-64" text="La vista compacta muestra un solo Neto Gravado y un solo Total IVA, que es lo que coincide en casi todos los comprobantes. El detalle completo agrega Neto Grav. 21%, IVA 21% y Otros Atributos, útil cuando hay alícuotas distintas del 21%. Los importes que no coinciden quedan subrayados con el detalle en el tooltip." />
+          </div>
+
+          {/* Mobile: ▥ y ⓘ sueltos entre los controles de carga no decían qué
+              hacían. Se van al menú ⋮, donde la acción lleva etiqueta y la ayuda
+              va como hint de la misma fila. */}
+          <div className="ml-auto sm:hidden -mr-1.5">
+            <RowActions
+              title="Vista del listado"
+              acciones={[{
+                key: 'detalle',
+                label: detalle ? 'Volver a la vista compacta' : 'Ver detalle completo',
+                icon: <Columns3 size={16} />,
+                hint: detalle ? 'Oculta Neto Grav. 21%, IVA 21% y Otros Atributos' : 'Agrega Neto Grav. 21%, IVA 21% y Otros Atributos',
+                onClick: () => setDetalle(v => !v),
+              }]}
+            />
           </div>
         </div>
 
@@ -989,7 +1207,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
               {/* Mostrar todos los meses */}
               <button onClick={() => { setMesSel(''); setDesde(''); setHasta(''); }} title="Ver todos los meses"
                 tabIndex={fechasAbierto ? 0 : -1}
-                className={`inline-flex items-center h-8 px-2.5 rounded-lg border transition-colors ${
+                className={`inline-flex items-center h-11 sm:h-8 px-2.5 rounded-lg border transition-colors ${
                   mesSel === '' && !desde && !hasta
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
@@ -998,7 +1216,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
               {hayFiltroFecha && (
                 <button onClick={limpiarFechas} title="Quitar filtros"
                   tabIndex={fechasAbierto ? 0 : -1}
-                  className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                  className="inline-flex items-center gap-1 h-11 sm:h-8 px-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
                   <X size={13} /> Limpiar
                 </button>
               )}
@@ -1006,6 +1224,54 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           </div>
         </div>
       </div>
+
+      {/* ── Grupo 2 · Buscar y filtrar ────────────────────────────────────────
+          Apilado y a ancho completo en mobile: buscador y select mezclados con
+          los botones de acción en la misma fila no se leían como un grupo. */}
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Buscar y filtrar</p>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+          <div className="relative w-full sm:w-auto">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              placeholder="Buscar monto, razón social o factura…"
+              className="w-full sm:w-56 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 rounded-lg pl-7 pr-9 py-1.5 min-h-11 sm:min-h-0 text-sm sm:text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')} title="Limpiar" aria-label="Limpiar búsqueda"
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-auto sm:h-auto sm:right-2 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">×</button>
+            )}
+          </div>
+          {tiposDisponibles.length > 0 && (
+            <select value={tipoSel} onChange={e => setTipoSel(e.target.value)}
+              aria-label="Tipo de boleta"
+              className="w-full sm:w-auto border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2.5 py-1.5 min-h-11 sm:min-h-0 text-sm sm:text-xs">
+              <option value="">Todas las boletas</option>
+              {tiposDisponibles.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* ── Grupo 3 · Acciones ────────────────────────────────────────────────
+          Con etiqueta también en mobile: + y ⬆ sueltos no decían qué hacían. */}
+      {!isViewer && (
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowManual(v => !v)} title="Cargar un comprobante a mano"
+            className="flex-1 sm:flex-none border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 min-h-11 sm:min-h-0 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-1.5 text-sm sm:text-xs">
+            <Plus size={14} /> Cargar manual
+          </button>
+          <button onClick={() => onOpenWizard([])} title="Importar Excel y mapear columnas"
+            className="flex-1 sm:flex-none border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 min-h-11 sm:min-h-0 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-1.5 text-sm sm:text-xs">
+            <Upload size={14} /> Importar Excel
+          </button>
+        </div>
+      )}
+
+      {/* Acumulado de lo que quedó visible con los filtros de arriba. */}
+      <p className="text-sm text-slate-500">
+        Imp. Total {tipoSel ? `(${tipoSel})` : 'acumulado'}: <strong className="text-amber-600 dark:text-amber-400">{fmt(impAcum)}</strong>
+        {' · '}IVA total: <strong className="text-slate-600 dark:text-slate-300">{fmt(ivaAcum)}</strong>
+      </p>
 
       {/* Archivos cargados (lotes) */}
       <LotesCard lotes={lotes} isViewer={isViewer} onDeleteLote={onDeleteLote} />
@@ -1031,24 +1297,30 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
             {/* Barra de totales = cabecera plegable del mes. Imp. Total es el acento:
                 más grande, más peso y solo, a la derecha. */}
             <button type="button" onClick={() => toggleMes(mes)}
-              className="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-3 sm:px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/70 transition-colors text-left">
-              <span className="flex items-center gap-1.5 min-w-32 mr-1">
-                <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+              className="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-3 sm:px-4 py-2.5 min-h-14 sm:min-h-0 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/70 transition-colors text-left">
+              <span className="flex items-center gap-1.5 sm:min-w-32 mr-1">
+                <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
                 <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">{labelMes(mes)}</span>
                 <span className="text-xs font-normal text-slate-400">({filas.length})</span>
               </span>
-              <TotalMes label="Neto Grav." valor={subtotalF(filas, netoDe)} />
-              {detalle && <TotalMes label="Neto Grav. 21%" valor={subtotal(filas, 'neto_grav_21')} />}
-              {detalle && <TotalMes label="IVA 21%" valor={subtotal(filas, 'iva_21')} tono="text-sky-600 dark:text-sky-400" />}
-              <TotalMes label="Total IVA" valor={subtotalF(filas, ivaDe)} tono="text-sky-600 dark:text-sky-400" />
-              {/* Percepciones/IIBB: violeta porque no suman a ningún total del mes */}
-              {(percep || iibb) ? (
-                <span className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-700"
-                  title="Percepciones sufridas en las compras. Son pago a cuenta: se acumulan aparte y no suman al Imp. Total.">
-                  {percep ? <TotalMes label="Percep. IVA" valor={percep} tono="text-violet-600 dark:text-violet-400" /> : null}
-                  {iibb ? <TotalMes label="Ing. Brutos" valor={iibb} tono="text-violet-600 dark:text-violet-400" /> : null}
-                </span>
-              ) : null}
+              {/* Los subtotales intermedios se ocultan en mobile: con flex-wrap los
+                  siete chips convertían cada cabecera de mes en un bloque de ~140px,
+                  y una lista de 12 meses en puro scroll. Quedan el mes y el Imp. Total,
+                  que es el número que se busca al plegar. */}
+              <span className="hidden sm:contents">
+                <TotalMes label="Neto Grav." valor={subtotalF(filas, netoDe)} />
+                {detalle && <TotalMes label="Neto Grav. 21%" valor={subtotal(filas, 'neto_grav_21')} />}
+                {detalle && <TotalMes label="IVA 21%" valor={subtotal(filas, 'iva_21')} tono="text-sky-600 dark:text-sky-400" />}
+                <TotalMes label="Total IVA" valor={subtotalF(filas, ivaDe)} tono="text-sky-600 dark:text-sky-400" />
+                {/* Percepciones/IIBB: violeta porque no suman a ningún total del mes */}
+                {(percep || iibb) ? (
+                  <span className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-700"
+                    title="Percepciones sufridas en las compras. Son pago a cuenta: se acumulan aparte y no suman al Imp. Total.">
+                    {percep ? <TotalMes label="Percep. IVA" valor={percep} tono="text-violet-600 dark:text-violet-400" /> : null}
+                    {iibb ? <TotalMes label="Ing. Brutos" valor={iibb} tono="text-violet-600 dark:text-violet-400" /> : null}
+                  </span>
+                ) : null}
+              </span>
               <span className="ml-auto flex items-baseline gap-1.5 whitespace-nowrap">
                 <span className="text-[11px] uppercase tracking-wide text-slate-400">Imp. Total</span>
                 <span className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{fmt(subtotal(filas, 'imp_total'))}</span>
@@ -1058,9 +1330,16 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
             {/* grid-rows 1fr↔0fr: colapso animado sin medir alturas a mano. */}
             <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${abierto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
               <div className="overflow-hidden">
-                {/* El scroll vive en la card (no en la página) para que el encabezado
-                    quede fijo arriba y la Razón Social fija a la izquierda en mobile. */}
-                <div className="overflow-auto max-h-[70vh] border-t border-slate-100 dark:border-slate-700/60">
+                {/* Mobile: una card por comprobante (ver CompraCard). */}
+                <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-700/60 border-t border-slate-100 dark:border-slate-700/60">
+                  {pagFilas.map(c => (
+                    <CompraCard key={c.id} c={c} detalle={detalle} isViewer={isViewer} onDelete={onDeleteCompra} />
+                  ))}
+                </div>
+
+                {/* Desktop: la tabla completa. El scroll vive en la card (no en la
+                    página) para que el encabezado quede fijo arriba. */}
+                <div className="hidden sm:block overflow-auto max-h-[70vh] border-t border-slate-100 dark:border-slate-700/60">
                   <table className="w-full text-xs whitespace-nowrap">
                     <thead>
                       <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-20 [&>th]:bg-slate-100 dark:[&>th]:bg-slate-900 [&>th]:border-b [&>th]:border-slate-200 dark:[&>th]:border-slate-700">
@@ -1111,7 +1390,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                             <td className="px-2 py-1 text-right">
                               {!isViewer && (
                                 <button onClick={() => onDeleteCompra(c.id)} title="Eliminar comprobante" aria-label="Eliminar comprobante"
-                                  className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition"><Trash2 size={12} /></button>
+                                  className="text-slate-300 hover:text-red-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus:opacity-100 transition"><Trash2 size={12} /></button>
                               )}
                             </td>
                           </tr>
@@ -1162,7 +1441,7 @@ function CompraManualForm({ onSubmit, onCancel }) {
   const num = (k, label, extraCls = '') => (
     <div>
       <label className={labelCls}>{label}</label>
-      <input type="number" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} ${extraCls}`} />
+      <input type="number" inputMode="decimal" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} ${extraCls}`} />
     </div>
   );
   // Percepciones/IIBB: mismo input que el resto (simétrico), con label violeta que
@@ -1170,7 +1449,7 @@ function CompraManualForm({ onSubmit, onCancel }) {
   const numV = (k, label) => (
     <div>
       <label className="block text-[11px] text-violet-500 dark:text-violet-400 mb-0.5">{label} <span className="text-violet-400/70">(no suma)</span></label>
-      <input type="number" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} border-violet-200 dark:border-violet-800 focus:ring-violet-500`} />
+      <input type="number" inputMode="decimal" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} border-violet-200 dark:border-violet-800 focus:ring-violet-500`} />
     </div>
   );
 
@@ -1239,7 +1518,7 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Monto de ventas</label>
-              <input type="number" min="0" step="0.01" value={vTotal} onChange={e => setVTotal(e.target.value)} placeholder="0"
+              <input type="number" inputMode="decimal" min="0" step="0.01" value={vTotal} onChange={e => setVTotal(e.target.value)} placeholder="0"
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
             </div>
             <div>
@@ -1304,7 +1583,7 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
                         <span className="text-right">
                           {!isViewer && (
                             <button onClick={() => onDelete(v.id)} title="Eliminar"
-                              className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                              className="text-slate-300 hover:text-red-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
                               <Trash2 size={14} />
                             </button>
                           )}
@@ -1374,7 +1653,7 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
                 Monto del crédito
                 <InfoTooltip text="Se acumula con los demás créditos del mismo mes y se resta del saldo mensual de IVA. Cargalo en positivo: la resta la hace el cálculo." />
               </label>
-              <input type="number" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0"
+              <input type="number" inputMode="decimal" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0"
                 className={`w-full ${inputCls}`} />
             </div>
             <div>
@@ -1443,11 +1722,11 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
                             {!isViewer && (
                               <>
                                 <button onClick={() => setEditando(c.id)} title="Editar"
-                                  className="text-slate-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
+                                  className="text-slate-300 hover:text-blue-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
                                   <Pencil size={13} />
                                 </button>
                                 <button onClick={() => eliminar(c.id)} title="Eliminar"
-                                  className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
+                                  className="text-slate-300 hover:text-red-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
                                   <Trash2 size={14} />
                                 </button>
                               </>
@@ -1490,7 +1769,7 @@ function CreditoEditRow({ credito, onSave, onCancel }) {
     <div className={`${GRID_CREDITOS} items-center px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 bg-blue-50/50 dark:bg-blue-900/10`}>
       <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={cls} />
       <input type="text" value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Concepto" className={cls} />
-      <input type="number" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
+      <input type="number" inputMode="decimal" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
         className={`${cls} text-right tabular-nums w-28`} />
       <span className="flex items-center justify-end gap-1">
         <button onClick={guardar} disabled={saving} title="Guardar"

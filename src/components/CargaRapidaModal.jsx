@@ -336,13 +336,13 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>
-                <input type="number" min="0" step="any" placeholder="0"
+                <input type="number" inputMode="decimal" min="0" step="any" placeholder="0"
                   className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Ingresos Brutos <span className="font-normal text-violet-400/70">(no suma)</span></label>
-                <input type="number" min="0" step="any" placeholder="0"
+                <input type="number" inputMode="decimal" min="0" step="any" placeholder="0"
                   className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
               </div>
@@ -354,7 +354,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
             <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esPago ? 'text-blue-500' : 'text-green-600'}`}>
               {esPago ? '−' : '+'}
             </span>
-            <input type="number" min="0" step="any" placeholder="0"
+            <input type="number" inputMode="decimal" min="0" step="any" placeholder="0"
               className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={monto} onChange={e => setMonto(e.target.value)} required />
           </div>

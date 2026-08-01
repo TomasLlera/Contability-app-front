@@ -5,9 +5,11 @@ import MovimientoForm from '../components/MovimientoForm';
 import CalendarioSubrubro from '../components/CalendarioSubrubro';
 import ConfirmModal from '../components/ConfirmModal';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet, Banknote, ArrowLeftRight, Edit3 } from 'lucide-react';
+import { ArrowLeft, Download, Trash2, FileText, Zap, ArrowDownCircle, CheckCircle2, Clock, Wallet, Banknote, ArrowLeftRight, Edit3, ChevronDown } from 'lucide-react';
 import ExportModal from '../components/ExportModal';
 import DescuentosPanel from '../components/DescuentosPanel';
+import RowActions from '../components/RowActions';
+import TableScroll from '../components/TableScroll';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
@@ -59,6 +61,132 @@ function TipoBadge({ mov, deuda = false }) {
   return deuda
     ? <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Por cobrar</span>
     : <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendiente</span>;
+}
+
+// ── Movimiento como card (solo mobile) ───────────────────────────────────────
+// La tabla del detalle arranca en 10 columnas y crece con los campos
+// personalizados del rubro: 900px o más contra los 351px útiles de un teléfono.
+// Debajo de sm cada movimiento se muestra como card con lo que se consulta
+// siempre —fecha, tipo, monto/pago y saldo— y el resto detrás de un acordeón.
+function MovimientoCard({ m, esDeudaSub, camposNumericos, camposTexto, venc, isAdmin, onEdit, onDelete }) {
+  const [abierto, setAbierto] = useState(false);
+
+  const esFactura = m.tipo === 'factura';
+  const esPago    = m.tipo === 'pago';
+  const esNC      = m.tipo === 'nota_credito';
+  const esAjuste  = m.tipo === 'ajuste';
+  const esAutoAjuste = esAjuste && m._ajuste_pago_id;
+
+  // Un movimiento suma (factura/deuda) o resta (pago/abono/NC/ajuste): se muestra
+  // el que corresponda, no las dos columnas con un guion en una.
+  const suma  = (m.monto || 0) > 0;
+  const valor = suma ? m.monto : m.pago;
+  const signo = suma ? '+' : '−';
+  const colorValor = suma
+    ? (esDeudaSub ? 'text-orange-600 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100')
+    : esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : esDeudaSub ? 'text-green-600' : 'text-blue-600';
+
+  const extras = [
+    ...camposNumericos.map(c => {
+      const val = m.campos_extra?.[c.nombre];
+      const n = Number(val);
+      if (val === undefined || val === '' || isNaN(n)) return null;
+      return { label: c.nombre, valor: `${c.tipo === 'suma' ? '+' : '−'}${fmt(n)}`, tono: c.tipo === 'suma' ? 'text-green-600' : 'text-red-500' };
+    }),
+    ...camposTexto.map(c => {
+      const val = m.campos_extra?.[c.nombre];
+      return val ? { label: c.nombre, valor: val } : null;
+    }),
+  ].filter(Boolean);
+
+  const hayDetalle = extras.length > 0 || esFactura;
+
+  const fondo = esFactura && m.pagado
+    ? 'bg-green-50/50 dark:bg-green-900/10'
+    : (esPago || esNC) ? (esDeudaSub ? 'bg-green-50/40 dark:bg-green-900/10' : 'bg-blue-50/30 dark:bg-blue-900/10')
+    : esAjuste ? 'bg-orange-50/30 dark:bg-orange-900/10'
+    : esDeudaSub && esFactura ? 'bg-orange-50/30 dark:bg-orange-900/10'
+    : '';
+
+  return (
+    <div className={`px-3 py-2.5 ${fondo}`}>
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={() => hayDetalle && setAbierto(v => !v)}
+          aria-expanded={hayDetalle ? abierto : undefined}
+          className="flex-1 min-w-0 text-left"
+        >
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <TipoBadge mov={m} deuda={esDeudaSub} />
+            {esFactura && (esDeudaSub || m.documento) && (
+              <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                esDeudaSub ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400'
+                  : m.documento === 'remito' ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                  : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+              }`}>
+                {esDeudaSub ? 'Deuda' : m.documento === 'remito' ? 'Remito' : 'Factura'}
+              </span>
+            )}
+            {esPago && m.metodo_pago && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                m.metodo_pago === 'efectivo'
+                  ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                  : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+              }`}>
+                {m.metodo_pago === 'efectivo' ? <><Banknote size={10} /> Efvo</> : <><ArrowLeftRight size={10} /> Transf</>}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+            {m.fecha
+              ? <span className="tabular-nums">{m.fecha}</span>
+              : <span className="text-amber-500 italic">Sin fecha</span>}
+            {venc && <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${venc.cls}`}>{venc.label}</span>}
+            {hayDetalle && <ChevronDown size={12} className={`shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />}
+          </p>
+        </button>
+
+        <div className="shrink-0 text-right">
+          <p className={`text-base font-bold tabular-nums whitespace-nowrap ${colorValor}`}>
+            {(valor || 0) > 0 ? `${signo}${fmt(valor)}` : <span className="text-slate-300 dark:text-slate-600">—</span>}
+          </p>
+          {esFactura && (
+            (m.saldo ?? m.monto) <= 0.005
+              ? <p className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle2 size={11} /> Saldada</p>
+              : <p className={`text-xs tabular-nums ${m.saldo != null && m.saldo < m.monto - 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                  Saldo {fmt(m.saldo ?? m.monto)}
+                </p>
+          )}
+        </div>
+
+        {isAdmin && (
+          <RowActions
+            title={m.concepto || (esFactura ? 'Factura' : 'Movimiento')}
+            acciones={[
+              !esAutoAjuste && { key: 'editar', label: 'Editar', icon: <Edit3 size={16} />, onClick: () => onEdit(m) },
+              { key: 'borrar', label: 'Borrar', icon: <Trash2 size={16} />, tone: 'danger', onClick: () => onDelete(m) },
+            ].filter(Boolean)}
+          />
+        )}
+      </div>
+
+      {abierto && hayDetalle && (
+        <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-slate-400 dark:text-slate-500">Total</span>
+            <span className={`text-sm font-bold tabular-nums ${m._total >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(m._total)}</span>
+          </div>
+          {extras.map(e => (
+            <div key={e.label} className="flex items-baseline justify-between gap-3">
+              <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">{e.label}</span>
+              <span className={`text-sm text-right wrap-break-word ${e.tono || 'text-slate-700 dark:text-slate-200'}`}>{e.valor}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SubrubroView({ rubro, subrubro, onBack, role }) {
@@ -302,7 +430,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                 <button
                   key={f.label}
                   onClick={f.action}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${active ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  className={`px-2.5 py-1 min-h-10 sm:min-h-0 rounded-md text-xs font-medium transition-colors ${active ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                 >{f.label}</button>
               );
             })}
@@ -318,7 +446,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                 <button
                   key={f.val}
                   onClick={() => setEstadoFiltro(f.val)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${estadoFiltro === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  className={`px-2.5 py-1 min-h-10 sm:min-h-0 rounded-md text-xs font-medium transition-colors ${estadoFiltro === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                 >{f.label}</button>
               ))}
             </div>
@@ -326,7 +454,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           {/* Navegación por mes (oculta en modo "Todo") */}
           {!mostrarTodo && (
             <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
-              <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium">‹</button>
+              <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-3 py-1 min-h-10 sm:min-h-0 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-base sm:text-sm font-medium">‹</button>
               <span className="px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-20 text-center">{parseMes(mesActual)}</span>
               <button
                 onClick={() => setMesActual(mesSiguiente(mesActual))}
@@ -339,7 +467,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowExportModal(true)}
-            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"
+            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"
           ><Download size={14} /> Excel</button>
           {isAdmin && (
             <button
@@ -353,13 +481,13 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                   toast.success('Movimientos eliminados');
                 },
               })}
-              className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
+              className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
             ><Trash2 size={14} /> Limpiar</button>
           )}
           {isAdmin && (
             <button
               onClick={() => { setEditingMov(null); setShowForm(true); }}
-              className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 shadow-sm"
+              className="bg-blue-600 text-white px-4 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm"
             >+ Movimiento</button>
           )}
         </div>
@@ -390,8 +518,29 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
         </div>
       ) : (
         <div>
-        <p className="sm:hidden text-xs text-slate-400 dark:text-slate-500 mb-1.5">Deslizá la tabla para ver el resto de las columnas →</p>
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
+        {/* Mobile: una card por movimiento (ver MovimientoCard). */}
+        <div className="sm:hidden rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
+          {movsDetallados.map(m => {
+            const esFact = m.tipo === 'factura';
+            const saldada = esFact && ((m.saldo ?? m.monto) <= 0.005 || m.pagado === true);
+            return (
+              <MovimientoCard
+                key={m.id}
+                m={m}
+                esDeudaSub={esDeudaSub}
+                camposNumericos={camposNumericos}
+                camposTexto={camposTexto}
+                venc={saldada ? null : vencimientoLabel(m.fecha_vencimiento)}
+                isAdmin={isAdmin}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            );
+          })}
+        </div>
+
+        {/* Desktop: la tabla completa. */}
+        <TableScroll className="hidden sm:block rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
@@ -561,7 +710,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
               })}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         </div>
       ))}
 

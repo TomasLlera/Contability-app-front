@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import { EntityIcon } from '../icons';
 import InfoTooltip from '../components/InfoTooltip';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import {
   AlertCircle, Clock, TrendingUp, FolderOpen, ClipboardList,
-  ChevronRight, ChevronLeft, ChevronDown, Building2, CheckCircle2, AlertTriangle, Banknote,
+  ChevronRight, ChevronDown, Building2, CheckCircle2, AlertTriangle, Banknote,
   ArrowLeftRight, Check, Truck, CalendarClock, Percent
 } from 'lucide-react';
 
@@ -49,7 +50,7 @@ function DesgloseMetodo({ movs }) {
   );
 }
 
-function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick }) {
+function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick, wrapperClass = '' }) {
   const isInteractive = typeof onClick === 'function';
   return (
     <div
@@ -58,6 +59,7 @@ function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick }
                   transition-all duration-200
                   hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgb(15_23_42/0.12)]
                   dark:hover:shadow-[0_8px_24px_-8px_rgb(0_0_0/0.5)]
+                  ${wrapperClass}
                   ${isInteractive ? 'cursor-pointer' : ''}
                   ${urgent
                     ? 'border-red-300/80 dark:border-red-800 ring-1 ring-red-200 dark:ring-red-900/40'
@@ -75,7 +77,10 @@ function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick }
       </div>
       <p className={`text-2xl font-bold tracking-tight ${urgent ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{value}</p>
       <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">{sub}</p>}
+      {/* En mobile la card mide ~170px: con `truncate` un importe en ARS se corta
+          a la mitad. Se deja envolver en dos líneas y recién a partir de sm
+          vuelve a una sola línea truncada. */}
+      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 line-clamp-2 sm:truncate">{sub}</p>}
     </div>
   );
 }
@@ -116,6 +121,30 @@ function computeSaldo(rubro, tendencia) {
   return { rubro, facturas, pagos, deuda, nombreMes };
 }
 
+/**
+ * Una de las tres métricas del saldo mensual.
+ *
+ * Un importe en ARS no entra en un tercio de 375px: a `truncate` le tocaba
+ * cortar el dato principal de la card ("$ 71.019...."), que es justo lo que no
+ * se puede cortar (ver MOBILE.md → Tipografía). Debajo de `sm` la métrica pasa
+ * a ocupar la fila entera —label a la izquierda, importe a la derecha— y ahí el
+ * número entra completo. En `sm:` vuelve al bloque apilado de tres columnas.
+ */
+function MetricaSaldo({ label, valor, onClick, bg, ring, labelColor, valorColor }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-xl p-2.5 sm:p-3 min-w-0 cursor-pointer transition-shadow
+                  flex items-center justify-between gap-3 sm:block ${bg} ${ring}`}
+    >
+      <p className={`text-xs font-medium sm:mb-1 shrink-0 ${labelColor}`}>{label}</p>
+      <p className={`text-base sm:text-lg font-bold tabular-nums text-right sm:text-left sm:truncate ${valorColor}`}>
+        {fmt(valor)}
+      </p>
+    </div>
+  );
+}
+
 // Tarjeta de saldo mensual de un rubro. Formato idéntico para todos los rubros;
 // al clickear abre la gráfica asociada a ese mismo rubro (tabla ↔ gráfico).
 function SaldoCard({ rubro, facturas, pagos, deuda, nombreMes, onOpenGrafica, onNavigate }) {
@@ -131,22 +160,33 @@ function SaldoCard({ rubro, facturas, pagos, deuda, nombreMes, onOpenGrafica, on
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{rubro.nombre}</span>
         <span className="ml-auto text-xs text-slate-400 capitalize">{nombreMes}</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'facturado'); }}
-          className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3 cursor-pointer transition-shadow hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700">
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Facturas</p>
-          <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(facturas)}</p>
-        </div>
-        <div onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'pagado'); }}
-          className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3 cursor-pointer transition-shadow hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-700">
-          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">Pagos</p>
-          <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(pagos)}</p>
-        </div>
-        <div onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'diferencia'); }}
-          className={`rounded-xl p-3 cursor-pointer transition-shadow hover:ring-2 ${deuda > 0 ? 'bg-red-50 dark:bg-red-950/30 hover:ring-red-300 dark:hover:ring-red-800' : 'bg-slate-50 dark:bg-slate-700/40 hover:ring-slate-300 dark:hover:ring-slate-600'}`}>
-          <p className={`text-xs font-medium mb-1 ${deuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>Deuda</p>
-          <p className={`text-lg font-bold tabular-nums truncate ${deuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(deuda)}</p>
-        </div>
+      {/* Las tres métricas se comparan entre sí, así que en `sm:` van en fila.
+          En mobile no: a un tercio de 375px el importe se cortaba. Ver MetricaSaldo. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        <MetricaSaldo
+          label="Facturas" valor={facturas}
+          onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'facturado'); }}
+          bg="bg-blue-50 dark:bg-blue-900/20"
+          ring="hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-700"
+          labelColor="text-blue-600 dark:text-blue-400"
+          valorColor="text-slate-800 dark:text-slate-100"
+        />
+        <MetricaSaldo
+          label="Pagos" valor={pagos}
+          onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'pagado'); }}
+          bg="bg-emerald-50 dark:bg-emerald-900/20"
+          ring="hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-700"
+          labelColor="text-emerald-600 dark:text-emerald-400"
+          valorColor="text-slate-800 dark:text-slate-100"
+        />
+        <MetricaSaldo
+          label="Deuda" valor={deuda}
+          onClick={e => { e.stopPropagation(); onOpenGrafica?.(rubro.id, 'diferencia'); }}
+          bg={deuda > 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-slate-50 dark:bg-slate-700/40'}
+          ring={deuda > 0 ? 'hover:ring-2 hover:ring-red-300 dark:hover:ring-red-800' : 'hover:ring-2 hover:ring-slate-300 dark:hover:ring-slate-600'}
+          labelColor={deuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}
+          valorColor={deuda > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}
+        />
       </div>
     </div>
   );
@@ -174,6 +214,10 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   });
   const [localesDropOpen, setLocalesDropOpen] = useState(false);
   const localesDropRef = useRef(null);
+  const vencCardRef = useRef(null);
+  const isMobile = useIsMobile();
+  // Mobile: la lista arranca recortada (ver VENC_MOBILE_MAX). Desktop la ignora.
+  const [verTodosVenc, setVerTodosVenc] = useState(false);
   const [cajaHoy, setCajaHoy] = useState([]);
   // Rubros configurados para "Saldos mensuales" (null = config sin cargar todavía)
   const [dashboardRubroIds, setDashboardRubroIds] = useState(null);
@@ -238,14 +282,20 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
 
   const mostrarFiltroLocales = localesOrdenados.length > 1;
 
-  const toggleLocal = (id) => setLocalesSel(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    localStorage.setItem('dash_venc_locales', JSON.stringify([...next]));
-    return next;
-  });
+  // Cada cambio de filtro arma otra lista: se vuelve a recortar en mobile, si no
+  // el "Ver todos" pedido sobre 7 días quedaba aplicado sobre los 30.
+  const toggleLocal = (id) => {
+    setVerTodosVenc(false);
+    setLocalesSel(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem('dash_venc_locales', JSON.stringify([...next]));
+      return next;
+    });
+  };
   const limpiarLocales = () => {
     localStorage.setItem('dash_venc_locales', '[]');
+    setVerTodosVenc(false);
     setLocalesSel(new Set());
   };
 
@@ -271,6 +321,18 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const montoVencido = vencidos.reduce((s, v) => s + v.monto, 0);
   // Total (saldo) de las boletas mostradas en el rango elegido (7/14/30d).
   const totalVencFiltrados = vencFiltrados.reduce((s, v) => s + (v.monto || 0), 0);
+
+  const vencOrdenados = [...vencFiltrados].sort((a, b) => a.dias_restantes - b.dias_restantes);
+  // Con 30 vencimientos la lista completa son ~1500px de scroll en mobile, y el
+  // resto del dashboard queda enterrado debajo. Se muestran los más urgentes y el
+  // resto se despliega a pedido. Desktop no recorta: ya tiene su caja de 16rem
+  // con scroll propio.
+  const VENC_MOBILE_MAX = 6;
+  const vencExpandible = isMobile && vencOrdenados.length > VENC_MOBILE_MAX;
+  const vencRecortados = vencExpandible && !verTodosVenc;
+  const vencVisibles = vencRecortados ? vencOrdenados.slice(0, VENC_MOBILE_MAX) : vencOrdenados;
+
+  const irAVencimientos = () => vencCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // Caja hoy
   const gastosHoy          = cajaHoy.filter(m => m.tipo === 'gasto');
@@ -301,36 +363,51 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{greeting()}</h1>
           <p className="text-sm text-slate-400 mt-0.5 capitalize">
             {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
           </p>
+          {/* "Locales" era una StatCard con el mismo peso visual que "Facturas
+              vencidas". Es un dato de inventario —informativo, nunca accionable—
+              así que baja a una línea del header y le deja las cards a lo que
+              exige una decisión. */}
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 flex items-center gap-1.5">
+            <Building2 size={12} className="shrink-0" />
+            {locales.length} {locales.length === 1 ? 'local' : 'locales'} · {rubros.length} rubros · {totalSubrubros} subrubros
+          </p>
         </div>
+        {/* Los chips decían exactamente lo mismo que las dos StatCards de abajo.
+            En mobile, donde las cards quedan a un dedo de distancia, se ocultan;
+            en desktop —donde el header puede estar lejos del dato— se conservan,
+            pero como accesos: llevan al vencimiento o a la caja en vez de solo
+            anunciarlos. */}
         {tieneAlertas && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="hidden sm:flex items-center gap-2 flex-wrap">
             {vencidos.length > 0 && (
-              <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+              <button
+                onClick={irAVencimientos}
+                className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+              >
                 <AlertCircle size={11} /> {vencidos.length} factura{vencidos.length !== 1 ? 's' : ''} vencida{vencidos.length !== 1 ? 's' : ''}
-              </span>
+                <ChevronRight size={11} />
+              </button>
             )}
             {gastosPendientes.length > 0 && (
-              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+              <button
+                onClick={() => onViewChange?.('caja')}
+                className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+              >
                 <Clock size={11} /> {gastosPendientes.length} gasto{gastosPendientes.length !== 1 ? 's' : ''} sin confirmar
-              </span>
+                <ChevronRight size={11} />
+              </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          label="Locales"
-          value={locales.length}
-          sub={`${rubros.length} rubros · ${totalSubrubros} subrubros`}
-          iconBg="bg-blue-50 dark:bg-blue-900/30" iconText="text-blue-500"
-          icon={<Building2 size={18} />} />
+      {/* Stat cards — las tres que piden una acción. Todas navegan al detalle. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard
           label={vencidos.length > 0 ? 'Facturas vencidas' : 'Sin vencidas'}
           value={vencidos.length > 0 ? vencidos.length : '✓'}
@@ -338,20 +415,28 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           iconBg={vencidos.length > 0 ? 'bg-red-50 dark:bg-red-900/30' : 'bg-green-50 dark:bg-green-900/30'}
           iconText={vencidos.length > 0 ? 'text-red-500' : 'text-green-500'}
           icon={vencidos.length > 0 ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+          onClick={irAVencimientos}
           urgent={vencidos.length > 0} />
         <StatCard
           label="Vencen en 7 días"
           value={proximos7d.length}
           sub={proximos7d.length > 0 ? fmt(proximos7d.reduce((s, v) => s + v.monto, 0)) : 'Sin urgencias'}
           iconBg="bg-amber-50 dark:bg-amber-900/30" iconText="text-amber-500"
-          icon={<Clock size={18} />} />
+          icon={<Clock size={18} />}
+          onClick={irAVencimientos} />
+        {/* En mobile este dato ya lo da "Caja de hoy", que además desglosa
+            efectivo/transferencia; repetirlo acá era la tercera aparición del
+            mismo número. Se muestra desde `sm`, donde la caja puede quedar en la
+            otra columna. */}
         <StatCard
+          wrapperClass="hidden sm:block"
           label={gastosPendientes.length > 0 ? 'Sin confirmar hoy' : 'Caja al día'}
           value={gastosPendientes.length > 0 ? gastosPendientes.length : '✓'}
           sub={gastosPendientes.length > 0 ? fmt(totalPendientes) + ' pendiente' : gastosConfirmados.length > 0 ? `${gastosConfirmados.length} confirmados` : 'Sin gastos hoy'}
           iconBg={gastosPendientes.length > 0 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-green-50 dark:bg-green-900/30'}
           iconText={gastosPendientes.length > 0 ? 'text-amber-500' : 'text-green-500'}
-          icon={<ClipboardList size={18} />} />
+          icon={<ClipboardList size={18} />}
+          onClick={() => onViewChange?.('caja')} />
       </div>
 
       {/* Caja + Vencimientos */}
@@ -365,8 +450,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Caja de hoy</h3>
             </div>
             <button onClick={() => onViewChange?.('caja')}
-              className="text-xs text-blue-500 hover:underline flex items-center gap-0.5 shrink-0">
-              Ver caja <ChevronRight size={12} />
+              className="text-xs text-blue-500 hover:underline flex items-center gap-0.5 shrink-0 min-h-11 sm:min-h-0 px-1.5 -mr-1.5">
+              Ver caja <ChevronRight size={13} />
             </button>
           </div>
 
@@ -457,21 +542,25 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
         </div>
 
         {/* Vencimientos */}
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+        <div ref={vencCardRef} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 scroll-mt-20">
+          {/* El título y el contador no se separan de los chips de rango: en 375px
+              `flex-wrap` los mandaba a una segunda línea y el header perdía el
+              contador de vista. El título se encoge (min-w-0 + truncate) antes
+              que los chips, que son el control. */}
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle size={15} className="text-amber-500 shrink-0" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Próximos vencimientos</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate min-w-0">Próximos vencimientos</h3>
             {!loadingVenc && vencimientos.length > 0 && (
               <>
-                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium shrink-0">
                   {vencFiltrados.length}
                 </span>
                 <div className="flex bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5 ml-auto shrink-0">
                   {[7, 14, 30].map(d => (
                     <button
                       key={d}
-                      onClick={() => setRangoVenc(d)}
-                      className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                      onClick={() => { setRangoVenc(d); setVerTodosVenc(false); }}
+                      className={`min-w-11 min-h-9 sm:min-w-0 sm:min-h-0 px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
                         rangoVenc === d
                           ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -485,8 +574,14 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
             )}
           </div>
 
+          {/* El total encabeza la lista, no flota entre el header y los ítems: en
+              mobile va sobre una banda propia que lo ata visualmente a lo que
+              suma. En `sm:` el ancho ya deja clara la relación y vuelve a texto
+              suelto. */}
           {!loadingVenc && vencimientos.length > 0 && (
-            <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-3
+                            rounded-xl bg-slate-50 dark:bg-slate-900/40 px-3 py-2
+                            sm:bg-transparent sm:dark:bg-transparent sm:rounded-none sm:px-0 sm:py-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-base font-bold text-slate-800 dark:text-slate-100 tabular-nums">
                   {fmt(totalVencFiltrados)}
@@ -499,7 +594,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 <div className="relative" ref={localesDropRef}>
                   <button
                     onClick={() => setLocalesDropOpen(o => !o)}
-                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 min-h-11 sm:min-h-0 rounded-lg font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                   >
                     <Building2 size={12} />
                     {etiquetaLocales}
@@ -509,7 +604,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                     <div className="absolute right-0 z-20 mt-1 w-48 max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg p-1">
                       <button
                         onClick={limpiarLocales}
-                        className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        className="w-full flex items-center gap-2 text-sm sm:text-xs px-2 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                       >
                         <span className="w-3.5 shrink-0">{localesSel.size === 0 && <Check size={13} className="text-blue-500" />}</span>
                         Todos los locales
@@ -521,7 +616,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                           <button
                             key={l.id}
                             onClick={() => toggleLocal(l.id)}
-                            className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            className="w-full flex items-center gap-2 text-sm sm:text-xs px-2 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                           >
                             <span className="w-3.5 shrink-0">{activo && <Check size={13} className="text-blue-500" />}</span>
                             <EntityIcon value={l.icon} fallback="home" size={13} />
@@ -556,58 +651,81 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               </p>
             </div>
           ) : (
-            <div className="space-y-1.5 overflow-y-auto max-h-64 pr-0.5">
-              {[...vencFiltrados].sort((a, b) => a.dias_restantes - b.dias_restantes).map(item => {
-                const info = vencInfo(item.dias_restantes);
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => onNavigate?.(item.rubro, item.subrubro)}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer hover:opacity-80 transition-opacity ${info.row}`}
-                  >
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${info.dot}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold truncate">{item.subrubro?.nombre}</p>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <p className="text-xs opacity-60 truncate">{item.rubro?.nombre}</p>
-                        {mostrarFiltroLocales && badgeDeLocal.get(localDe(item)) && (
-                          <span className={`text-xs px-1.5 rounded shrink-0 font-medium ${badgeDeLocal.get(localDe(item)).cls}`}>
-                            {badgeDeLocal.get(localDe(item)).nombre}
-                          </span>
-                        )}
+            // Sin scroll propio en mobile: anidado dentro del scroll de la página
+            // se pelean por el gesto. En desktop conserva su caja de 16rem.
+            <>
+              <div className="space-y-1.5 sm:overflow-y-auto sm:max-h-64 pr-0.5">
+                {vencVisibles.map(item => {
+                  const info = vencInfo(item.dias_restantes);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => onNavigate?.(item.rubro, item.subrubro)}
+                      className={`flex items-center gap-2.5 px-3 py-2 min-h-12 rounded-xl border cursor-pointer hover:opacity-80 transition-opacity ${info.row}`}
+                    >
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${info.dot}`} />
+                      <div className="flex-1 min-w-0">
+                        {/* "GRIDO - Néstor Rubén Ló..." no se puede resolver en un
+                            teléfono: no hay hover para el tooltip. Se le dan dos
+                            líneas, que alcanzan para casi todos los proveedores.
+                            En `sm:` vuelve a una línea para no descuadrar la
+                            altura de las filas del panel de escritorio. */}
+                        <p className="text-sm font-semibold line-clamp-2 sm:truncate" title={item.subrubro?.nombre}>
+                          {item.subrubro?.nombre}
+                        </p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-xs opacity-60 truncate">{item.rubro?.nombre}</p>
+                          {mostrarFiltroLocales && badgeDeLocal.get(localDe(item)) && (
+                            <span className={`text-xs px-1.5 rounded shrink-0 font-medium ${badgeDeLocal.get(localDe(item)).cls}`}>
+                              {badgeDeLocal.get(localDe(item)).nombre}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {/* El importe es el dato que se lee de reojo: nunca por debajo de 14px. */}
+                        <p className="text-sm font-bold tabular-nums">{fmt(item.monto)}</p>
+                        <p className="text-xs opacity-60">{info.label}</p>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold">{fmt(item.monto)}</p>
-                      <p className="text-xs opacity-60">{info.label}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {/* Solo aparece en mobile: es donde la lista se recorta. */}
+              {vencExpandible && (
+                <button
+                  onClick={() => setVerTodosVenc(v => !v)}
+                  className="mt-2 w-full flex items-center justify-center gap-1 min-h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-blue-600 dark:text-blue-400 active:bg-slate-50 dark:active:bg-slate-700/40 transition-colors"
+                >
+                  {verTodosVenc
+                    ? <>Ver menos <ChevronDown size={14} className="rotate-180" /></>
+                    : <>Ver todos ({vencOrdenados.length}) <ChevronDown size={14} /></>}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Atajo a las comparativas del mes (viven en Gráficas) */}
-      <button
-        onClick={() => onViewChange?.('graficas')}
-        className="w-full flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-left hover:border-blue-300 dark:hover:border-blue-700 transition-colors group"
-      >
-        <span className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0">
-          <CalendarClock size={18} />
-        </span>
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Rendimiento mensual</span>
-          <span className="block text-xs text-slate-400">Comparación de quincena y cierre con el período anterior.</span>
-        </span>
-        <ChevronRight size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
-      </button>
-
-      {/* Saldos mensuales — una tabla por rubro configurado, cada una con su gráfica */}
-      {saldos.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Saldos mensuales</p>
+      {/* Saldos mensuales — una tabla por rubro configurado, cada una con su gráfica.
+          "Rendimiento mensual" era un banner de ancho completo para lo que es un
+          link a Gráficas: ahora acompaña al encabezado de esta sección, que es de
+          lo que habla (los números del mes). */}
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            {saldos.length > 0 ? 'Saldos mensuales' : ''}
+          </p>
+          <button
+            onClick={() => onViewChange?.('graficas')}
+            title="Comparación de quincena y cierre con el período anterior"
+            className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 min-h-11 sm:min-h-0 px-1.5 -mr-1.5 rounded-lg hover:underline"
+          >
+            <CalendarClock size={14} /> Rendimiento mensual <ChevronRight size={13} />
+          </button>
+        </div>
+        {saldos.length > 0 && (
           <div className={`grid grid-cols-1 gap-4 ${saldos.length > 1 ? 'xl:grid-cols-2' : ''}`}>
             {saldos.map(s => (
               <SaldoCard
@@ -618,8 +736,8 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {rubros.length === 0 && (
         <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">

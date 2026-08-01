@@ -268,12 +268,12 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     <div className="grid grid-cols-2 gap-3">
       <div>
         <label className={labelVioletCls}>Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>
-        <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
+        <input type="number" inputMode="decimal" min="0" step="any" className={inputVioletCls} placeholder="0"
           value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
       </div>
       <div>
         <label className={labelVioletCls}>Ingresos Brutos <span className="font-normal text-violet-400/70">(no suma)</span></label>
-        <input type="number" min="0" step="any" className={inputVioletCls} placeholder="0"
+        <input type="number" inputMode="decimal" min="0" step="any" className={inputVioletCls} placeholder="0"
           value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
       </div>
     </div>
@@ -384,7 +384,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             </label>
             <div className="relative">
               <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esDeudaSub ? 'text-orange-500' : 'text-green-600'}`}>+</span>
-              <input type="number" min="0" step="any" className={inputNumCls} placeholder="0"
+              <input type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0"
                 value={monto} onChange={e => setMonto(e.target.value)} />
             </div>
           </div>
@@ -396,7 +396,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 text-sm font-semibold">+</span>
-                <input type="number" min="0" step="any" className={inputNumCls} placeholder="0"
+                <input type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0"
                   value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
               </div>
             </div>
@@ -408,7 +408,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 text-sm font-semibold">−</span>
-                <input type="number" min="0" step="any" className={inputNumCls} placeholder="0"
+                <input type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0"
                   value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
               </div>
             </div>
@@ -483,7 +483,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             </label>
             <div className="relative">
               <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esDeudaSub ? 'text-green-600' : 'text-blue-500'}`}>−</span>
-              <input type="number" min="0" step="any"
+              <input type="number" inputMode="decimal" min="0" step="any"
                 className={inputNumCls}
                 placeholder="0"
                 value={pago}
@@ -629,15 +629,20 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         </>
       )}
 
-      <div className="flex gap-2 pt-1">
+      {/* Barra de acciones pegada al pie del formulario. `sticky bottom-0` la
+          mantiene visible sin scrollear hasta el final: este formulario llega a
+          diez campos y en un teléfono el botón de guardar quedaba fuera de vista. */}
+      <div className="sticky bottom-0 -mx-4 sm:mx-0 -mb-4 sm:mb-0 px-4 sm:px-0 pt-2 pb-3 sm:pb-0
+                      flex gap-2 bg-white dark:bg-slate-800
+                      border-t sm:border-t-0 border-slate-200 dark:border-slate-700">
         <button type="button" onClick={onCancel} disabled={saving}
-          className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40">
+          className="flex-1 min-h-11 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40">
           Cancelar
         </button>
         <button
           type="submit"
           disabled={saving || excedeNC || ncMultiple || (esPagoONC ? !Number(pago) : !Number(monto))}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+          className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar'}
         </button>

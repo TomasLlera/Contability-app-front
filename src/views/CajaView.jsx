@@ -11,6 +11,8 @@ import { EntityIcon } from '../icons';
 import ConfirmModal from '../components/ConfirmModal';
 import CajaExportModal from '../components/CajaExportModal';
 import InfoTooltip from '../components/InfoTooltip';
+import RowActions from '../components/RowActions';
+import Modal from '../components/Modal';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -37,6 +39,11 @@ const formatFechaCorta = (dateStr) => {
 };
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const selectCls = inputCls;
+
+// Botón del toolbar de la Caja. Mobile: columna ícono + etiqueta, repartiéndose
+// el ancho a 44px de alto. Desktop: el ícono solo de siempre.
+const toolbarBtn = 'flex-1 sm:flex-none min-h-11 sm:w-auto sm:h-auto sm:p-2 flex flex-col sm:flex-row items-center justify-center gap-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0';
+const toolbarLbl = 'sm:hidden text-[11px] leading-none font-medium';
 
 // ── Panel de configuración ──────────────────────────────────────────────────
 function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
@@ -94,13 +101,21 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2"><Settings size={15} /> Configurar Caja</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
-        </div>
-
+    // Modal en vez de un cuadro a mano: en mobile queda full-screen y el botón de
+    // guardar se fija al pie. Antes vivía al final del contenido, así que había que
+    // recorrer empleados y proveedores enteros para llegar a guardar.
+    <Modal
+      title="Configurar Caja"
+      size="md"
+      onClose={onClose}
+      footer={
+        <button onClick={handleSave}
+          className="w-full min-h-11 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2">
+          <Check size={15} /> Guardar configuración
+        </button>
+      }
+    >
+      <div>
         {/* Sincronización de rubros */}
         <div className="mb-5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl overflow-hidden">
           <button type="button" onClick={() => setSyncOpen(v => !v)}
@@ -135,7 +150,8 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                 <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
                   <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Días de anticipación</label>
                   <div className="flex items-center gap-2">
-                    <input type="number" min="0" max="30" value={diasAnticipacion}
+                    {/* numeric y no decimal: son días enteros, sin separador. */}
+                    <input type="number" inputMode="numeric" min="0" max="30" value={diasAnticipacion}
                       onChange={e => setDiasAnticipacion(e.target.value)}
                       className="w-20 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     <span className="text-xs text-slate-500">días antes del vencimiento</span>
@@ -165,7 +181,8 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                   <div key={i} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-1.5">
                     <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{e.nombre}</span>
                     <button onClick={() => setEmpleados(prev => prev.filter((_, j) => j !== i))}
-                      className="text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+                      aria-label={`Quitar ${e.nombre}`}
+                      className="tap shrink-0 text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
                   </div>
                 ))}
               </div>
@@ -173,7 +190,8 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                 <input type="text" className={inputCls} placeholder="Nombre del empleado"
                   value={nuevoEmp} onChange={e => setNuevoEmp(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addEmpleado()} />
-                <button onClick={addEmpleado} className="bg-green-600 text-white px-3 rounded-lg hover:bg-green-700"><Plus size={15} /></button>
+                <button onClick={addEmpleado} aria-label="Agregar empleado"
+                  className="shrink-0 w-11 flex items-center justify-center bg-green-600 text-white rounded-lg hover:bg-green-700"><Plus size={17} /></button>
               </div>
             </>
           )}
@@ -204,7 +222,8 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                     <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{p.nombre}</span>
                     {p.subrubro_id && <span className="text-xs text-blue-500">vinculado</span>}
                     <button onClick={() => setProveedores(prev => prev.filter((_, j) => j !== i))}
-                      className="text-slate-400 hover:text-red-500"><Trash2 size={13} /></button>
+                      aria-label={`Quitar ${p.nombre}`}
+                      className="tap shrink-0 text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
                   </div>
                 ))}
               </div>
@@ -215,8 +234,8 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                     <option value="">— Elegir subrubro —</option>
                     {subrubrosVinculables.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
                   </select>
-                  <button onClick={addProveedor} disabled={!nuevoProvSub}
-                    className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700 disabled:opacity-40"><Plus size={15} /></button>
+                  <button onClick={addProveedor} disabled={!nuevoProvSub} aria-label="Vincular subrubro"
+                    className="shrink-0 w-11 flex items-center justify-center bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40"><Plus size={17} /></button>
                 </div>
               </div>
               <div>
@@ -225,20 +244,15 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                   <input type="text" className={inputCls} placeholder="Nombre del proveedor"
                     value={nuevoProv} onChange={e => setNuevoProv(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addProveedor()} />
-                  <button onClick={addProveedor} disabled={!nuevoProv.trim()}
-                    className="bg-red-500 text-white px-3 rounded-lg hover:bg-red-600 disabled:opacity-40"><Plus size={15} /></button>
+                  <button onClick={addProveedor} disabled={!nuevoProv.trim()} aria-label="Agregar proveedor"
+                    className="shrink-0 w-11 flex items-center justify-center bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-40"><Plus size={17} /></button>
                 </div>
               </div>
             </>
           )}
         </div>
-
-        <button onClick={handleSave}
-          className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2">
-          <Check size={15} /> Guardar configuración
-        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -274,7 +288,11 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     ? allSubrubros.filter(s => String(s.rubro_id) === rubroSel)
     : [];
 
+  // Cerrar al tocar afuera solo con mouse. En touch, `mousedown` también dispara
+  // y cualquier tap al scrollear descartaba el formulario a medio llenar. En
+  // mobile se cierra con Cancelar, que está siempre visible.
   useEffect(() => {
+    if (!window.matchMedia('(hover: hover)').matches) return;
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onCancel();
     };
@@ -356,7 +374,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
         <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
           {TIPOS_FORM.map(t => (
             <button key={t.value} type="button" onClick={() => { setTipo(t.value); setSeleccion(''); setConcepto(''); setRubroSel(''); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}
-              className={`flex-1 py-2 transition-colors ${tipo === t.value ? `${t.color} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+              className={`flex-1 min-h-11 sm:min-h-0 py-2 transition-colors ${tipo === t.value ? `${t.color} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
               {t.label}
             </button>
           ))}
@@ -417,14 +435,17 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <input type="number" min="0" step="any" className={inputCls} placeholder="Monto"
+      {/* Monto y método apilados en mobile: en dos columnas de 150px el toggle
+          Efectivo/Transf. queda en botones de 75px, imposibles de acertar. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <input type="number" inputMode="decimal" min="0" step="any" className={inputCls} placeholder="Monto"
           value={monto} onChange={e => setMonto(e.target.value)} required />
-        <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
-          {[['efectivo', 'Efectivo'], ['transferencia', 'Transf.']].map(([v, l]) => (
+        <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm sm:text-xs font-medium">
+          {[['efectivo', 'Efectivo'], ['transferencia', 'Transferencia', 'Transf.']].map(([v, l, corto]) => (
             <button key={v} type="button" onClick={() => setMetodo(v)}
-              className={`flex-1 py-2 transition-colors ${metodo === v ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-              {l}
+              className={`flex-1 min-h-11 sm:min-h-0 py-2 transition-colors ${metodo === v ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+              <span className="sm:hidden">{l}</span>
+              <span className="hidden sm:inline">{corto || l}</span>
             </button>
           ))}
         </div>
@@ -441,11 +462,11 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
 
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} disabled={saving}
-          className="flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm disabled:opacity-40">
+          className="flex-1 min-h-11 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm disabled:opacity-40">
           Cancelar
         </button>
         <button type="submit" disabled={saving || !concepto.trim() || !Number(monto)}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+          className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar'}
         </button>
@@ -466,10 +487,11 @@ function MetodoBadge({ metodo }) {
 // backend adjunta desde Movimiento.documento). Los gastos manuales no tienen
 // comprobante enlazado y no muestran badge.
 function DocumentoBadge({ documento }) {
-  if (documento === 'factura')
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">Factura</span>;
-  if (documento === 'remito')
-    return <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">Remito</span>;
+  // Los dos en gris: el tipo de comprobante es una etiqueta, no un estado. En
+  // ámbar competía con "Sin confirmar", que sí pide acción.
+  const cls = 'text-[11px] leading-[18px] px-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium';
+  if (documento === 'factura') return <span className={cls}>Factura</span>;
+  if (documento === 'remito')  return <span className={cls}>Remito</span>;
   return null;
 }
 
@@ -518,15 +540,18 @@ function agruparPorMetodo(items, nombreDe) {
 }
 
 // Encabezado de sección de método: ícono, label, contador y subtotal del grupo.
+// Sticky: con veinte gastos cargados, al scrollear se pierde de vista si lo que
+// estás mirando es efectivo o transferencia. `top-14` lo deja justo debajo del
+// header de la app; el fondo opaco es lo que evita que las filas se le transparenten.
 function GrupoHeader({ grupo }) {
   const Icon = grupo.icon;
   const total = grupo.items.reduce((s, m) => s + (m.monto || 0), 0);
   return (
-    <div className={`flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-lg border ${grupo.bg} ${grupo.border}`}>
-      <Icon size={13} className={`${grupo.color} shrink-0`} />
+    <div className={`sticky top-14 z-10 flex items-center gap-2 px-2.5 py-2 mb-2 rounded-lg border backdrop-blur-sm ${grupo.bg} ${grupo.border}`}>
+      <Icon size={14} className={`${grupo.color} shrink-0`} />
       <span className={`text-xs font-semibold uppercase tracking-wide ${grupo.color}`}>{grupo.label}</span>
       <span className="text-xs text-slate-400 dark:text-slate-500">({grupo.items.length})</span>
-      <span className="ml-auto text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmt(total)}</span>
+      <span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{fmt(total)}</span>
     </div>
   );
 }
@@ -549,9 +574,6 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   const esConfirmado = (m.tipo === 'gasto' || esCobro) && m.confirmado === true;
   const esGasto      = m.tipo === 'gasto';
   const confirmable  = esGasto || esCobro;
-  // Gastos: verde si el pago está confirmado, rojo mientras está sin pagar.
-  // Cobros de deuda: naranja mientras están sin cobrar, verde al confirmarse.
-  // El resto de los tipos (empleados, ingresos) conservan su color de origen.
   // Descuento por pago ya aplicado: el ítem vale el NETO y `descuento` guarda cuánto
   // se descontó. Es lo que pinta la fila de violeta.
   const conDescuento = Number(m.descuento) > 0;
@@ -560,10 +582,19 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   const puedeDescontar = aplicaDescuento && esPendiente && m.movimiento_id != null;
   const mostrarAcordeon = puedeDescontar || conDescuento;
 
+  // Jerarquía de color del importe. Antes cada estado tenía su color propio
+  // (rojo pendiente, verde confirmado, naranja sin cobrar) y con nueve filas en
+  // pantalla competían todos entre sí, así que ninguno resaltaba. Ahora:
+  //   · pendiente  → neutro fuerte. Es plata que todavía debés: es el default.
+  //   · confirmado → neutro apagado. Ya está hecho; se corre a segundo plano.
+  //   · descuento  → violeta. Único caso donde el número no es el bruto, y eso
+  //                  sí hay que poder verlo de un vistazo.
+  // El rojo queda reservado para lo crítico (un saldo negativo en el Resumen) y
+  // el verde para la acción, que es el botón ✓.
   const montoColor = conDescuento ? 'text-purple-600 dark:text-purple-400'
-    : esGasto ? (esPendiente ? 'text-red-500' : 'text-green-600')
-    : esCobro ? (esPendiente ? 'text-orange-500' : 'text-green-600')
-    : colorMonto;
+    : (esGasto || esCobro)
+      ? (esPendiente ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500')
+      : colorMonto;
 
   const bruto = Number(m.monto_bruto ?? m.monto) || 0;
   const descRaw = Number(descInput) || 0;
@@ -588,21 +619,29 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
     }`}>
     <div
       onClick={selectable ? () => onToggleSelect(m.id) : undefined}
-      className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 ${selectable ? 'cursor-pointer' : ''}`}>
+      className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 ${selectable ? 'cursor-pointer' : ''}`}>
       {selectable && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onToggleSelect(m.id); }}
           title={selected ? 'Deseleccionar' : 'Seleccionar'}
-          className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+          aria-label={selected ? 'Deseleccionar' : 'Seleccionar'}
+          className={`tap shrink-0 w-6 h-6 sm:w-5 sm:h-5 rounded-md border flex items-center justify-center transition-colors ${
             selected
               ? 'bg-blue-500 border-blue-500 text-white'
               : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-blue-400'
           }`}>
-          <Check size={12} />
+          <Check size={14} className="sm:w-3 sm:h-3" />
         </button>
       )}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <p className={`text-sm font-medium truncate ${esPendiente ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
+        {/* El contenedor era `flex-wrap`: con un nombre largo el ícono de "ir al
+            subrubro" se iba solo a una segunda línea, sin contexto. Sin wrap, el
+            ícono queda siempre pegado al final del nombre y es el texto el que
+            cede ancho (min-w-0). El nombre además usa dos líneas en mobile —no
+            hay hover para resolver un truncado— y una sola en `sm:`, donde el
+            `title` alcanza. */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className={`text-sm font-medium line-clamp-2 sm:truncate min-w-0 ${esPendiente ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}
+             title={conceptoLimpio(m)}>
             {conceptoLimpio(m)}
           </p>
           {m.es_especial && <Star size={11} className="text-amber-500 shrink-0" />}
@@ -611,59 +650,91 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
               type="button"
               onClick={(e) => { e.stopPropagation(); onGoToSubrubro(m); }}
               title={`Ir al subrubro: ${subrubro.nombre}`}
-              className="shrink-0 text-slate-400 hover:text-blue-500 transition-colors"
+              aria-label={`Ir al subrubro: ${subrubro.nombre}`}
+              className="tap shrink-0 text-slate-400 hover:text-blue-500 transition-colors"
             >
               <ExternalLink size={12} />
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
           {/* Dentro de una sección agrupada por método el badge repite lo que ya dice
               el encabezado: se omite y queda solo el tipo de comprobante y el estado. */}
           {!hideMetodo && <MetodoBadge metodo={m.metodo} />}
           <DocumentoBadge documento={m.documento} />
-          {esPendiente && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
-          {esConfirmado && m.movimiento_id && <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 flex items-center gap-0.5"><Check size={9} /> {esCobro ? 'Cobro confirmado' : 'Pago confirmado'}</span>}
+          {esPendiente && <span className="text-[11px] leading-[18px] px-1.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
+          {/* El ✓ verde de la derecha ya dice que está confirmado: en mobile este
+              badge solo agrega una línea de alto por fila. Se muestra desde `sm`. */}
+          {esConfirmado && m.movimiento_id && <span className="hidden sm:flex text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 items-center gap-0.5"><Check size={9} /> {esCobro ? 'Cobro confirmado' : 'Pago confirmado'}</span>}
           {conDescuento && (
             <span title={`Descuento de ${fmt(m.descuento)}${m.descuento_pct ? ` (${m.descuento_pct}%)` : ''} aplicado sobre ${fmt(bruto)}`}
-              className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium flex items-center gap-0.5">
-              <Percent size={9} /> Con descuento
+              className="text-[11px] leading-[18px] px-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium inline-flex items-center gap-0.5">
+              <Percent size={9} /> <span className="hidden sm:inline">Con </span>descuento
             </span>
           )}
         </div>
       </div>
       {/* En mobile el monto se apila sobre las acciones: si van todos en línea, el
           concepto se queda sin ancho y se trunca a nada. */}
-      <div className="shrink-0 flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
-        <p className={`text-sm sm:text-base font-bold whitespace-nowrap ${montoColor}`}>
+      <div className="shrink-0 flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+        <p className={`text-base font-bold whitespace-nowrap tabular-nums ${montoColor}`}>
           {fmt(m.monto)}
         </p>
+        {/* Confirmar es LA acción diaria de la caja: se queda visible y a 44px en
+            mobile. Descuento/editar/eliminar pasan al menú ⋮ — en escritorio
+            RowActions los sigue dibujando en línea, igual que antes.
+            gap-2 = los 8px mínimos de separación entre dos targets táctiles
+            adyacentes (MOBILE.md): con gap-1 los bordes de 44px se solapaban. */}
         <div className="flex items-center gap-2 sm:gap-3">
           {confirmable && onConfirmar && (
             <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming}
               title={esConfirmado ? 'Revertir confirmación' : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
-              className={`p-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
+              aria-label={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
+              className={`w-11 h-11 sm:w-auto sm:h-auto sm:p-1.5 flex items-center justify-center rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
                 esConfirmado
                   ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
                   : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
               }`}>
-              {confirming ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {confirming ? <Loader2 size={18} className="animate-spin sm:w-3.5 sm:h-3.5" /> : <Check size={18} className="sm:w-3.5 sm:h-3.5" />}
             </button>
           )}
-          {mostrarAcordeon && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); setDescOpen(v => !v); }}
-              title={conDescuento ? 'Ver detalle del descuento' : 'Aplicar descuento por pago'}
-              className={`p-1.5 rounded-lg shrink-0 transition-colors flex items-center gap-0.5 ${
-                conDescuento
-                  ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
-                  : 'text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/40'
-              }`}>
-              <Percent size={13} />
-              <ChevronDown size={11} className={`transition-transform ${descOpen ? 'rotate-180' : ''}`} />
-            </button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); onEdit(m); }} className="p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0"><Pencil size={14} /></button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} className="p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0"><Trash2 size={14} /></button>
+          <RowActions
+            title={conceptoLimpio(m)}
+            acciones={[
+              mostrarAcordeon && {
+                key: 'descuento',
+                label: conDescuento ? 'Ver detalle del descuento' : 'Aplicar descuento por pago',
+                icon: <Percent size={16} />,
+                iconDesktop: (
+                  <>
+                    <Percent size={13} />
+                    <ChevronDown size={11} className={`transition-transform ${descOpen ? 'rotate-180' : ''}`} />
+                  </>
+                ),
+                onClick: () => setDescOpen(v => !v),
+                className: `p-1.5 rounded-lg shrink-0 transition-colors flex items-center gap-0.5 ${
+                  conDescuento
+                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
+                    : 'text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/40'
+                }`,
+              },
+              {
+                key: 'editar',
+                label: 'Editar',
+                icon: <Pencil size={16} />,
+                onClick: () => onEdit(m),
+                className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
+              },
+              {
+                key: 'eliminar',
+                label: 'Eliminar',
+                icon: <Trash2 size={16} />,
+                tone: 'danger',
+                onClick: () => onDelete(m.id),
+                className: 'p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0',
+              },
+            ]}
+          />
         </div>
       </div>
     </div>
@@ -709,10 +780,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                   </button>
                 ))}
               </div>
-              <input type="number" min="0" step="any" autoFocus
+              <input type="number" inputMode="decimal" min="0" step="any" autoFocus
                 value={descInput} onChange={e => setDescInput(e.target.value)}
                 placeholder={esPct ? '7' : '0,00'}
-                className="flex-1 min-w-0 border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                className="flex-1 min-w-0 min-h-11 sm:min-h-0 border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
             </div>
             {esPct && descValido && (
               <div className="flex justify-between text-xs text-purple-700 dark:text-purple-300">
@@ -763,27 +834,31 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
         <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</h4>
       </div>
       <div className="space-y-1.5 text-sm">
+        {/* Disponible y Gastos en neutro: son los datos de entrada del cálculo,
+            no alertas. El color se guarda para lo que exige mirar — el ámbar de
+            lo sin confirmar y el rojo de una Resta negativa. */}
         <div className="flex justify-between text-slate-600 dark:text-slate-300">
           <span>{labelDisponible || 'Disponible'}</span>
-          <span className="font-semibold text-green-600">{fmt(disponible)}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{fmt(disponible)}</span>
         </div>
         <div className="flex justify-between text-slate-600 dark:text-slate-300">
-          <span>Gastos</span><span className="font-semibold text-red-500">{fmt(gastos)}</span>
+          <span>Gastos</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-100 tabular-nums">− {fmt(gastos)}</span>
         </div>
         {sinConfirmar > 0 && (
           <div className="flex justify-between text-slate-600 dark:text-slate-300">
             <span>Sin confirmar</span>
-            <span className="font-semibold text-amber-500">{fmt(sinConfirmar)}</span>
+            <span className="font-semibold text-amber-500 tabular-nums">{fmt(sinConfirmar)}</span>
           </div>
         )}
         <div className="border-t border-slate-100 dark:border-slate-700 pt-1.5 flex justify-between font-bold">
           <span className="text-slate-700 dark:text-slate-200">Resta</span>
-          <span className={restante >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}>{fmt(restante)}</span>
+          <span className={`tabular-nums ${restante >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(restante)}</span>
         </div>
         {sinConfirmar > 0 && (
           <div className="flex justify-between text-xs">
             <span className="text-slate-500 dark:text-slate-400">Si confirmás todo</span>
-            <span className={`font-semibold ${restanteSiConfirma >= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-red-500'}`}>{fmt(restanteSiConfirma)}</span>
+            <span className={`font-semibold tabular-nums ${restanteSiConfirma >= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-red-500'}`}>{fmt(restanteSiConfirma)}</span>
           </div>
         )}
       </div>
@@ -819,7 +894,12 @@ function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfir
 export default function CajaView({ rubros = [], onNavigate }) {
   const [fecha, setFecha]           = useState(todayStr());
   // Ocultar los montos de "Saldo del día" y "Saldo en cuenta" (privacidad). Persiste.
-  const [ocultarSaldos, setOcultarSaldos] = useState(() => localStorage.getItem('cajaOcultarSaldos') === '1');
+  // Arranca visible siempre. Antes el estado se persistía, así que un "ocultar"
+  // puntual —mostrarle la pantalla a alguien— dejaba los saldos tapados para
+  // siempre y costaba un tap extra en cada entrada a la Caja. Ocultar es la
+  // excepción, no el default: vive lo que dura la vista.
+  const [ocultarSaldos, setOcultarSaldos] = useState(false);
+  const resumenRef = useRef(null);
   const [movs, setMovs]             = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1218,6 +1298,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const gastosTrans = gastos.filter(m => m.metodo === 'transferencia'  && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
   const sinConfirmarEfvo  = gastos.filter(m => m.metodo === 'efectivo'      && m.confirmado === false).reduce((s,m) => s+m.monto,0);
   const sinConfirmarTrans = gastos.filter(m => m.metodo === 'transferencia' && m.confirmado === false).reduce((s,m) => s+m.monto,0);
+  // Misma cuenta que hace ResumenMetodo (`restante`). Se calcula acá porque el
+  // atajo de arriba muestra el resultado sin montar la card.
+  const restaEfvo  = disponibleEfvo  - gastosEfvo;
+  const restaTrans = disponibleTrans - gastosTrans;
   const vencEfvo    = vencimientos.filter(v => v.metodo_pago !== 'transferencia');
   const vencTrans   = vencimientos.filter(v => v.metodo_pago === 'transferencia');
 
@@ -1235,47 +1319,54 @@ export default function CajaView({ rubros = [], onNavigate }) {
       {/* Navegación de fecha. En mobile la fecha va sola en su fila y las acciones
           debajo: no entran los 6 botones más la fecha larga en 360px de ancho. */}
       <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-        <button onClick={() => setFecha(addDays(fecha, -1))}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
-          <ChevronLeft size={18} />
+        <button onClick={() => setFecha(addDays(fecha, -1))} aria-label="Día anterior"
+          className="w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
+          <ChevronLeft size={20} />
         </button>
         <div className="flex-1 min-w-0 text-center">
           <button
             onClick={() => { try { dateInputRef.current?.showPicker(); } catch { dateInputRef.current?.click(); } }}
-            className="font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 transition-colors max-w-full truncate"
+            className="min-h-11 sm:min-h-0 font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 transition-colors max-w-full truncate"
           >
             <span className="sm:hidden">{formatFechaMobile(fecha)}</span>
             <span className="hidden sm:inline">{formatFecha(fecha)}</span>
           </button>
           {fecha !== todayStr() && (
-            <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline block mx-auto">Ir a hoy</button>
+            <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline block mx-auto -mt-1 sm:mt-0 pb-1">Ir a hoy</button>
           )}
         </div>
-        <button onClick={() => setFecha(addDays(fecha, 1))}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
-          <ChevronRight size={18} />
+        <button onClick={() => setFecha(addDays(fecha, 1))} aria-label="Día siguiente"
+          className="w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
+          <ChevronRight size={20} />
         </button>
         <input ref={dateInputRef} type="date" value={fecha}
           onChange={e => setFecha(e.target.value)}
           className="sr-only" />
-        <div className="flex items-center justify-end gap-1 sm:gap-2 w-full sm:w-auto">
+        {/* Cuatro íconos sueltos no se entienden: en mobile cada uno lleva su
+            etiqueta debajo y se reparten el ancho. En `sm:` vuelven a ser íconos
+            con `title`, que ahí sí hay hover. */}
+        <div className="flex items-stretch justify-end gap-1 sm:gap-2 w-full sm:w-auto">
           <button
-            onClick={() => setOcultarSaldos(v => { localStorage.setItem('cajaOcultarSaldos', v ? '0' : '1'); return !v; })}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+            onClick={() => setOcultarSaldos(v => !v)}
+            className={toolbarBtn}
             title={ocultarSaldos ? 'Mostrar saldos' : 'Ocultar saldos'}>
-            {ocultarSaldos ? <EyeOff size={16} /> : <Eye size={16} />}
+            {ocultarSaldos ? <EyeOff size={18} /> : <Eye size={18} />}
+            <span className={toolbarLbl}>{ocultarSaldos ? 'Mostrar' : 'Ocultar'}</span>
           </button>
           <button onClick={refrescarTodo} disabled={refreshing}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 disabled:opacity-50" title="Refrescar ahora (sincroniza pagos y vencimientos)">
-            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            className={`${toolbarBtn} disabled:opacity-50`} title="Refrescar ahora (sincroniza pagos y vencimientos)">
+            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            <span className={toolbarLbl}>Refrescar</span>
           </button>
           <button onClick={() => setShowExport(true)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 shrink-0" title="Exportar mes a Excel">
-            <FileSpreadsheet size={16} />
+            className={`${toolbarBtn} hover:text-emerald-600 dark:hover:text-emerald-400`} title="Exportar mes a Excel">
+            <FileSpreadsheet size={18} />
+            <span className={toolbarLbl}>Excel</span>
           </button>
           <button onClick={() => setShowConfig(true)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0" title="Configurar empleados y proveedores">
-            <Settings size={16} />
+            className={toolbarBtn} title="Configurar empleados y proveedores">
+            <Settings size={18} />
+            <span className={toolbarLbl}>Ajustes</span>
           </button>
         </div>
       </div>
@@ -1291,18 +1382,18 @@ export default function CajaView({ rubros = [], onNavigate }) {
             </div>
             {!editandoSaldo && (
               <button onClick={() => { setSaldoInput(saldoInicial || ''); setEditandoSaldo(true); }}
-                className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-500 hover:underline flex items-center gap-1">
                 <Pencil size={11} /> {saldoMov ? 'Editar' : 'Ajustar'}
               </button>
             )}
           </div>
           {editandoSaldo ? (
             <div ref={saldoEditRef} className="flex gap-2 mt-3">
-              <input type="number" min="0" step="any" className={inputCls} placeholder="Saldo del día anterior"
+              <input type="number" inputMode="decimal" min="0" step="any" className={inputCls} placeholder="Saldo del día anterior"
                 value={saldoInput} onChange={e => setSaldoInput(e.target.value)} autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleSaldoInicial()} />
-              <button onClick={handleSaldoInicial} className="bg-blue-600 text-white px-3 rounded-lg text-sm hover:bg-blue-700">OK</button>
-              <button onClick={() => setEditandoSaldo(false)} className="text-slate-400 hover:text-slate-600 px-2">✕</button>
+              <button onClick={handleSaldoInicial} className="shrink-0 min-w-11 min-h-11 sm:min-h-0 bg-blue-600 text-white px-3 rounded-lg text-sm font-medium hover:bg-blue-700">OK</button>
+              <button onClick={() => setEditandoSaldo(false)} aria-label="Cancelar" className="shrink-0 min-w-11 min-h-11 sm:min-h-0 text-slate-400 hover:text-slate-600 px-2">✕</button>
             </div>
           ) : (
             <div className="mt-1">
@@ -1328,18 +1419,18 @@ export default function CajaView({ rubros = [], onNavigate }) {
             </div>
             {!editandoSaldoCuenta && (
               <button onClick={() => { setSaldoCuentaInput(saldoCuentaHoy ?? ''); setEditandoSaldoCuenta(true); }}
-                className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-500 hover:underline flex items-center gap-1">
                 <Pencil size={11} /> {saldoCuentaMov ? 'Editar' : 'Ingresar'}
               </button>
             )}
           </div>
           {editandoSaldoCuenta ? (
             <div ref={saldoCuentaEditRef} className="flex gap-2 mt-3">
-              <input type="number" min="0" step="any" className={inputCls} placeholder="Saldo actual en cuenta"
+              <input type="number" inputMode="decimal" min="0" step="any" className={inputCls} placeholder="Saldo actual en cuenta"
                 value={saldoCuentaInput} onChange={e => setSaldoCuentaInput(e.target.value)} autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleSaldoCuenta()} />
-              <button onClick={handleSaldoCuenta} className="bg-blue-600 text-white px-3 rounded-lg text-sm hover:bg-blue-700">OK</button>
-              <button onClick={() => setEditandoSaldoCuenta(false)} className="text-slate-400 hover:text-slate-600 px-2">✕</button>
+              <button onClick={handleSaldoCuenta} className="shrink-0 min-w-11 min-h-11 sm:min-h-0 bg-blue-600 text-white px-3 rounded-lg text-sm font-medium hover:bg-blue-700">OK</button>
+              <button onClick={() => setEditandoSaldoCuenta(false)} aria-label="Cancelar" className="shrink-0 min-w-11 min-h-11 sm:min-h-0 text-slate-400 hover:text-slate-600 px-2">✕</button>
             </div>
           ) : (
             <div className="mt-1">
@@ -1363,6 +1454,38 @@ export default function CajaView({ rubros = [], onNavigate }) {
         </div>
       </div>
 
+      {/* Atajo al resumen. El detalle vive al final, que es donde corresponde:
+          es el total de los gastos que están más abajo, y un total arriba de lo
+          que suma se lee al revés. Lo que sí estaba mal era el alcance —"¿cuánto
+          me queda?" es la pregunta con la que se entra a la Caja y quedaba a
+          nueve gastos de scroll—, así que se adelanta solo la línea de fondo.
+          Tocarla baja al detalle. Mobile únicamente: en desktop las dos columnas
+          dejan el resumen a la vista sin esto. */}
+      <button
+        onClick={() => resumenRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        className="sm:hidden w-full flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-left active:bg-slate-50 dark:active:bg-slate-700/40 transition-colors"
+      >
+        <span className="flex-1 min-w-0 space-y-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Banknote size={12} className="text-green-600 shrink-0" /> Resta efectivo
+            </span>
+            <span className={`text-sm font-bold tabular-nums ${restaEfvo >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>
+              {fmt(restaEfvo)}
+            </span>
+          </span>
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <ArrowLeftRight size={12} className="text-blue-600 shrink-0" /> Resta transferencia
+            </span>
+            <span className={`text-sm font-bold tabular-nums ${restaTrans >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>
+              {fmt(restaTrans)}
+            </span>
+          </span>
+        </span>
+        <ChevronDown size={16} className="text-slate-400 shrink-0" />
+      </button>
+
       {/* Ingresos extra */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -1371,7 +1494,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ingresos extra</h3>
             {ingresosExtra.length > 0 && <span className="text-xs text-slate-400">{fmt(ingresosExtra.reduce((s,m) => s+m.monto,0))}</span>}
           </div>
-          <button onClick={() => openForm('ingreso_extra')} className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Plus size={11} /> Agregar</button>
+          <button onClick={() => openForm('ingreso_extra')} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0"><Plus size={13} /> Agregar</button>
         </div>
         {/* La edición de un cobro de deuda (ingreso con movimiento_id) se renderiza
             en la sección "Deudas por cobrar", no acá. */}
@@ -1379,7 +1502,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
           <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'ingreso_extra'} /></div>
         )}
         {ingresosExtra.map(m => (
-          <div key={m.id} className="mb-2">
+          <div key={m.id} className="mb-1.5 sm:mb-2">
             {/* Abono de deuda espejado desde un subrubro (origen 'subrubro'): verde y
                 con acceso directo al subrubro de origen. Ingreso manual: ámbar. */}
             {editingMov?.id === m.id && showForm ? null : (
@@ -1400,7 +1523,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
       <div>
         <div className="flex items-center justify-between mb-2">
           <button type="button" onClick={() => setEmpleadosOpen(v => !v)}
-            className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
+            className="flex items-center gap-2 min-h-11 sm:min-h-0 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
             <Users size={14} className="text-green-600 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cajas empleados</h3>
             {empleados.length > 0 && <span className="text-xs text-slate-400">{fmt(empleados.reduce((s,m) => s+m.monto,0))}</span>}
@@ -1409,7 +1532,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             )}
             <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
           </button>
-          <button onClick={() => { setEmpleadosOpen(true); openForm('empleado'); }} className="text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={11} /> Agregar</button>
+          <button onClick={() => { setEmpleadosOpen(true); openForm('empleado'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={13} /> Agregar</button>
         </div>
         {empleadosOpen && (
           <>
@@ -1420,7 +1543,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
               <p className="text-xs text-slate-400 py-2 text-center">Sin empleados cargados</p>
             )}
             {empleados.map(m => (
-              <div key={m.id} className="mb-2">
+              <div key={m.id} className="mb-1.5 sm:mb-2">
                 {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-600" />}
               </div>
             ))}
@@ -1430,35 +1553,49 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       {/* Gastos / Proveedores */}
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-y-1 mb-2">
+        {/* Título en su propia fila a ancho completo; monto y acciones abajo.
+            En una sola fila el que cedía ancho era el título ("Gas...") mientras
+            "Seleccionar todos" se quedaba entero — al revés de la prioridad. En
+            `sm:` entra todo en una línea y vuelve al layout de antes. */}
+        <div className="mb-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-y-1">
           <button type="button" onClick={() => setGastosOpen(v => !v)}
-            className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
-            <ShoppingCart size={14} className="text-red-500 shrink-0" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Gastos y proveedores</h3>
-            {gastos.length > 0 && <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
-            {!gastosOpen && gastos.length > 0 && (
-              <span className="text-xs text-slate-400 dark:text-slate-500">· {gastos.length}</span>
-            )}
-            <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${gastosOpen ? 'rotate-180' : ''}`} />
+            className="w-full sm:w-auto flex items-center gap-2 min-h-11 sm:min-h-0 text-left sm:flex-1 sm:min-w-0 hover:opacity-80 transition-opacity">
+            <ShoppingCart size={14} className="text-slate-400 shrink-0" />
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 sm:truncate">Gastos y proveedores</h3>
+            <span className="hidden sm:contents">
+              {gastos.length > 0 && <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
+              {!gastosOpen && gastos.length > 0 && (
+                <span className="text-xs text-slate-400 dark:text-slate-500">· {gastos.length}</span>
+              )}
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ml-auto sm:ml-0 ${gastosOpen ? 'rotate-180' : ''}`} />
           </button>
-          {hayDescuentos && (
-            <button onClick={() => setSoloDescuentos(v => !v)}
-              title={soloDescuentos ? 'Mostrar todos los pagos' : `Ver solo los pagos con descuento (${fmt(totalDescuentos)} descontados hoy)`}
-              className={`text-xs shrink-0 ml-2 px-1.5 py-0.5 rounded-full flex items-center gap-1 transition-colors ${
-                soloDescuentos
-                  ? 'bg-purple-600 text-white'
-                  : 'text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40'
-              }`}>
-              <Percent size={10} /> {fmt(totalDescuentos)}
-            </button>
-          )}
-          {gastos.length > 0 && (
-            <button onClick={allGastosSelected ? clearSelection : selectAllGastos}
-              className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-2">
-              {allGastosSelected ? 'Quitar selección' : 'Seleccionar todos'}
-            </button>
-          )}
-          <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={11} /> Agregar</button>
+          <div className="flex items-center gap-2 sm:contents">
+            {/* El total solo en mobile: en `sm:` ya va pegado al título. */}
+            {gastos.length > 0 && (
+              <span className="sm:hidden text-xs text-slate-400 tabular-nums">
+                {fmt(gastos.reduce((s,m) => s+m.monto,0))} · {gastos.length}
+              </span>
+            )}
+            {hayDescuentos && (
+              <button onClick={() => setSoloDescuentos(v => !v)}
+                title={soloDescuentos ? 'Mostrar todos los pagos' : `Ver solo los pagos con descuento (${fmt(totalDescuentos)} descontados hoy)`}
+                className={`text-xs shrink-0 sm:ml-2 px-1.5 py-0.5 rounded-full flex items-center gap-1 transition-colors ${
+                  soloDescuentos
+                    ? 'bg-purple-600 text-white'
+                    : 'text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40'
+                }`}>
+                <Percent size={10} /> {fmt(totalDescuentos)}
+              </button>
+            )}
+            {gastos.length > 0 && (
+              <button onClick={allGastosSelected ? clearSelection : selectAllGastos}
+                className="min-h-11 sm:min-h-0 px-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-auto sm:ml-2">
+                {allGastosSelected ? 'Quitar selección' : 'Seleccionar todos'}
+              </button>
+            )}
+            <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 sm:ml-2"><Plus size={13} /> Agregar</button>
+          </div>
         </div>
         {gastosOpen && (
           <>
@@ -1474,7 +1611,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
               <div key={grupo.key ?? 'sin-metodo'} className="mb-3">
                 <GrupoHeader grupo={grupo} />
                 {grupo.items.map(m => (
-                  <div key={m.id} className="mb-2">
+                  <div key={m.id} className="mb-1.5 sm:mb-2">
                     {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} />}
                   </div>
                 ))}
@@ -1489,24 +1626,35 @@ export default function CajaView({ rubros = [], onNavigate }) {
           con ✓ (registra el abono en el subrubro y suma a los ingresos del día). */}
       {(deudasCobro.length > 0 || (showForm && editingMov?.tipo === 'ingreso_extra' && editingMov?.movimiento_id != null)) && (
         <div>
-          <div className="flex flex-wrap items-center justify-between gap-y-1 mb-2">
+          {/* Mismo criterio que "Gastos y proveedores": título a ancho completo
+              en mobile, monto y acciones en la fila siguiente. */}
+          <div className="mb-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-y-1">
             <button type="button" onClick={() => setDeudasOpen(v => !v)}
-              className="flex items-center gap-2 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
-              <HandCoins size={14} className="text-orange-500 shrink-0" />
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Deudas por cobrar</h3>
-              {deudasCobro.length > 0 && <span className="text-xs text-slate-400">{fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))}</span>}
-              {!deudasOpen && deudasCobro.length > 0 && (
-                <span className="text-xs text-slate-400 dark:text-slate-500">· {deudasCobro.length}</span>
-              )}
+              className="w-full sm:w-auto flex items-center gap-2 min-h-11 sm:min-h-0 text-left sm:flex-1 sm:min-w-0 hover:opacity-80 transition-opacity">
+              <HandCoins size={14} className="text-slate-400 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 sm:truncate">Deudas por cobrar</h3>
+              <span className="hidden sm:contents">
+                {deudasCobro.length > 0 && <span className="text-xs text-slate-400">{fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))}</span>}
+                {!deudasOpen && deudasCobro.length > 0 && (
+                  <span className="text-xs text-slate-400 dark:text-slate-500">· {deudasCobro.length}</span>
+                )}
+              </span>
               <InfoTooltip text="Plata que te deben, vencida o por vencer. Al confirmar el cobro con ✓ se registra el abono en el subrubro y el monto se suma a los ingresos del día bajo su método." />
-              <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${deudasOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ml-auto sm:ml-0 ${deudasOpen ? 'rotate-180' : ''}`} />
             </button>
-            {deudasCobro.length > 0 && (
-              <button onClick={allDeudasSelected ? clearSelection : selectAllDeudas}
-                className="text-xs text-slate-500 dark:text-slate-400 hover:text-orange-500 hover:underline shrink-0 ml-2">
-                {allDeudasSelected ? 'Quitar selección' : 'Seleccionar todas'}
-              </button>
-            )}
+            <div className="flex items-center gap-2 sm:contents">
+              {deudasCobro.length > 0 && (
+                <span className="sm:hidden text-xs text-slate-400 tabular-nums">
+                  {fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))} · {deudasCobro.length}
+                </span>
+              )}
+              {deudasCobro.length > 0 && (
+                <button onClick={allDeudasSelected ? clearSelection : selectAllDeudas}
+                  className="min-h-11 sm:min-h-0 px-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-auto sm:ml-2">
+                  {allDeudasSelected ? 'Quitar selección' : 'Seleccionar todas'}
+                </button>
+              )}
+            </div>
           </div>
           {deudasOpen && (
             <>
@@ -1517,7 +1665,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 <div key={grupo.key ?? 'sin-metodo'} className="mb-3">
                   <GrupoHeader grupo={grupo} />
                   {grupo.items.map(m => (
-                    <div key={m.id} className="mb-2">
+                    <div key={m.id} className="mb-1.5 sm:mb-2">
                       {editingMov?.id === m.id && showForm ? null : (
                         <MovRow
                           m={m}
@@ -1543,8 +1691,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
         </div>
       )}
 
-      {/* Resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Resumen — al final, después de los gastos que suma. El acceso rápido
+          está arriba (botón "Resta efectivo / Resta transferencia"). */}
+      <div ref={resumenRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 scroll-mt-20">
         <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600"
           disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
         <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600"
@@ -1589,24 +1738,27 @@ function SeleccionPanel({ total, count, subNames, onClear, onConfirmar }) {
       ? subNames[0]
       : `Múltiples (${subNames.length})`;
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-lg">
-      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl ring-1 ring-white/10 px-4 py-3 flex items-center gap-3">
+    // En mobile sube por encima de la bottom nav; en desktop conserva su posición
+    // de siempre. El offset sale de `.bottom-above-nav` (index.css), que se apoya
+    // en el mismo --bottomnav-h que usa la barra: si cambia el alto, se mueven las dos.
+    <div className="fixed bottom-above-nav left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] max-w-lg">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl ring-1 ring-white/10 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs text-slate-400">Total seleccionado</span>
-            <span className="text-lg font-bold text-green-400">{fmt(total)}</span>
+            <span className="text-xs text-slate-400 hidden sm:inline">Total seleccionado</span>
+            <span className="text-lg font-bold text-green-400 tabular-nums">{fmt(total)}</span>
           </div>
           <div className="text-xs text-slate-400 mt-0.5 truncate">
-            {count} {count === 1 ? 'movimiento' : 'movimientos'} · <span className="text-slate-200">{subLabel}</span>
+            {count} {count === 1 ? 'mov.' : 'movs.'} · <span className="text-slate-200">{subLabel}</span>
           </div>
         </div>
         <button onClick={onConfirmar}
-          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 transition-colors shrink-0 flex items-center gap-1">
-          <Check size={13} /> Marcar pagados
+          className="text-xs font-medium px-3 min-h-11 sm:min-h-0 sm:py-1.5 rounded-lg bg-green-600 hover:bg-green-500 transition-colors shrink-0 flex items-center gap-1">
+          <Check size={14} /> <span className="hidden sm:inline">Marcar </span>pagados
         </button>
-        <button onClick={onClear} title="Limpiar selección"
-          className="text-slate-400 hover:text-white transition-colors shrink-0">
-          <X size={16} />
+        <button onClick={onClear} title="Limpiar selección" aria-label="Limpiar selección"
+          className="w-11 h-11 sm:w-auto sm:h-auto flex items-center justify-center text-slate-400 hover:text-white transition-colors shrink-0">
+          <X size={18} />
         </button>
       </div>
     </div>

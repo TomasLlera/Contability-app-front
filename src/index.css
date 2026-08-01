@@ -102,6 +102,56 @@ body {
   transform: scale(0.97);
 }
 
+/* Área táctil de 44×44 sin agrandar el ícono ni empujar el layout: el
+   pseudo-elemento se expande por fuera de la caja. Para íconos chicos que
+   comparten fila (editar/borrar) donde no se puede subir el padding real. */
+.tap {
+  position: relative;
+}
+.tap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
+  width: 100%;
+  height: 100%;
+}
+/* Con mouse el hit area ampliado no hace falta y puede tapar elementos vecinos. */
+@media (hover: hover) and (pointer: fine) {
+  .tap::after { display: none; }
+}
+
+/* Alto de la bottom navigation, en un solo lugar: lo consume la barra
+   (`h-(--bottomnav-h)` en BottomNav) y lo consume el espacio que le reserva el
+   contenido (`.pb-bottomnav`). Antes el 3.5rem estaba escrito a mano en los dos
+   lados y podían desfasarse. */
+:root { --bottomnav-h: 3.5rem; }
+
+/* Reserva el alto de la bottom navigation (+ el home indicator de iOS) para que
+   el último ítem de una lista no quede debajo de la barra. Con el alto solo, el
+   último elemento queda pegado al borde y se lee como cortado: el 1rem extra es
+   el aire que lo separa. */
+.pb-bottomnav {
+  padding-bottom: calc(var(--bottomnav-h) + 1rem + env(safe-area-inset-bottom));
+}
+/* Cualquier elemento `fixed` propio de una vista (barras de acción, FABs) se
+   levanta con esto para no quedar debajo de la barra ni pisarla. */
+.bottom-above-nav {
+  bottom: calc(var(--bottomnav-h) + 0.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .pb-bottomnav { padding-bottom: 0; }
+  .bottom-above-nav { bottom: 1rem; }
+}
+
+/* En touch el scroll con inercia dentro de una tabla no debe arrastrar la página. */
+@media (hover: none) {
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+}
+
 
 /* Slightly nicer scrollbars on desktop */
 @media (pointer: fine) {

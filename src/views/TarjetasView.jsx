@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { registroApi, cajaApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
+import RowActions from '../components/RowActions';
 import TarjetasGraficosModal from '../components/TarjetasGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
 import ComparativaVentasModal from '../components/ComparativaVentasModal';
@@ -251,7 +252,7 @@ export default function TarjetasView({ role }) {
                         {fmt(t.monto)} <span className="text-slate-400">· {t.empleado || 'Sin asignar'}</span>
                       </span>
                       {!isViewer && (
-                        <span className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                        <span className="flex items-center gap-1 shrink-0 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
                           <button onClick={() => startEdit(t)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
                           <button onClick={() => handleDelete(t)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
                         </span>
@@ -289,7 +290,7 @@ export default function TarjetasView({ role }) {
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Monto</label>
-              <input type="number" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0" className={inputCls} />
+              <input type="number" inputMode="decimal" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0" className={inputCls} />
             </div>
             <div>
               <label className="flex items-center gap-1 text-xs text-slate-400 mb-1">
@@ -321,28 +322,30 @@ export default function TarjetasView({ role }) {
               <Users size={14} className="text-green-600" /> Ingresos por empleado — {fecha}
             </span>
           </div>
-          <div className="overflow-x-auto">
+          {/* Se queda como tabla: es una matriz empleado × tipo de tarjeta, y el
+              valor está justamente en comparar filas y columnas entre sí. */}
+          <TableScroll hint="Deslizá para ver todos los tipos de tarjeta">
             <table className="w-full text-sm whitespace-nowrap">
               <thead className="text-slate-400 text-xs">
                 <tr>
-                  <th className="text-left px-4 py-1.5 font-medium">Empleado</th>
+                  <th className="text-left px-4 py-1.5 font-medium sticky left-0 z-10 bg-white dark:bg-slate-800">Empleado</th>
                   {TIPOS.map(t => <th key={t.key} className={`text-right px-4 py-1.5 font-medium ${t.text}`}>{t.label}</th>)}
                   <th className="text-right px-4 py-1.5 font-medium">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                 {porEmpleadoDia.map(e => (
-                  <tr key={e.empleado} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-200">{e.empleado}</td>
+                  <tr key={e.empleado} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
+                    <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-200 sticky left-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/30">{e.empleado}</td>
                     {TIPOS.map(t => (
-                      <td key={t.key} className="px-4 py-2 text-right text-slate-500">{e[t.key] ? fmt(e[t.key]) : '—'}</td>
+                      <td key={t.key} className="px-4 py-2 text-right text-slate-500 tabular-nums">{e[t.key] ? fmt(e[t.key]) : '—'}</td>
                     ))}
-                    <td className="px-4 py-2 text-right font-semibold text-slate-700 dark:text-slate-200">{fmt(e.total)}</td>
+                    <td className="px-4 py-2 text-right font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{fmt(e.total)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </div>
       )}
 
@@ -355,7 +358,55 @@ export default function TarjetasView({ role }) {
         {txsDia.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-8">Sin ingresos cargados para este día.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: cards. Editar apila los campos a ancho completo en vez de
+              meterlos en celdas dentro de un scroll horizontal. */}
+          <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-700/60">
+            {txsDia.map(t => {
+              const def = tipoDef(t.tipo);
+              return editId === t.id ? (
+                <div key={t.id} className="px-3 py-3 bg-blue-50/50 dark:bg-blue-900/10 space-y-2">
+                  <select value={edit.tipo} onChange={e => setEdit(p => ({ ...p, tipo: e.target.value }))} className={`${cellInput} min-h-11`}>
+                    {TIPOS.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
+                  </select>
+                  <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} className={`${cellInput} min-h-11`} />
+                  <select value={empleados.some(x => x.nombre === edit.empleado) || !edit.empleado ? edit.empleado : '__otro__'}
+                    onChange={e => setEdit(p => ({ ...p, empleado: e.target.value === '__otro__' ? '' : e.target.value }))}
+                    className={`${cellInput} min-h-11`}>
+                    <option value="">— Sin asignar —</option>
+                    {empleados.map((x, i) => <option key={i} value={x.nombre}>{x.nombre}</option>)}
+                  </select>
+                  <input type="number" inputMode="decimal" min="0" step="0.01" value={edit.monto}
+                    onChange={e => setEdit(p => ({ ...p, monto: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditId(null); }}
+                    className={`${cellInput} min-h-11 text-right`} autoFocus />
+                  <div className="flex gap-2 pt-0.5">
+                    <button onClick={() => setEditId(null)} className="flex-1 min-h-11 rounded-lg border border-slate-200 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300">Cancelar</button>
+                    <button onClick={saveEdit} className="flex-1 min-h-11 rounded-lg bg-blue-600 text-white text-sm font-medium">Guardar</button>
+                  </div>
+                </div>
+              ) : (
+                <div key={t.id} className="flex items-center gap-2 px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">{t.empleado || 'Sin asignar'}</p>
+                  </div>
+                  <span className="shrink-0 text-base font-bold text-slate-700 dark:text-slate-200 tabular-nums">{fmt(t.monto)}</span>
+                  {!isViewer && (
+                    <RowActions
+                      title={`${def.label}${t.empleado ? ` — ${t.empleado}` : ''}`}
+                      acciones={[
+                        { key: 'editar', label: 'Editar', icon: <Pencil size={16} />, onClick: () => startEdit(t) },
+                        { key: 'eliminar', label: 'Eliminar', icon: <Trash2 size={16} />, tone: 'danger', onClick: () => handleDelete(t) },
+                      ]}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-slate-400 text-xs">
                 <tr>
@@ -387,7 +438,7 @@ export default function TarjetasView({ role }) {
                         </div>
                       </td>
                       <td className="px-4 py-1.5">
-                        <input type="number" min="0" step="0.01" value={edit.monto}
+                        <input type="number" inputMode="decimal" min="0" step="0.01" value={edit.monto}
                           onChange={e => setEdit(p => ({ ...p, monto: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditId(null); }}
                           className={`${cellInput} text-right`} autoFocus />
@@ -408,7 +459,7 @@ export default function TarjetasView({ role }) {
                       <td className="px-4 py-2 text-right font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">{fmt(t.monto)}</td>
                       <td className="px-2 py-2">
                         {!isViewer && (
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <div className="flex items-center justify-end gap-1 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
                             <button onClick={() => startEdit(t)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={13} /></button>
                             <button onClick={() => handleDelete(t)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
                           </div>
@@ -420,6 +471,7 @@ export default function TarjetasView({ role }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

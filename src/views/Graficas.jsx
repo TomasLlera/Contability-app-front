@@ -110,6 +110,10 @@ function GraficoTendencia({ tendencia, metrica }) {
   const m = METRICAS.find(x => x.key === metrica);
   const vals = tendencia.map(t => Math.max(t[metrica] ?? 0, 0));
   const maxVal = Math.max(...vals, 1);
+  // El tooltip era la única forma de ver el valor de una barra, y abría con hover:
+  // en un teléfono el gráfico quedaba mudo. Ahora también se abre al tocar la barra
+  // (`activo`), y se cierra al tocar otra o la misma de nuevo.
+  const [activo, setActivo] = useState(null);
   if (tendencia.length === 0) return <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos para este período</div>;
   return (
     <div>
@@ -120,18 +124,25 @@ function GraficoTendencia({ tendencia, metrica }) {
           const isLast = i === tendencia.length - 1;
           const prev = tendencia[i - 1];
           const [anio, mes] = t.mes.split('-');
+          const abierto = activo === t.mes;
           return (
-            <div key={t.mes} className="flex-1 h-full flex flex-col items-center gap-1 group relative">
-              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+            <button
+              type="button"
+              key={t.mes}
+              onClick={() => setActivo(a => (a === t.mes ? null : t.mes))}
+              aria-label={`${MESES[mes]} ${anio}: ${fmt(val)}`}
+              className="flex-1 h-full flex flex-col items-center gap-1 group relative"
+            >
+              <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap transition-opacity pointer-events-none z-10 group-hover:opacity-100 ${abierto ? 'opacity-100' : 'opacity-0'}`}>
                 <p className="font-semibold">{fmt(val)}</p>
                 {prev && <Delta current={val} previous={prev[metrica] ?? 0} positiveIsGood={metrica === 'pagado'} />}
               </div>
               <div className="w-full flex-1 flex items-end">
-                <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? m.color : m.colorLight}`} style={{ height: `${Math.max(pct, 2)}%` }} />
+                <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? m.color : m.colorLight} ${abierto ? 'ring-2 ring-blue-400/60' : ''}`} style={{ height: `${Math.max(pct, 2)}%` }} />
               </div>
               <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{MESES[mes]}</p>
               {isLast && <p className="text-xs text-slate-400">{anio}</p>}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -154,6 +165,9 @@ function GraficoTendencia({ tendencia, metrica }) {
 
 // ── Gráfico de barras genérico para caja ─────────────────────────────────────
 function CajaBarChart({ datos, chartCfg }) {
+  // Mismo motivo que en GraficoTendencia: sin tap el gráfico no dice ningún número
+  // en mobile.
+  const [activo, setActivo] = useState(null);
   const vals = datos.map(d => d[chartCfg.key] || 0);
   const maxVal = Math.max(...vals, 1);
   const total = vals.reduce((s, v) => s + v, 0);
@@ -162,6 +176,10 @@ function CajaBarChart({ datos, chartCfg }) {
 
   const minBarW = 22;
   const needsScroll = datos.length > 14;
+  // Con 30 días, 30 etiquetas de 12px bajo barras de 22px son ilegibles: se muestra
+  // una de cada N para que el eje se pueda leer. El paso sale de la cantidad de
+  // barras, así que un mes corto o un rango de 7 días siguen mostrándolas todas.
+  const pasoLabel = datos.length > 20 ? 5 : datos.length > 14 ? 3 : 1;
 
   return (
     <div>
@@ -176,19 +194,31 @@ function CajaBarChart({ datos, chartCfg }) {
             const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
             const isLast = i === datos.length - 1;
             const prev = datos[i - 1];
+            const abierto = activo === d.key;
+            // Se etiqueta 1 de cada `pasoLabel`, más siempre la última (el día actual).
+            const mostrarLabel = isLast || i % pasoLabel === 0;
             return (
-              <div key={d.key} className="flex-1 h-full flex flex-col items-center gap-1 group relative" style={needsScroll ? { minWidth: `${minBarW}px` } : {}}>
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              <button
+                type="button"
+                key={d.key}
+                onClick={() => setActivo(a => (a === d.key ? null : d.key))}
+                aria-label={`${d.label}: ${fmt(val)}`}
+                className="flex-1 h-full flex flex-col items-center gap-1 group relative"
+                style={needsScroll ? { minWidth: `${minBarW}px` } : {}}
+              >
+                <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap transition-opacity pointer-events-none z-10 group-hover:opacity-100 ${abierto ? 'opacity-100' : 'opacity-0'}`}>
                   <p className="font-semibold">{d.label}</p>
                   <p>{fmt(val)}</p>
                   {prev && val > 0 && <Delta current={val} previous={prev[chartCfg.key] || 0} positiveIsGood={chartCfg.key.startsWith('ingreso') || chartCfg.key === 'transDelta'} />}
                 </div>
                 <div className="w-full flex-1 flex items-end">
-                  <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? chartCfg.color : chartCfg.colorLight}`}
+                  <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? chartCfg.color : chartCfg.colorLight} ${abierto ? 'ring-2 ring-blue-400/60' : ''}`}
                     style={{ height: `${Math.max(pct, val > 0 ? 2 : 0)}%` }} />
                 </div>
-                <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{d.label}</p>
-              </div>
+                <p className={`text-xs h-4 ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>
+                  {mostrarLabel ? d.label : ''}
+                </p>
+              </button>
             );
           })}
         </div>

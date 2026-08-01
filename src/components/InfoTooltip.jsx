@@ -18,6 +18,10 @@ import { HelpCircle } from 'lucide-react';
 export default function InfoTooltip({ text, side, size = 13, width = 'w-56' }) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState(side || 'top');
+  // Corrimiento horizontal en px para que el popover no se salga de la pantalla.
+  // Centrado a secas, un ⓘ cerca del borde derecho (los headers de las tablas de
+  // IVA, por ejemplo) dejaba media ayuda fuera del viewport en un teléfono.
+  const [shift, setShift] = useState(0);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -30,9 +34,17 @@ export default function InfoTooltip({ text, side, size = 13, width = 'w-56' }) {
   // Posición inteligente: si el usuario no fija `side`, abrimos hacia abajo
   // cuando no hay lugar arriba (icono cerca del borde superior del viewport).
   const recalcPos = () => {
-    if (!side && ref.current) {
-      setPos(ref.current.getBoundingClientRect().top < 120 ? 'bottom' : 'top');
-    }
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    if (!side) setPos(r.top < 120 ? 'bottom' : 'top');
+
+    // El popover se dibuja centrado en el ícono; se corre lo justo para que sus
+    // dos bordes queden dentro del viewport con 8px de margen.
+    const ancho = Math.min(224, window.innerWidth - 16); // 224px = w-56
+    const centro = r.left + r.width / 2;
+    const min = 8 + ancho / 2;
+    const max = window.innerWidth - 8 - ancho / 2;
+    setShift(centro < min ? min - centro : centro > max ? max - centro : 0);
   };
   const toggle = () => { recalcPos(); setShow(v => !v); };
   const open = () => { recalcPos(); setShow(true); };
@@ -46,21 +58,26 @@ export default function InfoTooltip({ text, side, size = 13, width = 'w-56' }) {
       onMouseEnter={open}
       onMouseLeave={() => setShow(false)}
     >
+      {/* `tap` lleva el área táctil a 44px sin agrandar el ícono de 13px ni
+          empujar el texto que tiene al lado. */}
       <button
         type="button"
         aria-label="Ayuda"
         onClick={toggle}
-        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        className="tap text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
       >
         <HelpCircle size={size} />
       </button>
       {show && (
         <div
           role="tooltip"
-          className={`absolute left-1/2 -translate-x-1/2 ${width} bg-slate-800 text-white text-xs rounded-lg px-3 py-2.5 z-30 shadow-lg leading-relaxed font-normal normal-case tracking-normal text-left ${esTop ? 'bottom-full mb-2' : 'top-full mt-2'}`}
+          style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
+          className={`absolute left-1/2 ${width} max-w-[calc(100vw-1rem)] bg-slate-800 text-white text-xs rounded-lg px-3 py-2.5 z-30 shadow-lg leading-relaxed font-normal normal-case tracking-normal text-left ${esTop ? 'bottom-full mb-2' : 'top-full mt-2'}`}
         >
           {text}
+          {/* La flecha se queda apuntando al ícono aunque el globo se haya corrido. */}
           <div
+            style={{ marginLeft: `${-shift}px` }}
             className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${esTop ? 'top-full border-t-slate-800' : 'bottom-full border-b-slate-800'}`}
           />
         </div>

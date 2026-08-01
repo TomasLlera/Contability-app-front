@@ -65,7 +65,7 @@ function CategoriaForm({ initial = EMPTY, onSave, onCancel, submitLabel = 'Agreg
             <div className="mt-2 flex items-center gap-2">
               <span className="text-xs text-slate-500">Porcentaje por defecto:</span>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 min="0"
                 max="100"
                 step="0.01"

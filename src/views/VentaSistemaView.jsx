@@ -4,6 +4,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import VentaSistemaGraficosModal from '../components/VentaSistemaGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
 import InfoTooltip from '../components/InfoTooltip';
+import RowActions from '../components/RowActions';
 import ComparativaVentasModal from '../components/ComparativaVentasModal';
 import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, Scale, Receipt, FileText, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -210,7 +211,7 @@ export default function VentaSistemaView({ role }) {
                         {v.concepto && <span className="text-slate-400"> · {v.concepto}</span>}
                       </span>
                       {!isViewer && (
-                        <span className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                        <span className="flex items-center gap-1 shrink-0 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
                           <button onClick={() => startEdit(v)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
                           <button onClick={() => handleDelete(v)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
                         </span>
@@ -225,12 +226,14 @@ export default function VentaSistemaView({ role }) {
       </div>
 
       {/* Total consolidado del día */}
-      <div className="flex items-center justify-between bg-slate-900 dark:bg-slate-800 border border-slate-700 rounded-xl px-5 py-4">
-        <div className="text-sm font-medium text-slate-300 flex items-center gap-1.5">
-          Total consolidado del {fecha}
+      {/* flex-wrap + gap: sin esto el label largo, el ⓘ y un importe en text-2xl
+          se desbordaban de los 351px de un teléfono. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-slate-900 dark:bg-slate-800 border border-slate-700 rounded-xl px-4 sm:px-5 py-3.5 sm:py-4">
+        <div className="text-sm font-medium text-slate-300 flex items-center gap-1.5 min-w-0">
+          <span className="truncate">Total consolidado del {fecha}</span>
           <InfoTooltip text="Ticket + facturado. Solo la parte facturada genera IVA débito fiscal (21%) y es la que se cruza contra el total de tarjetas en la Comparativa." />
         </div>
-        <span className="text-2xl font-bold text-white">{fmt(totalDia)}</span>
+        <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">{fmt(totalDia)}</span>
       </div>
 
       {/* Alta */}
@@ -243,7 +246,7 @@ export default function VentaSistemaView({ role }) {
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Monto</label>
-              <input type="number" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={inputCls} />
+              <input type="number" inputMode="decimal" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={inputCls} />
             </div>
             <div>
               <label className="flex items-center gap-1 text-xs text-slate-400 mb-1">
@@ -285,7 +288,53 @@ export default function VentaSistemaView({ role }) {
 function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdit, onCancelEdit, onDelete }) {
   const cellInput = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500';
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Mobile: cards. La edición inline de una tabla de 5 columnas dentro de un
+        scroll horizontal es impracticable con el pulgar; acá los campos se apilan
+        a ancho completo. */}
+    <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-700/60">
+      {ventas.map(v => editId === v.id ? (
+        <div key={v.id} className="px-3 py-3 bg-blue-50/50 dark:bg-blue-900/10 space-y-2">
+          <select value={edit.tipo} onChange={e => setEdit(p => ({ ...p, tipo: e.target.value }))} className={`${cellInput} min-h-11`}>
+            {TIPOS_VENTA.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+          <input type="date" value={edit.fecha} onChange={e => setEdit(p => ({ ...p, fecha: e.target.value }))} className={`${cellInput} min-h-11`} />
+          <input type="text" value={edit.concepto} onChange={e => setEdit(p => ({ ...p, concepto: e.target.value }))} placeholder="Detalle" className={`${cellInput} min-h-11`} />
+          <input type="number" inputMode="decimal" min="0" step="0.01" value={edit.monto} onChange={e => setEdit(p => ({ ...p, monto: e.target.value }))}
+            onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(); if (e.key === 'Escape') onCancelEdit(); }}
+            className={`${cellInput} min-h-11 text-right`} autoFocus />
+          <div className="flex gap-2 pt-0.5">
+            <button onClick={onCancelEdit} className="flex-1 min-h-11 rounded-lg border border-slate-200 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300">Cancelar</button>
+            <button onClick={onSaveEdit} className="flex-1 min-h-11 rounded-lg bg-blue-600 text-white text-sm font-medium">Guardar</button>
+          </div>
+        </div>
+      ) : (
+        <div key={v.id} className="flex items-center gap-2 px-3 py-2.5">
+          <div className="flex-1 min-w-0">
+            {(() => {
+              const def = tipoDef(v.tipo);
+              return <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>;
+            })()}
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              <span className="tabular-nums">{v.fecha}</span>
+              {v.concepto && <> · {v.concepto}</>}
+            </p>
+          </div>
+          <span className="shrink-0 text-base font-bold text-slate-700 dark:text-slate-200 tabular-nums">{fmt(v.monto)}</span>
+          {!isViewer && (
+            <RowActions
+              title={v.concepto || tipoDef(v.tipo).label}
+              acciones={[
+                { key: 'editar', label: 'Editar', icon: <Pencil size={16} />, onClick: () => onStartEdit(v) },
+                { key: 'eliminar', label: 'Eliminar', icon: <Trash2 size={16} />, tone: 'danger', onClick: () => onDelete(v) },
+              ]}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+
+    <div className="hidden sm:block overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-slate-400 text-xs">
           <tr>
@@ -311,7 +360,7 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
                 <input type="text" value={edit.concepto} onChange={e => setEdit(p => ({ ...p, concepto: e.target.value }))} placeholder="Detalle" className={cellInput} />
               </td>
               <td className="px-4 py-1.5">
-                <input type="number" min="0" step="0.01" value={edit.monto} onChange={e => setEdit(p => ({ ...p, monto: e.target.value }))}
+                <input type="number" inputMode="decimal" min="0" step="0.01" value={edit.monto} onChange={e => setEdit(p => ({ ...p, monto: e.target.value }))}
                   onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(); if (e.key === 'Escape') onCancelEdit(); }}
                   className={`${cellInput} text-right`} autoFocus />
               </td>
@@ -335,7 +384,7 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
               <td className="px-4 py-2 text-right font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">{fmt(v.monto)}</td>
               <td className="px-2 py-2">
                 {!isViewer && (
-                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <div className="flex items-center justify-end gap-1 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
                     <button onClick={() => onStartEdit(v)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={13} /></button>
                     <button onClick={() => onDelete(v)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
                   </div>
@@ -346,5 +395,6 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
         </tbody>
       </table>
     </div>
+    </>
   );
 }

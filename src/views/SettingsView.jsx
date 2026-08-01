@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { appConfigApi, usersApi, auditApi, rubrosApi, subrubrosApi, authApi, backupApi, cotizacionesApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
 import AuditDetailModal from '../components/AuditDetailModal';
 import InfoTooltip from '../components/InfoTooltip';
 
@@ -103,7 +103,35 @@ function AuditoriaSection() {
         </button>
       </div>
 
-      <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+      {/* Mobile: cards. La fecha completa de es-AR ("31/7/2026, 20:40:15") ya se
+          come un tercio del ancho, y con cinco columnas la tabla no entra. */}
+      <div className="sm:hidden border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
+        {loading ? (
+          <p className="px-3 py-6 text-center text-slate-400">Cargando...</p>
+        ) : items.length === 0 ? (
+          <p className="px-3 py-6 text-center text-slate-400">Sin registros</p>
+        ) : items.map(it => (
+          <button
+            key={it._id}
+            onClick={() => setDetalle(it)}
+            className="w-full text-left px-3 py-2.5 min-h-14 flex items-center gap-2 active:bg-slate-50 dark:active:bg-slate-700/40"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-slate-700 dark:text-slate-200 truncate">
+                <span className={`font-medium ${accionColor(it.accion)}`}>{it.accion}</span>
+                {' '}<span className="text-slate-500 dark:text-slate-400">{it.recurso}</span>
+                {it.recurso_id != null && <span className="text-blue-600 dark:text-blue-400 font-mono text-xs"> #{it.recurso_id}</span>}
+              </p>
+              <p className="text-xs text-slate-400 truncate">
+                {it.usuario} · {new Date(it.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+            <ChevronRight size={16} className="shrink-0 text-slate-300 dark:text-slate-600" />
+          </button>
+        ))}
+      </div>
+
+      <div className="hidden sm:block border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
         <div className="max-h-125 overflow-y-auto overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0">
