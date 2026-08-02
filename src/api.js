@@ -393,6 +393,8 @@ export const registroApi = {
   ventas: {
     getMes: (mes) => api.get(`/registro/ventas-sistema/mes/${mes}`).then(r => r.data),
     getDia: (fecha) => api.get(`/registro/ventas-sistema/dia/${fecha}`).then(r => r.data),
+    // Día donde retomar la carga: el siguiente al último con datos (tope hoy).
+    getProximoDia: () => api.get('/registro/ventas-sistema/proximo-dia').then(r => r.data),
     create: (data) => api.post('/registro/ventas-sistema', data).then(r => r.data),
     update: (id, data) => api.put(`/registro/ventas-sistema/${id}`, data).then(r => r.data),
     delete: (id) => api.delete(`/registro/ventas-sistema/${id}`).then(r => r.data),
@@ -400,6 +402,8 @@ export const registroApi = {
   tarjetas: {
     getMes: (mes) => api.get(`/registro/tarjetas/mes/${mes}`).then(r => r.data),
     getDia: (fecha) => api.get(`/registro/tarjetas/dia/${fecha}`).then(r => r.data),
+    // Día donde retomar la carga: el siguiente al último con datos (tope hoy).
+    getProximoDia: () => api.get('/registro/tarjetas/proximo-dia').then(r => r.data),
     create: (data) => api.post('/registro/tarjetas', data).then(r => r.data),
     update: (id, data) => api.put(`/registro/tarjetas/${id}`, data).then(r => r.data),
     delete: (id) => api.delete(`/registro/tarjetas/${id}`).then(r => r.data),
@@ -427,6 +431,10 @@ export const auditApi = {
 export const cajaApi = {
   getByFecha: (fecha) => api.get('/caja', { params: { fecha } }).then(r => r.data),
   getRango: (desde, hasta) => api.get('/caja/rango', { params: { desde, hasta } }).then(r => r.data),
+  // Saldo de apertura del día, encadenado en el backend desde el último saldo_inicial
+  // manual (sin ventana de días). Devuelve { saldo, ancla_fecha, ancla_monto };
+  // saldo === null = nunca se cargó un saldo inicial, no hay base para calcular.
+  getSaldoAnterior: (fecha) => api.get('/caja/saldo-anterior', { params: { fecha } }).then(r => r.data),
   create: (data) => api.post('/caja', data).then(r => r.data),
   update: (id, data) => api.put(`/caja/${id}`, data).then(r => r.data),
   delete: (id, fecha) => api.delete(`/caja/${id}`, { params: { fecha } }).then(r => r.data),

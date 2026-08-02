@@ -3,6 +3,7 @@ import { registroApi, cajaApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
 import RowActions from '../components/RowActions';
+import TableScroll from '../components/TableScroll';
 import TarjetasGraficosModal from '../components/TarjetasGraficosModal';
 import RegistroExportModal from '../components/RegistroExportModal';
 import ComparativaVentasModal from '../components/ComparativaVentasModal';
@@ -55,6 +56,7 @@ export default function TarjetasView({ role }) {
   const [mesData, setMesData] = useState(null);
   const [empleados, setEmpleados] = useState([]); // lista de la config de Caja
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [expandido, setExpandido] = useState(null); // tipo con el detalle abierto
   const [showMensual, setShowMensual] = useState(false);
@@ -63,6 +65,21 @@ export default function TarjetasView({ role }) {
 
   // Elegir un día lleva el resumen mensual a ese mes (evita tener dos navegadores desfasados).
   const setFecha = (f) => { setFechaState(f); setMes(f.slice(0, 7)); };
+
+  // La vista NO abre en hoy sino en el día donde quedó la carga: el siguiente al
+  // último que ya tiene datos (tope hoy). Si hoy es 3 y lo último cargado es el 31,
+  // abre el 1 — así se completan los días pendientes sin navegar hacia atrás a mano.
+  // `iniciando` evita que la primera carga se dispare para hoy y se repita al llegar
+  // la fecha sugerida.
+  const [iniciando, setIniciando] = useState(true);
+  useEffect(() => {
+    let vivo = true;
+    registroApi.tarjetas.getProximoDia()
+      .then(({ fecha: sugerida }) => { if (vivo && sugerida) setFecha(sugerida); })
+      .catch(() => {})   // si falla, se queda en hoy
+      .finally(() => { if (vivo) setIniciando(false); });
+    return () => { vivo = false; };
+  }, []);
 
   // Alta
   const [form, setForm] = useState({ tipo: 'qr', monto: '', empleado: '' });
@@ -84,8 +101,11 @@ export default function TarjetasView({ role }) {
         registroApi.tarjetas.getDia(fecha),
         registroApi.tarjetas.getMes(mes),
       ]);
-      setDia(d); setMesData(m);
+      setDia(d); setMesData(m); setError(null);
     } catch (err) {
+      // Sin esto un endpoint caído se veía idéntico a un día sin cargas (todo en
+      // cero), y no había forma de distinguir "no vendimos nada" de "no cargó".
+      setError(getErrorMsg(err));
       toast.error(getErrorMsg(err));
     } finally {
       setLoading(false);
@@ -98,7 +118,7 @@ export default function TarjetasView({ role }) {
     setRecarga(k => k + 1);
   }, [cargar]);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { if (!iniciando) cargar(); }, [cargar, iniciando]);
 
   // Empleados: misma lista que la Caja del día (CajaConfig), no una lista propia.
   useEffect(() => {
@@ -156,6 +176,21 @@ export default function TarjetasView({ role }) {
 
   if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando…</div>;
 
+  if (error && !dia) return (
+    <div className="max-w-6xl mx-auto">
+      <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 px-5 py-6 text-center">
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">No se pudieron cargar los datos de tarjetas</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{error}</p>
+        <button onClick={() => { setLoading(true); cargar(); }}
+          className="mt-3 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors">
+          Reintentar
+        </button>
+      </div>
+    </div>
+  );
+
+  // Todos con fallback: el endpoint puede devolver un día sin cargas (por_tipo con los
+  // 4 tipos en cero y arrays vacíos) y la vista tiene que renderizar igual.
   const porTipoDia = dia?.por_tipo || {};
   const totalDia = dia?.total || 0;
   const txsDia = dia?.transacciones || [];

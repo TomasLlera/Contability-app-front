@@ -582,18 +582,17 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   const puedeDescontar = aplicaDescuento && esPendiente && m.movimiento_id != null;
   const mostrarAcordeon = puedeDescontar || conDescuento;
 
-  // Jerarquía de color del importe. Antes cada estado tenía su color propio
-  // (rojo pendiente, verde confirmado, naranja sin cobrar) y con nueve filas en
-  // pantalla competían todos entre sí, así que ninguno resaltaba. Ahora:
-  //   · pendiente  → neutro fuerte. Es plata que todavía debés: es el default.
-  //   · confirmado → neutro apagado. Ya está hecho; se corre a segundo plano.
-  //   · descuento  → violeta. Único caso donde el número no es el bruto, y eso
-  //                  sí hay que poder verlo de un vistazo.
-  // El rojo queda reservado para lo crítico (un saldo negativo en el Resumen) y
-  // el verde para la acción, que es el botón ✓.
+  // Jerarquía de color del importe (semáforo de estado):
+  //   · pendiente  → ROJO. Plata que todavía debés/no cobraste: es lo que pide acción.
+  //   · confirmado → VERDE. Ya está hecho.
+  //   · descuento  → VIOLETA, y tiene prioridad sobre los dos anteriores: es el único
+  //                  caso donde el número mostrado no es el bruto, y eso hay que
+  //                  poder verlo de un vistazo aunque el pago ya esté confirmado.
+  // Los ítems no confirmables (empleados, ingresos manuales) conservan el color que
+  // les pasa la sección vía `colorMonto`.
   const montoColor = conDescuento ? 'text-purple-600 dark:text-purple-400'
     : (esGasto || esCobro)
-      ? (esPendiente ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500')
+      ? (esPendiente ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')
       : colorMonto;
 
   const bruto = Number(m.monto_bruto ?? m.monto) || 0;
@@ -607,6 +606,9 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
     ? descRaw > 0 && descRaw < 100
     : descRaw > 0 && descRaw < bruto;
 
+  // El borde/fondo repite el semáforo del importe para que el estado se lea de lejos,
+  // sin tener que buscar el badge: rojo punteado = falta confirmar, verde =
+  // confirmado, violeta = con descuento aplicado.
   return (
     <div className={`rounded-xl border transition-colors ${
       selected
@@ -614,8 +616,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
         : conDescuento
           ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-300 dark:border-purple-800'
           : esPendiente
-            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600 border-dashed'
-            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+            ? 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-900 border-dashed'
+            : esConfirmado
+              ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-900'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
     }`}>
     <div
       onClick={selectable ? () => onToggleSelect(m.id) : undefined}
@@ -640,7 +644,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
             hay hover para resolver un truncado— y una sola en `sm:`, donde el
             `title` alcanza. */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <p className={`text-sm font-medium line-clamp-2 sm:truncate min-w-0 ${esPendiente ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}
+          {/* El nombre va en neutro fuerte siempre. Antes lo pendiente se atenuaba,
+              que con el semáforo restaurado quedaba al revés: lo que falta confirmar
+              es justamente lo que hay que mirar. El estado lo dicen color y badge. */}
+          <p className="text-sm font-medium line-clamp-2 sm:truncate min-w-0 text-slate-800 dark:text-slate-100"
              title={conceptoLimpio(m)}>
             {conceptoLimpio(m)}
           </p>
@@ -662,7 +669,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
               el encabezado: se omite y queda solo el tipo de comprobante y el estado. */}
           {!hideMetodo && <MetodoBadge metodo={m.metodo} />}
           <DocumentoBadge documento={m.documento} />
-          {esPendiente && <span className="text-[11px] leading-[18px] px-1.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
+          {/* Rojo, igual que el importe y el borde: un solo código de color por estado. */}
+          {esPendiente && <span className="text-[11px] leading-[18px] px-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
           {/* El ✓ verde de la derecha ya dice que está confirmado: en mobile este
               badge solo agrega una línea de alto por fila. Se muestra desde `sm`. */}
           {esConfirmado && m.movimiento_id && <span className="hidden sm:flex text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 items-center gap-0.5"><Check size={9} /> {esCobro ? 'Cobro confirmado' : 'Pago confirmado'}</span>}
@@ -966,46 +974,21 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
 
+      // El saldo de ayer se necesita en los dos casos: para el ingreso por
+      // transferencia del día (saldo_cuenta de hoy − el de ayer).
+      const dataAyer = await cajaApi.getByFecha(addDays(fecha, -1));
+      setSaldoCuentaAyer(dataAyer.find(m => m.tipo === 'saldo_cuenta')?.monto ?? null);
+
       if (tieneSaldoManual) {
         setSaldoAutoCalculado(null);
-        const dataAyer = await cajaApi.getByFecha(addDays(fecha, -1));
-        setSaldoCuentaAyer(dataAyer.find(m => m.tipo === 'saldo_cuenta')?.monto ?? null);
       } else {
-        // Busca hasta 30 días atrás para encadenar el saldo correctamente
-        const hasta = addDays(fecha, -1);
-        const desde = addDays(fecha, -30);
-        const historial = await cajaApi.getRango(desde, hasta);
-
-        setSaldoCuentaAyer(
-          historial.filter(m => m.fecha === hasta).find(m => m.tipo === 'saldo_cuenta')?.monto ?? null
-        );
-
-        const byDate = {};
-        historial.forEach(m => {
-          if (!byDate[m.fecha]) byDate[m.fecha] = [];
-          byDate[m.fecha].push(m);
-        });
-
-        const dates = Object.keys(byDate).sort();
-
-        // Encuentra el último saldo_inicial almacenado (busca de más reciente a más antiguo)
-        let saldoBase = 0;
-        let startIdx = -1;
-        for (let i = dates.length - 1; i >= 0; i--) {
-          const entry = byDate[dates[i]].find(m => m.tipo === 'saldo_inicial');
-          if (entry) { saldoBase = entry.monto; startIdx = i; break; }
-        }
-
-        // Encadena el saldo corriendo desde el último ancla hasta ayer
-        let running = saldoBase;
-        for (let i = Math.max(startIdx, 0); i < dates.length; i++) {
-          const ms = byDate[dates[i]];
-          // confirmado !== false: los pendientes (gasto sin pagar / deuda sin cobrar) no mueven el saldo.
-          running += ms.filter(m => (m.tipo === 'empleado' || m.tipo === 'ingreso_extra') && m.metodo === 'efectivo' && m.confirmado !== false).reduce((s, m) => s + m.monto, 0);
-          running -= ms.filter(m => m.tipo === 'gasto' && m.metodo === 'efectivo' && m.confirmado !== false).reduce((s, m) => s + m.monto, 0);
-        }
-
-        setSaldoAutoCalculado(running);
+        // El encadenado lo resuelve el backend desde el último saldo_inicial manual,
+        // sin límite de días hacia atrás. Antes se hacía acá trayendo 30 días: cuando
+        // el ancla caía fuera de esa ventana la cadena arrancaba en cero y el saldo
+        // del día se desplomaba sin ninguna señal de que faltaba la base.
+        // saldo === null = nunca se cargó un saldo inicial → la Caja muestra "—".
+        const { saldo } = await cajaApi.getSaldoAnterior(fecha);
+        setSaldoAutoCalculado(saldo ?? null);
       }
     } catch {}
     setLoading(false);

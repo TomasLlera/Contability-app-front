@@ -68,6 +68,21 @@ export default function VentaSistemaView({ role }) {
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  // La carga arranca en el día donde quedó: el siguiente al último con datos (tope
+  // hoy), no en hoy. Si hoy es 3 y lo último cargado es el 31, el alta abre en el 1.
+  // Lleva también el mes visible a ese día para no quedar mirando otro mes.
+  useEffect(() => {
+    let vivo = true;
+    registroApi.ventas.getProximoDia()
+      .then(({ fecha: sugerida }) => {
+        if (!vivo || !sugerida) return;
+        setFecha(sugerida);
+        setMes(sugerida.slice(0, 7));
+      })
+      .catch(() => {});   // si falla, se queda en hoy
+    return () => { vivo = false; };
+  }, []);
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (saving) return;
