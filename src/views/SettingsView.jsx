@@ -12,11 +12,12 @@ const ROLE_META = {
   viewer:     { label: 'Solo lectura',   desc: 'Acceso limitado (lectura)',           icon: ShieldAlert, box: 'bg-slate-200 dark:bg-slate-600',    iconCls: 'text-slate-500 dark:text-slate-400' },
 };
 
+// `ancha`: la sección muestra tablas y necesita más ancho que un formulario.
 const SECCIONES = [
   { key: 'alertas',   label: 'Alertas',    icon: Bell,           ready: true },
   { key: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard, ready: true },
-  { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true },
-  { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true },
+  { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true, ancha: true },
+  { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true, ancha: true },
   { key: 'backup',    label: 'Backup',     icon: Database,       ready: true },
   { key: 'moneda',    label: 'Moneda',     icon: DollarSign, ready: true },
   { key: 'idioma',    label: 'Idioma',     icon: Globe,      ready: false },
@@ -132,7 +133,7 @@ function AuditoriaSection() {
       </div>
 
       <div className="hidden sm:block border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-        <div className="max-h-125 overflow-y-auto overflow-x-auto">
+        <div className="max-h-[65vh] min-h-80 overflow-y-auto overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0">
               <tr className="text-xs text-slate-500 dark:text-slate-400 uppercase">
@@ -806,7 +807,7 @@ export default function SettingsView() {
   const activa = SECCIONES.find(s => s.key === seccion);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className={`mx-auto transition-[max-width] duration-200 ${activa?.ancha ? 'max-w-6xl' : 'max-w-3xl'}`}>
       <div className="flex flex-col sm:flex-row bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
 
         {/* Secciones: tabs horizontales con scroll en mobile, barra lateral en desktop.
