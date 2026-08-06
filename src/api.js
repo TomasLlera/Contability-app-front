@@ -252,8 +252,9 @@ export const backupApi = {
 };
 
 export const movimientosApi = {
-  getBySubrubro: (subrubroId, anio, mes) =>
-    api.get(`/movimientos/${subrubroId}`, { params: { anio, mes } }).then(r => r.data),
+  // `params` acota el período: { anio, mes } | { desde, hasta } | {} (histórico).
+  getBySubrubro: (subrubroId, params = {}) =>
+    api.get(`/movimientos/${subrubroId}`, { params }).then(r => r.data),
   create: (subrubroId, data) => api.post(`/movimientos/${subrubroId}`, data).then(r => r.data),
   update: (id, data) => api.put(`/movimientos/${id}`, data).then(r => r.data),
   pagoVinculado: (subrubroId, data) =>
