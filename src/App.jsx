@@ -14,7 +14,9 @@ import BuscadorGlobal from './components/BuscadorGlobal';
 import CargaRapidaModal from './components/CargaRapidaModal';
 import ConfirmModal from './components/ConfirmModal';
 import BottomNav from './components/BottomNav';
-import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt, ClipboardList } from 'lucide-react';
+import RecordatorioPopup from './components/RecordatorioPopup';
+import useRecordatorios from './hooks/useRecordatorios';
+import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt, ClipboardList, BellRing } from 'lucide-react';
 import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
@@ -63,6 +65,10 @@ export default function App() {
   const [showCargaRapida, setShowCargaRapida] = useState(false);
   const [vencCount, setVencCount] = useState(0);
   const [headerHidden, setHeaderHidden] = useState(false);
+  // Recordatorios del día. El estado vive acá —y no en el Dashboard— porque el botón
+  // de la campana está en el header global. El popup, en cambio, se renderiza solo en
+  // Inicio: trabajando en Caja o cargando un movimiento nada interrumpe.
+  const recordatorios = useRecordatorios(loggedIn);
   const mainRef = useRef(null);
   const lastScrollY = useRef(0);
   const editingRubroRef = useRef(null);
@@ -313,6 +319,7 @@ export default function App() {
 
   const isRubroActive = activeView !== 'inicio' && activeView !== 'graficas' && activeView?.id;
   const activeLocal = isRubroActive ? locales.find(l => l.id === activeView.local_id) : null;
+  const enInicio = activeView === 'inicio';
 
   if (!loggedIn) return <Login onLogin={() => { setLoggedIn(true); setRole(authApi.getRole()); }} />;
 
@@ -792,6 +799,24 @@ export default function App() {
             </div>
           )}
           <div className="ml-auto flex items-center gap-2">
+            {/* Campana: abre a mano los recordatorios del día sin esperar al próximo
+                aviso. Solo en Inicio, que es donde se muestran. Un recordatorio sigue
+                vivo todo el día —se puede abrir las veces que haga falta— hasta que
+                se marca como completado. */}
+            {enInicio && recordatorios.totalHoy > 0 && (
+              <button
+                onClick={recordatorios.abrirTodos}
+                aria-label="Ver recordatorios del día"
+                title="Recordatorios del día"
+                className="relative flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg w-11 h-11 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 gap-1.5 text-xs font-medium transition-colors"
+              >
+                <BellRing size={18} className="sm:w-3.25 sm:h-3.25" />
+                <span className="hidden sm:block">Recordatorios</span>
+                <span className="absolute -top-1 -right-1 sm:static min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {recordatorios.totalHoy}
+                </span>
+              </button>
+            )}
             <button
               onClick={() => setShowSearch(true)}
               aria-label="Buscar"
@@ -904,6 +929,20 @@ export default function App() {
         rubros={rubros}
         onClose={() => setShowCargaRapida(false)}
         onSaved={() => { if (isRubroActive) cargar(activeView); }}
+      />
+    )}
+
+    {/* Recordatorios: solo en Inicio, y nunca sobre un modal abierto (la pila es z-40,
+        los modales z-50). El latido sigue corriendo en el resto de las secciones, así
+        que al volver al inicio está todo lo que se acumuló mientras tanto. */}
+    {enInicio && !showSearch && !showCargaRapida && (
+      <RecordatorioPopup
+        items={recordatorios.pendientes}
+        onCompletar={recordatorios.completar}
+        onPostergar={recordatorios.postergar}
+        onDescartar={recordatorios.descartar}
+        onToggleItem={recordatorios.toggleItem}
+        onNavigate={handleNavigateFromVenc}
       />
     )}
     </>

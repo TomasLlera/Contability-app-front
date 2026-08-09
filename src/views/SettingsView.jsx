@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { appConfigApi, usersApi, auditApi, rubrosApi, subrubrosApi, authApi, backupApi, cotizacionesApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Bell, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
+import { Mail, Bell, BellRing, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
 import AuditDetailModal from '../components/AuditDetailModal';
 import InfoTooltip from '../components/InfoTooltip';
+import RecordatoriosManager from '../components/RecordatoriosManager';
 
 // Metadatos visuales por rol (jerarquía: superadmin > admin > viewer).
 const ROLE_META = {
@@ -15,6 +16,7 @@ const ROLE_META = {
 // `ancha`: la sección muestra tablas y necesita más ancho que un formulario.
 const SECCIONES = [
   { key: 'alertas',   label: 'Alertas',    icon: Bell,           ready: true },
+  { key: 'recordatorios', label: 'Recordatorios', icon: BellRing, ready: true },
   { key: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard, ready: true },
   { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true, ancha: true },
   { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true, ancha: true },
@@ -841,6 +843,7 @@ export default function SettingsView() {
         {/* Contenido */}
         <div className="flex-1 min-w-0 p-4 sm:p-6">
           {activa?.key === 'alertas' ? <AlertasSection />
+            : activa?.key === 'recordatorios' ? <RecordatoriosManager />
             : activa?.key === 'dashboard' ? <DashboardSection />
             : activa?.key === 'usuarios' ? <UsuariosSection />
             : activa?.key === 'auditoria' ? <AuditoriaSection />

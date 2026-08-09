@@ -113,6 +113,11 @@ export const authApi = {
     if (!token) return null;
     try { return JSON.parse(atob(token.split('.')[1])).usuario || null; } catch { return null; }
   },
+  getUserId: () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try { return JSON.parse(atob(token.split('.')[1])).userId ?? null; } catch { return null; }
+  },
   // Renueva el token si le quedan menos de 3 días de vida
   refreshIfNeeded: async () => {
     const token = localStorage.getItem('token');
@@ -422,6 +427,26 @@ export const appConfigApi = {
 
 export const cotizacionesApi = {
   get: (refresh = false) => api.get('/cotizaciones', { params: refresh ? { refresh: 1 } : {} }).then(r => r.data),
+};
+
+export const recordatoriosApi = {
+  getAll: () => api.get('/recordatorios').then(r => r.data),
+  create: (data) => api.post('/recordatorios', data).then(r => r.data),
+  update: (id, data) => api.put(`/recordatorios/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/recordatorios/${id}`).then(r => r.data),
+  // motivo 'login' = primera consulta desde que se abrió la app; fuerza la aparición
+  // de todo lo no completado. 'intervalo' = tick del heartbeat, respeta la frecuencia.
+  getPendientes: (motivo = 'intervalo') =>
+    api.get('/recordatorios/pendientes', { params: { motivo } }).then(r => r.data),
+  // Todos los del día que siguen sin completar. Read-only: consultarlo a mano no
+  // cuenta como aparición ni corre el próximo aviso automático.
+  getHoy: () => api.get('/recordatorios/hoy').then(r => r.data),
+  // Checklist del día. Devuelve la lista completa de subrubros ya tildados.
+  toggleItem: (id, subrubro_id, hecho) =>
+    api.post(`/recordatorios/${id}/item`, { subrubro_id, hecho }).then(r => r.data),
+  completar: (id) => api.post(`/recordatorios/${id}/completar`).then(r => r.data),
+  postergar: (id) => api.post(`/recordatorios/${id}/postergar`).then(r => r.data),
+  getHistorial: (dias = 30) => api.get('/recordatorios/historial', { params: { dias } }).then(r => r.data),
 };
 
 export const auditApi = {
