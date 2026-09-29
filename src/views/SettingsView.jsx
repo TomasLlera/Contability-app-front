@@ -454,8 +454,16 @@ function UsuariosSection() {
     if (!newPassValue || newPassValue.length < 6) { toast.error('Mínimo 6 caracteres'); return; }
     try {
       await usersApi.changePassword(id, newPassValue);
-      toast.success('Contraseña actualizada');
       setChangingPassId(null); setNewPassValue('');
+      // Cambiar la contraseña cierra las sesiones abiertas de ese usuario (el backend
+      // invalida sus tokens). Si es la propia, se vuelve al login con aviso en vez
+      // de que la próxima acción falle sin explicación.
+      if (Number(id) === Number(authApi.getUserId())) {
+        toast.success('Contraseña actualizada. Volvé a iniciar sesión con la nueva.');
+        setTimeout(() => { authApi.logout(); window.location.href = '/'; }, 1500);
+      } else {
+        toast.success('Contraseña actualizada. Se cerraron las sesiones abiertas de ese usuario.');
+      }
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
