@@ -33,6 +33,10 @@ function AuditoriaSection() {
   const [loading, setLoading] = useState(false);
   const [filtroRecurso, setFiltroRecurso] = useState('');
   const [filtroUsuario, setFiltroUsuario] = useState('');
+  // ID puntual del recurso: lo fija "Ver historial" desde una inconsistencia.
+  const [filtroRecursoId, setFiltroRecursoId] = useState('');
+  // 'historial' = registro de cambios · 'inconsistencias' = verificaciones Caja ↔ Subrubros.
+  const [vista, setVista] = useState('historial');
   const [detalle, setDetalle] = useState(null);
   const [subrubros, setSubrubros] = useState({}); // id → { nombre, razon_social } para traducir el modal
   const limit = 25;
@@ -51,11 +55,16 @@ function AuditoriaSection() {
     })();
   }, []);
 
-  const cargar = async (p = page) => {
+  // `filtros` permite cargar con valores recién elegidos (el estado todavía no se
+  // actualizó en este render).
+  const cargar = async (p = page, filtros = {}) => {
+    const recurso = filtros.recurso ?? filtroRecurso;
+    const recursoId = filtros.recursoId ?? filtroRecursoId;
     setLoading(true);
     try {
       const params = { page: p, limit };
-      if (filtroRecurso) params.recurso = filtroRecurso;
+      if (recurso) params.recurso = recurso;
+      if (recursoId !== '' && recursoId != null) params.recurso_id = recursoId;
       if (filtroUsuario) params.usuario = filtroUsuario;
       const res = await auditApi.list(params);
       setItems(res.items || []);
@@ -83,8 +92,34 @@ function AuditoriaSection() {
     <div className="space-y-4">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Auditoría</h2>
-        <p className="text-xs text-slate-400">Historial de cambios en el sistema ({total} registros)</p>
+        <p className="text-xs text-slate-400">
+          {vista === 'historial' ? `Historial de cambios en el sistema (${total} registros)` : 'Verificaciones de integridad entre la Caja y los subrubros'}
+        </p>
       </div>
+
+      <div role="tablist" className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-700/50 w-full sm:w-auto sm:inline-flex">
+        {[['historial', 'Historial'], ['inconsistencias', 'Inconsistencias']].map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={vista === k} onClick={() => setVista(k)}
+            className={`flex-1 sm:flex-none min-h-11 sm:min-h-0 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              vista === k ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            }`}>{l}</button>
+        ))}
+      </div>
+
+      {vista === 'inconsistencias' ? (
+        <InconsistenciasPanel onVerHistorial={(recurso, recursoId) => {
+          setFiltroRecurso(recurso || '');
+          setFiltroRecursoId(recursoId ?? '');
+          setVista('historial');
+          cargar(1, { recurso: recurso || '', recursoId: recursoId ?? '' });
+        }} />
+      ) : (<>
+      {filtroRecursoId !== '' && (
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span>Filtrando por registro <span className="font-mono">#{filtroRecursoId}</span></span>
+          <button onClick={() => { setFiltroRecursoId(''); cargar(1, { recursoId: '' }); }} className="text-blue-500 hover:underline">Quitar</button>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <input
@@ -184,8 +219,100 @@ function AuditoriaSection() {
           >Siguiente</button>
         </div>
       </div>
+      </>)}
 
       {detalle && <AuditDetailModal item={detalle} onClose={() => setDetalle(null)} lookups={{ subrubros }} />}
+    </div>
+  );
+}
+
+// Verificaciones de integridad Caja ↔ Subrubros (GET /audit/inconsistencias). Solo
+// lista: no corrige nada. Cada caso enlaza a su historial de auditoría.
+function InconsistenciasPanel({ onVerHistorial }) {
+  const [data, setData] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [abiertos, setAbiertos] = useState(() => new Set());
+
+  const aplicar = (r) => {
+    setData(r);
+    // Se abren solas las que tienen errores.
+    setAbiertos(new Set(r.checks.filter(c => c.severidad === 'error' && c.cantidad > 0).map(c => c.key)));
+  };
+
+  const revisar = async () => {
+    setCargando(true);
+    try { aplicar(await auditApi.inconsistencias()); }
+    catch (err) { toast.error(getErrorMsg(err)); }
+    finally { setCargando(false); }
+  };
+
+  useEffect(() => {
+    let vivo = true;
+    auditApi.inconsistencias()
+      .then(r => { if (vivo) aplicar(r); })
+      .catch(err => { if (vivo) toast.error(getErrorMsg(err)); })
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, []);
+
+  const toggle = (k) => setAbiertos(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const verHistorial = (it) => {
+    if (it.caja_id != null) onVerHistorial('caja', it.caja_id);
+    else if (it.pago_id != null) onVerHistorial('', it.pago_id);
+    else if (it.factura_id != null) onVerHistorial('', it.factura_id);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {!data ? 'Revisando…' : data.total_errores === 0
+            ? <span className="inline-flex items-center gap-1.5 text-green-600 dark:text-green-400"><CheckCircle size={15} /> Sin errores de sincronización</span>
+            : <span className="inline-flex items-center gap-1.5 text-red-600 dark:text-red-400"><AlertTriangle size={15} /> {data.total_errores} error{data.total_errores !== 1 ? 'es' : ''} para revisar</span>}
+          {data && data.total_avisos > 0 && <span className="text-slate-400"> · {data.total_avisos} aviso{data.total_avisos !== 1 ? 's' : ''}</span>}
+        </p>
+        <button onClick={revisar} disabled={cargando}
+          className="min-h-11 sm:min-h-0 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 inline-flex items-center gap-1.5">
+          <RefreshCw size={14} className={cargando ? 'animate-spin' : ''} /> Revisar ahora
+        </button>
+      </div>
+
+      {data?.checks.map(c => {
+        const abierto = abiertos.has(c.key);
+        const tono = c.cantidad === 0 ? 'text-slate-400' : c.severidad === 'error' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
+        return (
+          <div key={c.key} className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+            <button type="button" onClick={() => c.cantidad > 0 && toggle(c.key)} disabled={c.cantidad === 0}
+              className="w-full min-h-11 flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:hover:bg-transparent disabled:cursor-default">
+              {c.cantidad === 0
+                ? <CheckCircle size={15} className="text-green-500 shrink-0" />
+                : <AlertTriangle size={15} className={`${tono} shrink-0`} />}
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">{c.titulo}</span>
+                <span className="block text-xs text-slate-400">{c.descripcion}</span>
+              </span>
+              <span className={`text-sm font-semibold tabular-nums ${tono}`}>{c.cantidad}</span>
+              {c.cantidad > 0 && <ChevronRight size={15} className={`text-slate-400 shrink-0 transition-transform ${abierto ? 'rotate-90' : ''}`} />}
+            </button>
+            {abierto && (
+              <ul className="border-t border-slate-100 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700 max-h-80 overflow-y-auto">
+                {c.items.map((it, i) => (
+                  <li key={i} className="px-3 py-2 flex items-center gap-2 text-xs">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-slate-700 dark:text-slate-200 truncate">{it.subrubro || it.concepto || it.usuario || '—'}</span>
+                      <span className="block text-slate-400">{it.detalle}</span>
+                    </span>
+                    {(it.caja_id != null || it.pago_id != null || it.factura_id != null) && (
+                      <button onClick={() => verHistorial(it)} className="shrink-0 min-h-11 sm:min-h-0 px-2 text-blue-500 hover:underline">Ver historial</button>
+                    )}
+                  </li>
+                ))}
+                {c.cantidad > c.items.length && <li className="px-3 py-2 text-xs text-slate-400">… y {c.cantidad - c.items.length} más</li>}
+              </ul>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

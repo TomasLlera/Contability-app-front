@@ -452,6 +452,8 @@ export const recordatoriosApi = {
 export const auditApi = {
   list: (params = {}) => api.get('/audit', { params }).then(r => r.data),
   get: (id) => api.get(`/audit/${id}`).then(r => r.data),
+  // Verificaciones de integridad Caja ↔ Subrubros (solo lectura).
+  inconsistencias: () => api.get('/audit/inconsistencias').then(r => r.data),
 };
 
 export const cajaApi = {
