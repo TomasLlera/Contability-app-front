@@ -474,9 +474,14 @@ export const cajaApi = {
   // Confirmar/revertir son operaciones atómicas del backend: registran (o deshacen)
   // el pago en el subrubro y, si hubo descuento, su Nota de Crédito automática.
   // descuento = monto fijo · descuento_pct = porcentaje (el backend lo resuelve a pesos).
-  confirmar: (id, { descuento = 0, descuento_pct = null, fecha } = {}) =>
-    api.post(`/caja/${id}/confirmar`, { descuento, descuento_pct, fecha }).then(r => r.data),
+  // monto = pago parcial (menor al saldo): el resto queda como un pendiente nuevo.
+  confirmar: (id, { descuento = 0, descuento_pct = null, fecha, monto = null } = {}) =>
+    api.post(`/caja/${id}/confirmar`, { descuento, descuento_pct, fecha, monto }).then(r => r.data),
   revertir: (id) => api.post(`/caja/${id}/revertir`).then(r => r.data),
+  // Factura/remito detrás de un ítem pendiente, para corregirla desde la Caja. El
+  // cambio se guarda en la factura y el ítem pasa a valer el saldo nuevo.
+  getBoleta: (id) => api.get(`/caja/${id}/boleta`).then(r => r.data),
+  updateBoleta: (id, data) => api.put(`/caja/${id}/boleta`, data).then(r => r.data),
   // Seguimiento de descuentos: totales + detalle. Sin params trae todo el histórico.
   getDescuentos: (params = {}) => api.get('/caja/descuentos', { params }).then(r => r.data),
 };

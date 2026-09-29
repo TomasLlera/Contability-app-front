@@ -4,7 +4,7 @@ import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
   Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink, HandCoins,
-  HelpCircle, Percent
+  HelpCircle, Percent, Coins, Receipt
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
@@ -330,6 +330,14 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
 
   const lista = tipo === 'empleado' ? empleadosList : tipo === 'gasto' ? proveedoresList : [];
 
+  // El monto de un ítem vinculado vive en dos lugares (Caja y subrubro): no se edita
+  // acá, que lo desincronizaba. El backend también lo rechaza.
+  const montoBloqueado = !initial ? null
+    : initial.origen === 'subrubro' ? 'Este pago se cargó en el subrubro: el monto se edita desde ahí.'
+    : initial.confirmado === true && initial.pago_mov_id != null ? 'Pago confirmado: revertí la confirmación para cambiar el monto.'
+    : initial.confirmado === false && initial.movimiento_id != null ? 'Para pagar una parte usá "Pago parcial"; para corregir el importe de la boleta, "Editar boleta" (menú de la fila).'
+    : null;
+
   const handleSeleccion = (val) => {
     setSeleccion(val);
     if (val && val !== '__otro__') setConcepto(val);
@@ -439,8 +447,9 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
       {/* Monto y método apilados en mobile: en dos columnas de 150px el toggle
           Efectivo/Transf. queda en botones de 75px, imposibles de acertar. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <input type="number" inputMode="decimal" min="0" step="any" className={inputCls} placeholder="Monto"
-          value={monto} onChange={e => setMonto(e.target.value)} required />
+        <input type="number" inputMode="decimal" min="0" step="any" className={`${inputCls} ${montoBloqueado ? 'opacity-60 cursor-not-allowed' : ''}`} placeholder="Monto"
+          value={monto} onChange={e => setMonto(e.target.value)} required disabled={montoBloqueado}
+          title={montoBloqueado || undefined} />
         <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm sm:text-xs font-medium">
           {[['efectivo', 'Efectivo'], ['transferencia', 'Transferencia', 'Transf.']].map(([v, l, corto]) => (
             <button key={v} type="button" onClick={() => setMetodo(v)}
@@ -451,6 +460,8 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
           ))}
         </div>
       </div>
+
+      {montoBloqueado && <p className="text-xs text-slate-500 dark:text-slate-400 -mt-1">{montoBloqueado}</p>}
 
       {tipo === 'gasto' && (
         <label className="flex items-center gap-2 cursor-pointer">
@@ -559,7 +570,9 @@ function GrupoHeader({ grupo }) {
 
 // `bloqueoConfirmar`: motivo por el que un pendiente no se puede confirmar desde la
 // vista actual (p. ej. se está mirando un día futuro). Revertir sigue permitido.
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false, bloqueoConfirmar = null }) {
+// `onPagoParcial` / `onEditarBoleta`: acciones de un pendiente vinculado a una
+// factura (pagar una parte; corregir la boleta sin ir al subrubro).
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false, bloqueoConfirmar = null, onPagoParcial, onEditarBoleta }) {
   // Acordeón de descuento: arranca cerrado siempre (también después de confirmar) para
   // no ocupar espacio; se abre a demanda, ya sea para cargar el descuento o para
   // consultar el detalle de uno ya aplicado.
@@ -729,6 +742,24 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                     ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
                     : 'text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/40'
                 }`,
+              },
+              esPendiente && m.movimiento_id != null && onPagoParcial && !confirmarBloqueado && {
+                key: 'parcial',
+                label: esCobro ? 'Cobro parcial' : 'Pago parcial',
+                hint: 'Pagar una parte: el resto queda pendiente',
+                icon: <Coins size={16} />,
+                iconDesktop: <Coins size={14} />,
+                onClick: () => onPagoParcial(m),
+                className: 'p-1 -m-1 text-slate-400 hover:text-green-600 transition-colors shrink-0',
+              },
+              esPendiente && m.movimiento_id != null && onEditarBoleta && {
+                key: 'boleta',
+                label: esCobro ? 'Editar deuda' : 'Editar boleta',
+                hint: 'Corregir el importe y las percepciones de la factura',
+                icon: <Receipt size={16} />,
+                iconDesktop: <Receipt size={14} />,
+                onClick: () => onEditarBoleta(m),
+                className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
               {
                 key: 'editar',
@@ -929,6 +960,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [showProximos, setShowProximos] = useState(false);
   // Filtro de la ventana de próximos: 'todos' | 'efectivo' | 'transferencia'.
   const [filtroProximos, setFiltroProximos] = useState('todos');
+  // Pago parcial en curso: { item, fechaPago } (null = sin modal).
+  const [parcialDe, setParcialDe] = useState(null);
+  // Ítem cuya boleta se está editando desde la Caja (null = sin modal).
+  const [boletaDe, setBoletaDe] = useState(null);
   // Confirmación pendiente de aviso por fecha pasada: { items, opts } mientras el
   // modal pregunta si registrar los pagos en el día visto (null = sin modal).
   const [avisoFecha, setAvisoFecha] = useState(null);
@@ -1169,7 +1204,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
         const r = await cajaApi.confirmar(m.id, { ...opts, fecha: fechaPago });
         cargar();
         toast.success(
-          r?.descuento
+          r?.parcial
+            ? `${esCobro ? 'Cobro' : 'Pago'} parcial de ${fmt(r.monto)} confirmado — quedan ${fmt(r.pendiente_restante)} pendientes`
+            : r?.descuento
             ? `Pago confirmado con descuento de ${fmt(r.descuento)}${r.descuento_pct ? ` (${r.descuento_pct}%)` : ''} — NC generada`
             : esCobro ? 'Cobro confirmado — sumado a los ingresos del día' : 'Pago confirmado'
         );
@@ -1676,7 +1713,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 <GrupoHeader grupo={grupo} />
                 {grupo.items.map(m => (
                   <div key={m.id} className="mb-1.5 sm:mb-2">
-                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoFuturo} />}
+                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoFuturo} onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })} onEditarBoleta={setBoletaDe} />}
                   </div>
                 ))}
               </div>
@@ -1745,6 +1782,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
                           onToggleSelect={toggleSelection}
                           hideMetodo
                           bloqueoConfirmar={bloqueoFuturo}
+                          onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })}
+                          onEditarBoleta={setBoletaDe}
                         />
                       )}
                     </div>
@@ -1829,6 +1868,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
                     subrubro={subrubroDe(m)}
                     onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
                     aplicaDescuento={!!subrubroDe(m)?.aplica_descuento}
+                    onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: todayStr() })}
+                    onEditarBoleta={setBoletaDe}
                   />
                 )))}
               </div>
@@ -1849,6 +1890,26 @@ export default function CajaView({ rubros = [], onNavigate }) {
           confirmLabel="Eliminar"
           onConfirm={confirmDelete}
           onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      {parcialDe && (
+        <PagoParcialModal
+          item={parcialDe.item}
+          onClose={() => setParcialDe(null)}
+          onConfirm={async (monto) => {
+            const { item, fechaPago } = parcialDe;
+            setParcialDe(null);
+            await handleConfirmarGasto(item, { monto }, { fechaPago });
+          }}
+        />
+      )}
+
+      {boletaDe && (
+        <EditarBoletaModal
+          item={boletaDe}
+          onClose={() => setBoletaDe(null)}
+          onSaved={() => { setBoletaDe(null); cargar(); }}
         />
       )}
 
@@ -1876,6 +1937,143 @@ export default function CajaView({ rubros = [], onNavigate }) {
         />
       )}
     </div>
+  );
+}
+
+// Pago parcial de un pendiente vinculado a una factura: se paga una parte y el resto
+// queda como un pendiente nuevo que se sigue arrastrando (típico en sueldos que se
+// pagan por semana). Reemplaza la costumbre de editar el monto del ítem.
+function PagoParcialModal({ item, onConfirm, onClose }) {
+  const [monto, setMonto] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const saldo = Number(item.monto) || 0;
+  const n = Number(monto) || 0;
+  const valido = n > 0 && n < saldo - 0.005;
+  const esCobro = item.tipo === 'ingreso_extra';
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    if (!valido || enviando) return;
+    setEnviando(true);
+    try { await onConfirm(Math.round(n * 100) / 100); }
+    finally { setEnviando(false); }
+  };
+
+  return (
+    <Modal title={esCobro ? 'Cobro parcial' : 'Pago parcial'} size="sm" onClose={onClose}>
+      <form onSubmit={enviar} className="space-y-3">
+        <div className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="font-medium text-slate-800 dark:text-slate-100 truncate">{conceptoLimpio(item)}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Saldo pendiente: <span className="tabular-nums font-semibold">{fmt(saldo)}</span></p>
+        </div>
+        <label className="block">
+          <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{esCobro ? 'Monto que cobrás ahora' : 'Monto que pagás ahora'}</span>
+          <input type="number" inputMode="decimal" min="0" step="any" autoFocus className={inputCls}
+            value={monto} onChange={e => setMonto(e.target.value)} placeholder="0,00" />
+        </label>
+        {n > 0 && (
+          <p className={`text-xs ${valido ? 'text-slate-500 dark:text-slate-400' : 'text-red-500'}`}>
+            {valido
+              ? <>Queda pendiente <span className="tabular-nums font-semibold">{fmt(saldo - n)}</span>, que va a seguir apareciendo en la Caja hasta pagarse.</>
+              : n >= saldo ? 'Para pagar el total usá el botón ✓ de la fila.' : 'Ingresá un monto mayor a 0.'}
+          </p>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button type="button" onClick={onClose}
+            className="flex-1 min-h-11 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm">Cancelar</button>
+          <button type="submit" disabled={!valido || enviando}
+            className="flex-1 min-h-11 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+            {enviando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {valido ? `${esCobro ? 'Cobrar' : 'Pagar'} ${fmt(n)}` : (esCobro ? 'Cobrar' : 'Pagar')}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// Corrige la factura/remito de un pendiente sin ir al subrubro (importe final y
+// percepciones). El cambio se guarda en la factura y el ítem pasa a valer el saldo
+// nuevo, así Caja y subrubro no se desincronizan.
+function EditarBoletaModal({ item, onSaved, onClose }) {
+  const [boleta, setBoleta] = useState(null);
+  const [form, setForm] = useState({ monto: '', percepcion_iva: '', ingresos_brutos: '' });
+  const [guardando, setGuardando] = useState(false);
+  const esCobro = item.tipo === 'ingreso_extra';
+
+  useEffect(() => {
+    let vivo = true;
+    cajaApi.getBoleta(item.id)
+      .then(b => {
+        if (!vivo) return;
+        setBoleta(b);
+        setForm({ monto: String(b.monto ?? ''), percepcion_iva: b.percepcion_iva ? String(b.percepcion_iva) : '', ingresos_brutos: b.ingresos_brutos ? String(b.ingresos_brutos) : '' });
+      })
+      .catch(err => { toast.error(err?.response?.data?.error || 'No se pudo cargar la boleta'); onClose(); });
+    return () => { vivo = false; };
+  }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const esRemito = boleta?.documento === 'remito';
+  const monto = Number(form.monto) || 0;
+  const saldoNuevo = boleta ? Math.round((monto - (boleta.pagado || 0)) * 100) / 100 : 0;
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    if (monto <= 0 || guardando) return;
+    setGuardando(true);
+    try {
+      await cajaApi.updateBoleta(item.id, {
+        monto,
+        ...(esRemito || esCobro ? {} : { percepcion_iva: Number(form.percepcion_iva) || 0, ingresos_brutos: Number(form.ingresos_brutos) || 0 }),
+      });
+      toast.success(saldoNuevo <= 0.005 ? 'Boleta actualizada — quedó saldada' : 'Boleta actualizada');
+      onSaved();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'No se pudo guardar la boleta');
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <Modal title={esCobro ? 'Editar deuda' : esRemito ? 'Editar remito' : 'Editar boleta'} size="sm" onClose={onClose}>
+      {!boleta ? (
+        <p className="text-sm text-slate-400 py-6 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando…</p>
+      ) : (
+        <form onSubmit={guardar} className="space-y-3">
+          <p className="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">{conceptoLimpio(item)}</p>
+          <label className="block">
+            <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Importe de la {esCobro ? 'deuda' : esRemito ? 'boleta (remito)' : 'boleta'}</span>
+            <input type="number" inputMode="decimal" min="0" step="any" autoFocus className={inputCls} value={form.monto} onChange={set('monto')} />
+          </label>
+          {!esRemito && !esCobro && (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Percepción IVA</span>
+                <input type="number" inputMode="decimal" min="0" step="any" className={inputCls} value={form.percepcion_iva} onChange={set('percepcion_iva')} placeholder="0,00" />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ingresos Brutos</span>
+                <input type="number" inputMode="decimal" min="0" step="any" className={inputCls} value={form.ingresos_brutos} onChange={set('ingresos_brutos')} placeholder="0,00" />
+              </label>
+            </div>
+          )}
+          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
+            {boleta.pagado > 0.005 && <p>Ya pagado: <span className="tabular-nums">{fmt(boleta.pagado)}</span></p>}
+            <p>Queda pendiente en la Caja: <span className={`tabular-nums font-semibold ${saldoNuevo <= 0.005 ? 'text-green-600' : ''}`}>{fmt(Math.max(0, saldoNuevo))}</span></p>
+            <p>El cambio se guarda en la {esCobro ? 'deuda' : 'boleta'} del subrubro.</p>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 min-h-11 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm">Cancelar</button>
+            <button type="submit" disabled={monto <= 0 || guardando}
+              className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+              {guardando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar
+            </button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
 
