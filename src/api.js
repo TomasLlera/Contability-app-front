@@ -456,6 +456,9 @@ export const auditApi = {
 
 export const cajaApi = {
   getByFecha: (fecha) => api.get('/caja', { params: { fecha } }).then(r => r.data),
+  // Pendientes que vencen en los próximos días: se muestran en la Caja de hoy para
+  // poder pagarlos por adelantado (confirmar en un día futuro está bloqueado).
+  getProximos: (fecha) => api.get('/caja/proximos', { params: { fecha } }).then(r => r.data),
   getRango: (desde, hasta) => api.get('/caja/rango', { params: { desde, hasta } }).then(r => r.data),
   // Saldo de apertura del día, encadenado en el backend desde el último saldo_inicial
   // manual (sin ventana de días). Devuelve { saldo, ancla_fecha, ancla_monto };

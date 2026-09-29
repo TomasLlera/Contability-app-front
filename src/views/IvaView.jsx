@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { hoyAR, mesAR } from '../utils/fecha';
 import { ivaApi, getErrorMsg } from '../api';
 import ComprasImportModal from '../components/ComprasImportModal';
 import Modal from '../components/Modal';
@@ -23,7 +24,7 @@ const labelMes = (mes) => {
 // Una Nota de Crédito resta (no suma). Se detecta por el texto del tipo.
 const normTipo = (s) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const esNC = (tipo) => normTipo(tipo).includes('credito');
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyAR();
 // Grilla compartida por el encabezado de columnas y por cada fila del listado de
 // ventas: es lo que mantiene alineadas las columnas sin repetir un <thead> por mes.
 // En mobile la fecha se angosta para que el concepto no quede aplastado.
@@ -992,7 +993,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
   const [showManual, setShowManual] = useState(false);
   const [tipoSel, setTipoSel] = useState(''); // '' = todas las boletas
   const [busqueda, setBusqueda] = useState('');
-  const [mesSel, setMesSel] = useState(new Date().toISOString().slice(0, 7)); // arranca en el mes actual; '' = todos
+  const [mesSel, setMesSel] = useState(mesAR()); // arranca en el mes actual; '' = todos
   const [desde, setDesde] = useState('');     // YYYY-MM-DD
   const [hasta, setHasta] = useState('');     // YYYY-MM-DD
   const [detalle, setDetalle] = useState(false); // columnas 21% + otros atributos
@@ -1014,7 +1015,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
 
   // Navegación por mes (incluye meses futuros o sin comprobantes).
   const mesesConDatos = [...new Set(compras.map(c => c.mes).filter(Boolean))].sort((a, b) => b.localeCompare(a));
-  const mesActual = () => new Date().toISOString().slice(0, 7);
+  const mesActual = () => mesAR();
   const shiftMes = (mes, d) => {
     const [y, m] = (mes || mesesConDatos[0] || mesActual()).split('-').map(Number);
     const dt = new Date(y, m - 1 + d, 1);

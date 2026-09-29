@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { hoyAR } from '../utils/fecha';
 import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2, HandCoins } from 'lucide-react';
 import { newIdemKey } from '../api';
 
@@ -21,7 +22,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // Modo DEUDA: cambia etiquetas, colores y oculta remito/percepciones/NC.
   const esDeudaSub = tipoSubrubro === 'deuda';
   const palabraDoc = esDeudaSub ? 'deuda' : 'factura';
-  const today = new Date().toISOString().split('T')[0];
+  const today = hoyAR();
 
   const tipoInicial = movimiento?.tipo || 'factura';
   const [tipo, setTipo] = useState(tipoInicial);

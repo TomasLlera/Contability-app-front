@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { hoyAR } from '../utils/fecha';
 import { movimientosApi, cajaApi, dashboardApi, authApi, appConfigApi } from '../api';
 import { EntityIcon } from '../icons';
 import InfoTooltip from '../components/InfoTooltip';
@@ -10,7 +11,7 @@ import {
 } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => hoyAR();
 
 function greeting() {
   const h = new Date().getHours();

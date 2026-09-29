@@ -13,14 +13,12 @@ import CajaExportModal from '../components/CajaExportModal';
 import InfoTooltip from '../components/InfoTooltip';
 import RowActions from '../components/RowActions';
 import Modal from '../components/Modal';
+import { hoyAR, sumarDias } from '../utils/fecha';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
-const todayStr = () => new Date().toISOString().split('T')[0];
-const addDays = (dateStr, n) => {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
-};
+// "Hoy" en Argentina: con UTC, entre las 21 y las 24 la Caja abría en el día siguiente.
+const todayStr = () => hoyAR();
+const addDays = sumarDias;
 const formatFecha = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00');
   const s = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -342,7 +340,10 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     if (savingRef.current) return;
     if (!concepto.trim() || !Number(monto)) return;
     const data = {
-      fecha, tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial,
+      // Al editar se conserva la fecha del ítem: editarlo mirando otro día lo mudaba
+      // a ese día (un pendiente arrastrado, por ejemplo, saltaba a la fecha vista).
+      fecha: initial?.fecha ?? fecha,
+      tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial,
       idempotency_key: idemKeyRef.current,
     };
     if (subrubroSel) {
@@ -556,7 +557,9 @@ function GrupoHeader({ grupo }) {
   );
 }
 
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false }) {
+// `bloqueoConfirmar`: motivo por el que un pendiente no se puede confirmar desde la
+// vista actual (p. ej. se está mirando un día futuro). Revertir sigue permitido.
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false, bloqueoConfirmar = null }) {
   // Acordeón de descuento: arranca cerrado siempre (también después de confirmar) para
   // no ocupar espacio; se abre a demanda, ya sea para cargar el descuento o para
   // consultar el detalle de uno ya aplicado.
@@ -579,7 +582,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   const conDescuento = Number(m.descuento) > 0;
   // El acordeón se ofrece para cargar el descuento (pendiente, subrubro habilitado y
   // vinculado a una factura) o para consultar uno ya aplicado.
-  const puedeDescontar = aplicaDescuento && esPendiente && m.movimiento_id != null;
+  const puedeDescontar = aplicaDescuento && esPendiente && m.movimiento_id != null && !bloqueoConfirmar;
+  const confirmarBloqueado = esPendiente && !!bloqueoConfirmar;
   const mostrarAcordeon = puedeDescontar || conDescuento;
 
   // Jerarquía de color del importe (semáforo de estado):
@@ -695,10 +699,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
             adyacentes (MOBILE.md): con gap-1 los bordes de 44px se solapaban. */}
         <div className="flex items-center gap-2 sm:gap-3">
           {confirmable && onConfirmar && (
-            <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming}
-              title={esConfirmado ? 'Revertir confirmación' : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
-              aria-label={esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
-              className={`w-11 h-11 sm:w-auto sm:h-auto sm:p-1.5 flex items-center justify-center rounded-lg shrink-0 transition-colors disabled:opacity-50 disabled:cursor-wait ${
+            <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming || confirmarBloqueado}
+              title={confirmarBloqueado ? bloqueoConfirmar : esConfirmado ? 'Revertir confirmación' : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
+              aria-label={confirmarBloqueado ? bloqueoConfirmar : esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
+              className={`w-11 h-11 sm:w-auto sm:h-auto sm:p-1.5 flex items-center justify-center rounded-lg shrink-0 transition-colors disabled:opacity-50 ${confirmarBloqueado ? 'disabled:cursor-not-allowed' : 'disabled:cursor-wait'} ${
                 esConfirmado
                   ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
                   : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
@@ -919,6 +923,15 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // ID del gasto cuya confirmación/reversión está en curso (bloquea doble clic en
   // el botón de confirmar, que de otro modo crearía dos pagos en el subrubro).
   const [confirmingId, setConfirmingId] = useState(null);
+  // Pendientes que vencen en los próximos días (solo se cargan mirando hoy): se
+  // pueden pagar por adelantado desde acá sin navegar a su fecha.
+  const [proximos, setProximos] = useState([]);
+  const [showProximos, setShowProximos] = useState(false);
+  // Filtro de la ventana de próximos: 'todos' | 'efectivo' | 'transferencia'.
+  const [filtroProximos, setFiltroProximos] = useState('todos');
+  // Confirmación pendiente de aviso por fecha pasada: { items, opts } mientras el
+  // modal pregunta si registrar los pagos en el día visto (null = sin modal).
+  const [avisoFecha, setAvisoFecha] = useState(null);
   // Acordeones con memoria: recuerdan si quedaron abiertos/cerrados entre recargas.
   const [gastosOpen, setGastosOpen] = useState(() => localStorage.getItem('cajaGastosOpen') !== '0');
   const [empleadosOpen, setEmpleadosOpen] = useState(() => localStorage.getItem('cajaEmpleadosOpen') !== '0');
@@ -969,8 +982,13 @@ export default function CajaView({ rubros = [], onNavigate }) {
       // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
       // como gastos pending sin método de pago. Idempotente — corre cada vez sin duplicar.
       try { await cajaApi.autoSync(fecha); } catch {}
-      const data = await cajaApi.getByFecha(fecha);
+      const esHoy = fecha === todayStr();
+      const [data, prox] = await Promise.all([
+        cajaApi.getByFecha(fecha),
+        esHoy ? cajaApi.getProximos(fecha).catch(() => []) : Promise.resolve([]),
+      ]);
       setMovs(data);
+      setProximos(prox);
 
       const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
 
@@ -1045,7 +1063,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      // Solo con el foco en la barra de fecha (flechas / fecha). Antes funcionaba con
+      // el foco en cualquier parte de la página y cambiaba de día sin que se notara:
+      // así terminaban pagos confirmados mirando otra fecha.
+      if (!e.target.closest?.('[data-date-nav]')) return;
       if (e.key === 'ArrowLeft') setFecha(f => addDays(f, -1));
       if (e.key === 'ArrowRight') setFecha(f => addDays(f, 1));
     };
@@ -1094,13 +1115,32 @@ export default function CajaView({ rubros = [], onNavigate }) {
     } catch (err) { toast.error('Error al guardar'); throw err; }
   };
 
+  // Validación día visto vs hoy antes de confirmar pagos. Devuelve true si se puede
+  // seguir ya mismo; si no, avisa (día futuro: bloqueado) o abre el modal que pide
+  // confirmar el registro en un día pasado y devuelve false.
+  const validarFechaPago = (items, opts, fechaPago) => {
+    const hoy = todayStr();
+    if (fechaPago > hoy) {
+      toast.error(`Estás viendo un día futuro (${formatFechaCorta(fechaPago)}). Los pagos se confirman desde hoy.`);
+      return false;
+    }
+    if (fechaPago < hoy) {
+      setAvisoFecha({ items, opts, fechaPago });
+      return false;
+    }
+    return true;
+  };
+
   // `opts` = { descuento } (monto fijo) o { descuento_pct } (porcentaje). Vacío = sin
   // descuento. El backend resuelve el % a pesos.
-  const handleConfirmarGasto = async (m, opts = {}) => {
+  // `fechaPago` = día en que se registra el pago: el visto por defecto; la sección
+  // de próximos vencimientos pasa hoy. `validado` = ya pasó por validarFechaPago.
+  const handleConfirmarGasto = async (m, opts = {}, { fechaPago = fecha, validado = false } = {}) => {
     // Bloqueo anti doble-clic: si ya hay una operación en curso para este gasto,
     // ignorar. Sin esto, dos clics rápidos entran ambos a la rama de confirmar
     // (m.confirmado sigue siendo false en el render viejo) y crean dos pagos.
     if (confirmingRef.current.has(m.id)) return;
+    if (m.confirmado !== true && m.metodo && !validado && !validarFechaPago([m], opts, fechaPago)) return;
     // Cobro de deuda (ingreso auto-sincronizado) vs gasto de proveedor: mismo
     // flujo — al confirmar se crea el pago/abono en el subrubro de origen.
     const esCobro = m.tipo === 'ingreso_extra';
@@ -1119,14 +1159,14 @@ export default function CajaView({ rubros = [], onNavigate }) {
           toast.error('Definí el método de pago antes de confirmar');
           return;
         }
-        // El pago se registra en la FECHA REAL en que se confirma = el día que se
-        // está viendo en la Caja (`fecha`, por defecto hoy), NO la fecha de
-        // vencimiento del ítem. Así una factura que venció el 15/7 y se paga el 17/7
-        // queda registrada en Caja y en el Subrubro el 17/7 (fecha del pago real).
+        // El pago se registra hoy, o en el día pasado que el usuario aceptó en el
+        // aviso; nunca en uno futuro (el backend también lo rechaza). NO se usa la
+        // fecha de vencimiento del ítem: una factura que venció el 15/7 y se paga el
+        // 17/7 queda registrada en Caja y en el Subrubro el 17/7.
         //
         // El backend hace el pago (por el neto) y la NC del descuento juntos: si algo
         // falla, no queda un pago huérfano sin su nota de crédito.
-        const r = await cajaApi.confirmar(m.id, { ...opts, fecha });
+        const r = await cajaApi.confirmar(m.id, { ...opts, fecha: fechaPago });
         cargar();
         toast.success(
           r?.descuento
@@ -1173,6 +1213,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
     }
     await cajaApi.delete(id, fecha);
     setMovs(prev => prev.filter(m => m.id !== id));
+    setProximos(prev => prev.filter(m => m.id !== id));
     setDeleteId(null);
     toast.success('Eliminado');
   };
@@ -1262,9 +1303,22 @@ export default function CajaView({ rubros = [], onNavigate }) {
       toast.error(sinMetodo ? 'Definí el método de pago en los ítems seleccionados' : 'No hay pendientes para confirmar');
       return;
     }
-    for (const m of aConfirmar) await handleConfirmarGasto(m);
-    clearSelection();
+    // Un solo aviso de fecha para toda la selección, no uno por ítem.
+    if (!validarFechaPago(aConfirmar, {}, fecha)) return;
+    await confirmarVarios(aConfirmar, {}, fecha);
     if (sinMetodo) toast('Se saltearon ' + sinMetodo + ' sin método definido', { icon: '⚠️' });
+  };
+
+  const confirmarVarios = async (items, opts, fechaPago) => {
+    for (const m of items) await handleConfirmarGasto(m, opts, { fechaPago, validado: true });
+    clearSelection();
+  };
+
+  // Aceptado el aviso de fecha pasada: confirma lo que quedó esperando.
+  const aceptarAvisoFecha = async () => {
+    const { items, opts, fechaPago } = avisoFecha;
+    setAvisoFecha(null);
+    await confirmarVarios(items, opts, fechaPago);
   };
 
   const disponibleEfvo  = saldoInicial
@@ -1288,6 +1342,19 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const vencEfvo    = vencimientos.filter(v => v.metodo_pago !== 'transferencia');
   const vencTrans   = vencimientos.filter(v => v.metodo_pago === 'transferencia');
 
+  // Mirando un día futuro los pendientes no se confirman (el backend también lo
+  // rechaza): se pagan desde hoy, en "Próximos vencimientos".
+  const fechaEsFutura = fecha > todayStr();
+  const proximosFiltrados = filtroProximos === 'todos' ? proximos : proximos.filter(m => m.metodo === filtroProximos);
+  // [{ fecha, items }] en orden de vencimiento (el backend ya los devuelve por fecha).
+  const proximosPorFecha = proximosFiltrados.reduce((grupos, m) => {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo?.fecha === m.fecha) ultimo.items.push(m);
+    else grupos.push({ fecha: m.fecha, items: [m] });
+    return grupos;
+  }, []);
+  const bloqueoFuturo = fechaEsFutura ? 'Estás viendo un día futuro: los pagos se confirman desde hoy' : null;
+
   const formProps = {
     fecha, onSave: handleSave,
     onCancel: () => { setShowForm(false); setEditingMov(null); },
@@ -1301,7 +1368,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
     <div className="space-y-5 max-w-2xl mx-auto">
       {/* Navegación de fecha. En mobile la fecha va sola en su fila y las acciones
           debajo: no entran los 6 botones más la fecha larga en 360px de ancho. */}
-      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+      <div data-date-nav className="flex flex-wrap items-center gap-1 sm:gap-2">
         <button onClick={() => setFecha(addDays(fecha, -1))} aria-label="Día anterior"
           className="w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
           <ChevronLeft size={20} />
@@ -1353,6 +1420,20 @@ export default function CajaView({ rubros = [], onNavigate }) {
           </button>
         </div>
       </div>
+
+      {/* Día futuro: se puede mirar, pero no confirmar pagos (quedarían registrados
+          en una fecha que todavía no pasó). */}
+      {fechaEsFutura && (
+        <div role="status" className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-sm text-amber-800 dark:text-amber-300">
+          <span className="flex items-center gap-2 min-w-0">
+            <Clock size={15} className="shrink-0" />
+            <span>Estás viendo un día futuro. Los pagos no se pueden confirmar acá: pagalos desde hoy, en <strong>Próximos vencimientos</strong>.</span>
+          </span>
+          <button onClick={() => setFecha(todayStr())} className="shrink-0 min-h-11 sm:min-h-0 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:underline">
+            Ir a hoy
+          </button>
+        </div>
+      )}
 
       {/* Saldos del día */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1595,7 +1676,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 <GrupoHeader grupo={grupo} />
                 {grupo.items.map(m => (
                   <div key={m.id} className="mb-1.5 sm:mb-2">
-                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} />}
+                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoFuturo} />}
                   </div>
                 ))}
               </div>
@@ -1663,6 +1744,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                           selected={selectedIds.has(m.id)}
                           onToggleSelect={toggleSelection}
                           hideMetodo
+                          bloqueoConfirmar={bloqueoFuturo}
                         />
                       )}
                     </div>
@@ -1684,6 +1766,77 @@ export default function CajaView({ rubros = [], onNavigate }) {
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
       </div>
 
+      {/* Próximos vencimientos — solo mirando hoy. Un botón compacto al final que
+          abre la lista en una ventana, para no alargar la Caja del día. */}
+      {proximos.length > 0 && (
+        <button type="button" onClick={() => setShowProximos(true)}
+          className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
+          <Clock size={15} className="text-slate-400 shrink-0" />
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Próximos vencimientos</span>
+          <span className="text-xs text-slate-400 tabular-nums">· {proximos.length}</span>
+          <span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300 tabular-nums">{fmt(proximos.reduce((s, m) => s + m.monto, 0))}</span>
+          <ChevronRight size={15} className="text-slate-400 shrink-0" />
+        </button>
+      )}
+
+      {showProximos && proximos.length > 0 && (
+        <Modal title={`Próximos vencimientos · ${fmt(proximosFiltrados.reduce((s, m) => s + m.monto, 0))}`} size="xl" onClose={() => setShowProximos(false)}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Vencen en los próximos días. Si los confirmás acá, el pago queda registrado hoy ({formatFechaCorta(todayStr())}).
+          </p>
+          {/* Filtro por método. "Todos" incluye los que todavía no tienen método. */}
+          <div role="tablist" aria-label="Filtrar por método" className="flex gap-1 p-1 mb-3 rounded-xl bg-slate-100 dark:bg-slate-700/50">
+            {[
+              ['todos', 'Todos', proximos],
+              ['efectivo', 'Efectivo', proximos.filter(m => m.metodo === 'efectivo')],
+              ['transferencia', 'Transferencia', proximos.filter(m => m.metodo === 'transferencia')],
+            ].map(([key, label, lista]) => (
+              <button key={key} type="button" role="tab" aria-selected={filtroProximos === key}
+                onClick={() => setFiltroProximos(key)}
+                className={`flex-1 min-h-11 sm:min-h-0 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  filtroProximos === key
+                    ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}>
+                {label} <span className="tabular-nums opacity-70">· {lista.length}</span>
+              </button>
+            ))}
+          </div>
+          {showForm && proximos.some(p => p.id === editingMov?.id) && (
+            <div className="mb-2"><EntryForm {...formProps} initial={editingMov} /></div>
+          )}
+          {proximosFiltrados.length === 0 && (
+            <p className="text-xs text-slate-400 py-4 text-center">No hay vencimientos próximos en {filtroProximos === 'efectivo' ? 'efectivo' : 'transferencia'}.</p>
+          )}
+          {/* Agrupados por fecha de vencimiento: un encabezado por día con su total, y
+              las filas de ese día juntas, sin repetir la fecha en cada una. */}
+          {proximosPorFecha.map(({ fecha: dia, items }) => (
+            <div key={dia} className="mb-3 last:mb-0">
+              <div className="flex items-baseline justify-between px-1 mb-1">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Vence {formatFechaMobile(dia)}</span>
+                <span className="text-xs text-slate-400 tabular-nums">{fmt(items.reduce((s, m) => s + m.monto, 0))} · {items.length}</span>
+              </div>
+              <div className="space-y-1">
+                {items.map(m => (editingMov?.id === m.id && showForm ? null : (
+                  <MovRow
+                    key={m.id}
+                    m={m}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onConfirmar={(mov, opts) => handleConfirmarGasto(mov, opts, { fechaPago: todayStr() })}
+                    colorMonto="text-red-500"
+                    confirming={confirmingId === m.id}
+                    subrubro={subrubroDe(m)}
+                    onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
+                    aplicaDescuento={!!subrubroDe(m)?.aplica_descuento}
+                  />
+                )))}
+              </div>
+            </div>
+          ))}
+        </Modal>
+      )}
+
       {showExport && <CajaExportModal onClose={() => setShowExport(false)} />}
 
       {showConfig && (
@@ -1696,6 +1849,20 @@ export default function CajaView({ rubros = [], onNavigate }) {
           confirmLabel="Eliminar"
           onConfirm={confirmDelete}
           onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      {avisoFecha && (
+        <ConfirmModal
+          dangerous={false}
+          message={<>
+            ¿Registrar {avisoFecha.items.length === 1 ? 'el pago' : `los ${avisoFecha.items.length} pagos`} con fecha {formatFechaCorta(avisoFecha.fechaPago)}?
+            <br />
+            Hoy es {formatFechaCorta(todayStr())} y estás viendo movimientos del {formatFechaCorta(avisoFecha.fechaPago)}.
+          </>}
+          confirmLabel={`Registrar el ${formatFechaCorta(avisoFecha.fechaPago)}`}
+          onConfirm={aceptarAvisoFecha}
+          onCancel={() => setAvisoFecha(null)}
         />
       )}
 

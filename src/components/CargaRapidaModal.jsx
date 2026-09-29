@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import { hoyAR } from '../utils/fecha';
 import { X, Zap } from 'lucide-react';
 import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg, newIdemKey } from '../api';
 import toast from 'react-hot-toast';
 import InfoTooltip from './InfoTooltip';
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => hoyAR();
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
 // ── Vencimiento automático del subrubro (espejo de calcularVencimientoSub del backend) ──

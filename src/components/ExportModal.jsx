@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { hoyAR } from '../utils/fecha';
 import { Download, X } from 'lucide-react';
 import { movimientosApi, getErrorMsg } from '../api';
 
-const hoy = () => new Date().toISOString().split('T')[0];
+const hoy = () => hoyAR();
 const addMonths = (n) => {
   const d = new Date();
   d.setMonth(d.getMonth() + n);

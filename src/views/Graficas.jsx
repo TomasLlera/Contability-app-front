@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { hoyAR, sumarDias } from '../utils/fecha';
 import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList, CalendarRange, CalendarClock, Wallet, Boxes } from 'lucide-react';
 import { EntityIcon } from '../icons';
@@ -10,12 +11,8 @@ const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
 const MESES = { '01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun',
                 '07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic' };
 
-const todayStr = () => new Date().toISOString().split('T')[0];
-const addDays = (dateStr, n) => {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
-};
+const todayStr = () => hoyAR();
+const addDays = sumarDias;
 
 // ── Caja charts config ────────────────────────────────────────────────────────
 const CAJA_PRESETS = { dia: [15, 30, 60], mes: [3, 6, 12], anio: [2, 3, 5] };

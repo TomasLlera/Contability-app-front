@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { hoyAR } from '../utils/fecha';
 import { registroApi, cajaApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
@@ -14,7 +15,7 @@ import {
 import toast from 'react-hot-toast';
 
 const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyAR();
 const shiftDia = (fecha, d) => {
   const dt = new Date(`${fecha}T12:00:00`);
   dt.setDate(dt.getDate() + d);

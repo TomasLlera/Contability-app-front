@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { hoyAR, mesAR } from '../utils/fecha';
 import { registroApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import VentaSistemaGraficosModal from '../components/VentaSistemaGraficosModal';
@@ -16,8 +17,8 @@ const labelMes = (mes) => {
   const [y, m] = mes.split('-');
   return `${MESES[Number(m) - 1]} ${y}`;
 };
-const hoy = () => new Date().toISOString().slice(0, 10);
-const mesActual = () => new Date().toISOString().slice(0, 7);
+const hoy = () => hoyAR();
+const mesActual = () => mesAR();
 const shiftMes = (mes, d) => {
   const [y, m] = mes.split('-').map(Number);
   const dt = new Date(y, m - 1 + d, 1);
