@@ -1011,39 +1011,37 @@ export default function CajaView({ rubros = [], onNavigate }) {
   });
   const clearSelection = () => setSelectedIds(new Set());
 
-  const cargar = async () => {
+  // Última corrida del auto-sync: { fecha, at }. Lo más caro de abrir la Caja es el
+  // auto-sync (lee todos los movimientos de los rubros sincronizados); al volver el
+  // foco a la ventana se saltea si corrió hace menos de un minuto para la misma fecha.
+  const ultimoSyncRef = useRef({ fecha: null, at: 0 });
+  const SYNC_MIN_MS = 60 * 1000;
+
+  // `forzarSync: false` = refresco automático (foco): respeta el mínimo entre
+  // corridas. Después de una acción del usuario se sincroniza siempre.
+  const cargar = async ({ forzarSync = true } = {}) => {
     setLoading(true);
     try {
       // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
-      // como gastos pending sin método de pago. Idempotente — corre cada vez sin duplicar.
-      try { await cajaApi.autoSync(fecha); } catch {}
-      const esHoy = fecha === todayStr();
-      const [data, prox] = await Promise.all([
-        cajaApi.getByFecha(fecha),
-        esHoy ? cajaApi.getProximos(fecha).catch(() => []) : Promise.resolve([]),
-      ]);
-      setMovs(data);
-      setProximos(prox);
-
-      const tieneSaldoManual = data.some(m => m.tipo === 'saldo_inicial');
-
-      // El saldo de ayer se necesita en los dos casos: para el ingreso por
-      // transferencia del día (saldo_cuenta de hoy − el de ayer).
-      const dataAyer = await cajaApi.getByFecha(addDays(fecha, -1));
-      setSaldoCuentaAyer(dataAyer.find(m => m.tipo === 'saldo_cuenta')?.monto ?? null);
-
-      if (tieneSaldoManual) {
-        setSaldoAutoCalculado(null);
-      } else {
-        // El encadenado lo resuelve el backend desde el último saldo_inicial manual,
-        // sin límite de días hacia atrás. Antes se hacía acá trayendo 30 días: cuando
-        // el ancla caía fuera de esa ventana la cadena arrancaba en cero y el saldo
-        // del día se desplomaba sin ninguna señal de que faltaba la base.
-        // saldo === null = nunca se cargó un saldo inicial → la Caja muestra "—".
-        const { saldo } = await cajaApi.getSaldoAnterior(fecha);
-        setSaldoAutoCalculado(saldo ?? null);
+      // como gastos pending sin método de pago. Idempotente — no duplica.
+      const ult = ultimoSyncRef.current;
+      if (forzarSync || ult.fecha !== fecha || Date.now() - ult.at > SYNC_MIN_MS) {
+        try { await cajaApi.autoSync(fecha); } catch { /* sin permisos o sin red: se muestra lo que haya */ }
+        ultimoSyncRef.current = { fecha, at: Date.now() };
       }
-    } catch {}
+      // Una sola request con todo lo del día (antes eran cuatro en serie): ítems,
+      // saldo en cuenta de ayer (para el ingreso por transferencia del día), saldo
+      // de efectivo de apertura encadenado desde el último saldo_inicial manual y,
+      // si es hoy, los próximos vencimientos.
+      const dia = await cajaApi.getDia(fecha);
+      setMovs(dia.movs);
+      setProximos(dia.proximos || []);
+      setSaldoCuentaAyer(dia.saldo_cuenta_ayer ?? null);
+      // Con saldo_inicial manual cargado hoy, ese manda. saldo === null = nunca se
+      // cargó un saldo inicial → la Caja muestra "—" en vez de un cero engañoso.
+      const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
+      setSaldoAutoCalculado(tieneSaldoManual ? null : (dia.saldo_anterior?.saldo ?? null));
+    } catch { /* se conserva lo último cargado */ }
     setLoading(false);
   };
 
@@ -1069,10 +1067,19 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // Refresca todo lo que depende de datos del servidor (movimientos del día +
   // reconciliación auto-sync, vencimientos, config y subrubros). Lo usa el botón
   // "Refrescar" y los disparos automáticos al volver el foco a la ventana.
-  const refrescarTodo = async () => {
+  // `automatico` = disparado por el foco: la Caja se recarga igual, pero el auto-sync
+  // y los vencimientos (lo pesado) respetan el mínimo de un minuto entre corridas.
+  const refrescarTodo = async ({ automatico = false } = {}) => {
+    const ult = ultimoSyncRef.current;
+    const pesado = !automatico || ult.fecha !== fecha || Date.now() - ult.at > SYNC_MIN_MS;
     setRefreshing(true);
     try {
-      await Promise.all([cargar(), cargarVencimientos(), cargarConfig(), cargarSubrubros()]);
+      await Promise.all([
+        cargar({ forzarSync: !automatico }),
+        pesado ? cargarVencimientos() : null,
+        cargarConfig(),
+        automatico ? null : cargarSubrubros(),
+      ]);
     } finally {
       setRefreshing(false);
     }
@@ -1086,7 +1093,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // tener que recargar la página a mano. Se omite si hay un formulario abierto para
   // no descartar lo que el usuario está escribiendo.
   useEffect(() => {
-    const onFocus = () => { if (!showForm && !editandoSaldo && !editandoSaldoCuenta) refrescarTodo(); };
+    const onFocus = () => { if (!showForm && !editandoSaldo && !editandoSaldoCuenta) refrescarTodo({ automatico: true }); };
     const onVisible = () => { if (document.visibilityState === 'visible') onFocus(); };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
@@ -1440,7 +1447,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             {ocultarSaldos ? <EyeOff size={18} /> : <Eye size={18} />}
             <span className={toolbarLbl}>{ocultarSaldos ? 'Mostrar' : 'Ocultar'}</span>
           </button>
-          <button onClick={refrescarTodo} disabled={refreshing}
+          <button onClick={() => refrescarTodo()} disabled={refreshing}
             className={`${toolbarBtn} disabled:opacity-50`} title="Refrescar ahora (sincroniza pagos y vencimientos)">
             <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
             <span className={toolbarLbl}>Refrescar</span>

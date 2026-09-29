@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { rubrosApi, subrubrosApi, localesApi, authApi, movimientosApi, getErrorMsg } from './api';
+import { rubrosApi, subrubrosApi, localesApi, authApi, getErrorMsg } from './api';
 import RubroView from './views/RubroView';
 import Dashboard from './views/Dashboard';
 import Graficas from './views/Graficas';
@@ -63,7 +63,6 @@ export default function App() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showCargaRapida, setShowCargaRapida] = useState(false);
-  const [vencCount, setVencCount] = useState(0);
   const [headerHidden, setHeaderHidden] = useState(false);
   // Recordatorios del día. El estado vive acá —y no en el Dashboard— porque el botón
   // de la campana está en el header global. El popup, en cambio, se renderiza solo en
@@ -156,8 +155,6 @@ export default function App() {
     if (loggedIn) {
       authApi.refreshIfNeeded();
       cargar();
-      cargarVencCount();
-      const vencInterval = setInterval(cargarVencCount, 5 * 60 * 1000);
 
       // Cierra sesión tras 1 hora de inactividad (persiste entre recargas)
       authApi.updateActivity();
@@ -171,7 +168,6 @@ export default function App() {
       }, 60 * 1000);
 
       return () => {
-        clearInterval(vencInterval);
         clearInterval(inactivityInterval);
         window.removeEventListener('mousemove', updateActivity);
         window.removeEventListener('keydown', updateActivity);
@@ -211,14 +207,6 @@ export default function App() {
       stats[r.id] = subs.length;
     }));
     setRubroStats(stats);
-  };
-
-  const cargarVencCount = async () => {
-    try {
-      const data = await movimientosApi.getVencimientos(7);
-      const lista = Array.isArray(data) ? data : (data?.vencimientos || []);
-      setVencCount(lista.length);
-    } catch {}
   };
 
   const toggleLocal = (id) => {
@@ -387,7 +375,7 @@ export default function App() {
 
         <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
           <button
-            onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); cargarVencCount(); }}
+            onClick={() => { setActiveView('inicio'); setInitialSubrubro(null); closeSidebar(); }}
             className={`press w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-lg text-sm font-medium ${
               activeView === 'inicio' ? 'bg-linear-to-b from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-400/30' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white'
             }`}
@@ -900,7 +888,7 @@ export default function App() {
     {!sidebarOpen && (
       <BottomNav
         activeView={activeView}
-        onNavigate={(view) => { setActiveView(view); setInitialSubrubro(null); closeSidebar(); if (view === 'inicio') cargarVencCount(); }}
+        onNavigate={(view) => { setActiveView(view); setInitialSubrubro(null); closeSidebar(); }}
         onOpenDrawer={() => setSidebarOpen(true)}
       />
     )}

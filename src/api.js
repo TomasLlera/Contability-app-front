@@ -458,6 +458,9 @@ export const auditApi = {
 
 export const cajaApi = {
   getByFecha: (fecha) => api.get('/caja', { params: { fecha } }).then(r => r.data),
+  // Todo lo de la Caja del Día en una request: { movs, saldo_cuenta_ayer,
+  // saldo_anterior: { saldo, ... }, proximos }.
+  getDia: (fecha) => api.get('/caja/dia', { params: { fecha } }).then(r => r.data),
   // Pendientes que vencen en los próximos días: se muestran en la Caja de hoy para
   // poder pagarlos por adelantado (confirmar en un día futuro está bloqueado).
   getProximos: (fecha) => api.get('/caja/proximos', { params: { fecha } }).then(r => r.data),
