@@ -939,6 +939,10 @@ function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 
   );
 }
 
+// Última respuesta de /caja/dia por fecha. Vive fuera del componente para sobrevivir
+// al cambio de vista: volver a la Caja la muestra al instante mientras se refresca.
+const cacheDia = new Map();
+
 export default function CajaView({ rubros = [], onNavigate }) {
   const [fecha, setFecha]           = useState(todayStr());
   // Ocultar los montos de "Saldo del día" y "Saldo en cuenta" (privacidad). Persiste.
@@ -1026,32 +1030,64 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // Las cargas son cadenas de promesas (no async/await): el estado solo se toca en
   // los callbacks, así los efectos que las disparan no hacen setState síncrono.
   // Todas devuelven la promesa.
+  // Fecha que se está mirando y fecha de los datos en pantalla. Las respuestas de
+  // una fecha que ya no se mira se descartan (navegar rápido entre días), y la caché
+  // solo se pinta al cambiar de fecha: después de una acción del usuario el estado
+  // en pantalla es más nuevo que la caché.
+  const fechaRef = useRef(fecha);
+  const mostradoRef = useRef(null);
+  useEffect(() => { fechaRef.current = fecha; }, [fecha]);
+
+  // Auto-syncs en curso. Mientras corre uno, los pendientes auto-sync en pantalla
+  // pueden estar desactualizados (factura pagada o con otro saldo): no se confirman.
+  const [syncsEnCurso, setSyncsEnCurso] = useState(0);
+  const sincronizando = syncsEnCurso > 0;
+
+  const aplicarDia = (f, dia) => {
+    if (fechaRef.current !== f) return;
+    mostradoRef.current = f;
+    setMovs(dia.movs);
+    setProximos(dia.proximos || []);
+    setSaldoCuentaAyer(dia.saldo_cuenta_ayer ?? null);
+    // Con saldo_inicial manual cargado hoy, ese manda. saldo === null = nunca se
+    // cargó un saldo inicial → la Caja muestra "—" en vez de un cero engañoso.
+    const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
+    setSaldoAutoCalculado(tieneSaldoManual ? null : (dia.saldo_anterior?.saldo ?? null));
+  };
+
+  // La Caja se pinta sin esperar al auto-sync (lo que tardaba 6-7 s): primero lo
+  // último conocido de esa fecha (caché), en paralelo lo que hay hoy en la base y el
+  // auto-sync; si el sync cambió algo, se vuelve a pedir el día.
   const cargar = ({ forzarSync = true } = {}) => {
-    // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
-    // como gastos pending sin método de pago. Idempotente — no duplica.
-    const ult = ultimoSyncRef.current;
-    const sincronizar = forzarSync || ult.fecha !== fecha || Date.now() - ult.at > SYNC_MIN_MS;
-    const pasoSync = sincronizar
-      ? cajaApi.autoSync(fecha)
-          .catch(() => { /* sin permisos o sin red: se muestra lo que haya */ })
-          .then(() => { ultimoSyncRef.current = { fecha, at: Date.now() }; })
-      : Promise.resolve();
+    const f = fecha;
+    if (mostradoRef.current !== f && cacheDia.has(f)) aplicarDia(f, cacheDia.get(f));
+
     // Una sola request con todo lo del día (antes eran cuatro en serie): ítems,
     // saldo en cuenta de ayer (para el ingreso por transferencia del día), saldo
     // de efectivo de apertura encadenado desde el último saldo_inicial manual y,
     // si es hoy, los próximos vencimientos.
-    return pasoSync
-      .then(() => cajaApi.getDia(fecha))
-      .then(dia => {
-        setMovs(dia.movs);
-        setProximos(dia.proximos || []);
-        setSaldoCuentaAyer(dia.saldo_cuenta_ayer ?? null);
-        // Con saldo_inicial manual cargado hoy, ese manda. saldo === null = nunca se
-        // cargó un saldo inicial → la Caja muestra "—" en vez de un cero engañoso.
-        const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
-        setSaldoAutoCalculado(tieneSaldoManual ? null : (dia.saldo_anterior?.saldo ?? null));
-      })
+    const traerDia = () => cajaApi.getDia(f)
+      .then(dia => { cacheDia.set(f, dia); aplicarDia(f, dia); })
       .catch(() => { /* se conserva lo último cargado */ });
+    const pasoDia = traerDia();
+
+    // Auto-sync: trae vencimientos (de los rubros configurados) y los crea como
+    // gastos pending. Idempotente — no duplica.
+    const ult = ultimoSyncRef.current;
+    const sincronizar = forzarSync || ult.fecha !== f || Date.now() - ult.at > SYNC_MIN_MS;
+    if (!sincronizar) return pasoDia;
+
+    setSyncsEnCurso(n => n + 1);
+    const pasoSync = cajaApi.autoSync(f)
+      .catch(() => null /* sin permisos o sin red: se muestra lo que haya */)
+      .then(r => {
+        ultimoSyncRef.current = { fecha: f, at: Date.now() };
+        const cambio = r && (r.creados || r.actualizados || r.eliminados);
+        // Encadenado a la primera lectura: una respuesta vieja no pisa a la nueva.
+        return cambio ? pasoDia.then(traerDia) : null;
+      })
+      .finally(() => setSyncsEnCurso(n => n - 1));
+    return Promise.all([pasoDia, pasoSync]);
   };
 
   const cargarConfig = () => cajaApi.getConfig().then(setConfig);
@@ -1189,6 +1225,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
     // ignorar. Sin esto, dos clics rápidos entran ambos a la rama de confirmar
     // (m.confirmado sigue siendo false en el render viejo) y crean dos pagos.
     if (confirmingRef.current.has(m.id)) return;
+    // El botón ya está deshabilitado; esto cubre la confirmación masiva y el pago parcial.
+    if (m.confirmado !== true && bloqueoSync(m)) { toast(bloqueoSync(m), { icon: '⏳' }); return; }
     if (m.confirmado !== true && m.metodo && !validado && !validarFechaPago([m], opts, fechaPago)) return;
     // Cobro de deuda (ingreso auto-sincronizado) vs gasto de proveedor: mismo
     // flujo — al confirmar se crea el pago/abono en el subrubro de origen.
@@ -1357,6 +1395,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const bulkConfirmSeleccionados = async () => {
     const aConfirmar = selectedGastos.filter(m => m.confirmado === false && m.metodo);
     const sinMetodo  = selectedGastos.filter(m => m.confirmado === false && !m.metodo).length;
+    const enSync = aConfirmar.find(bloqueoSync);
+    if (enSync) { toast(bloqueoSync(enSync), { icon: '⏳' }); return; }
     if (aConfirmar.length === 0) {
       toast.error(sinMetodo ? 'Definí el método de pago en los ítems seleccionados' : 'No hay pendientes para confirmar');
       return;
@@ -1412,6 +1452,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
     return grupos;
   }, []);
   const bloqueoFuturo = fechaEsFutura ? 'Estás viendo un día futuro: los pagos se confirman desde hoy' : null;
+  const bloqueoSync = (m) => (sincronizando && m.auto_sync ? 'Sincronizando vencimientos, esperá un momento…' : null);
+  const bloqueoDe = (m) => bloqueoFuturo || bloqueoSync(m);
 
   const formProps = {
     fecha, onSave: handleSave,
@@ -1462,8 +1504,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
             <span className={toolbarLbl}>{ocultarSaldos ? 'Mostrar' : 'Ocultar'}</span>
           </button>
           <button onClick={() => refrescarTodo()} disabled={refreshing}
-            className={`${toolbarBtn} disabled:opacity-50`} title="Refrescar ahora (sincroniza pagos y vencimientos)">
-            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            className={`${toolbarBtn} disabled:opacity-50`}
+            title={sincronizando ? 'Sincronizando vencimientos…' : 'Refrescar ahora (sincroniza pagos y vencimientos)'}>
+            <RefreshCw size={18} className={refreshing || sincronizando ? 'animate-spin' : ''} />
             <span className={toolbarLbl}>Refrescar</span>
           </button>
           <button onClick={() => setShowExport(true)}
@@ -1734,7 +1777,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 <GrupoHeader grupo={grupo} />
                 {grupo.items.map(m => (
                   <div key={m.id} className="mb-1.5 sm:mb-2">
-                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoFuturo} onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })} onEditarBoleta={setBoletaDe} />}
+                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoDe(m)} onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })} onEditarBoleta={setBoletaDe} />}
                   </div>
                 ))}
               </div>
@@ -1802,7 +1845,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                           selected={selectedIds.has(m.id)}
                           onToggleSelect={toggleSelection}
                           hideMetodo
-                          bloqueoConfirmar={bloqueoFuturo}
+                          bloqueoConfirmar={bloqueoDe(m)}
                           onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })}
                           onEditarBoleta={setBoletaDe}
                         />
@@ -1889,6 +1932,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                     subrubro={subrubroDe(m)}
                     onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
                     aplicaDescuento={!!subrubroDe(m)?.aplica_descuento}
+                    bloqueoConfirmar={bloqueoSync(m)}
                     onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: todayStr() })}
                     onEditarBoleta={setBoletaDe}
                   />
