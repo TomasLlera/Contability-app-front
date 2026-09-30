@@ -720,7 +720,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                   ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
                   : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
               }`}>
-              {confirming ? <Loader2 size={18} className="animate-spin sm:w-3.5 sm:h-3.5" /> : <Check size={18} className="sm:w-3.5 sm:h-3.5" />}
+              {confirming ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
             </button>
           )}
           <RowActions
@@ -732,7 +732,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 icon: <Percent size={16} />,
                 iconDesktop: (
                   <>
-                    <Percent size={13} />
+                    <Percent size={16} />
                     <ChevronDown size={11} className={`transition-transform ${descOpen ? 'rotate-180' : ''}`} />
                   </>
                 ),
@@ -748,7 +748,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 label: esCobro ? 'Cobro parcial' : 'Pago parcial',
                 hint: 'Pagar una parte: el resto queda pendiente',
                 icon: <Coins size={16} />,
-                iconDesktop: <Coins size={14} />,
+                iconDesktop: <Coins size={18} />,
                 onClick: () => onPagoParcial(m),
                 className: 'p-1 -m-1 text-slate-400 hover:text-green-600 transition-colors shrink-0',
               },
@@ -757,7 +757,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 label: esCobro ? 'Editar deuda' : 'Editar boleta',
                 hint: 'Corregir el importe y las percepciones de la factura',
                 icon: <Receipt size={16} />,
-                iconDesktop: <Receipt size={14} />,
+                iconDesktop: <Receipt size={18} />,
                 onClick: () => onEditarBoleta(m),
                 className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
@@ -765,6 +765,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 key: 'editar',
                 label: 'Editar',
                 icon: <Pencil size={16} />,
+                iconDesktop: <Pencil size={18} />,
                 onClick: () => onEdit(m),
                 className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
@@ -772,6 +773,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 key: 'eliminar',
                 label: 'Eliminar',
                 icon: <Trash2 size={16} />,
+                iconDesktop: <Trash2 size={18} />,
                 tone: 'danger',
                 onClick: () => onDelete(m.id),
                 className: 'p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0',
