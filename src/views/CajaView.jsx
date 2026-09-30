@@ -1812,18 +1812,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
         </div>
       )}
 
-      {/* Resumen — al final, después de los gastos que suma. El acceso rápido
-          está arriba (botón "Resta efectivo / Resta transferencia"). */}
-      <div ref={resumenRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 scroll-mt-20">
-        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600"
-          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
-        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600"
-          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
-          labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
-      </div>
-
-      {/* Próximos vencimientos — solo mirando hoy. Un botón compacto al final que
-          abre la lista en una ventana, para no alargar la Caja del día. */}
+      {/* Próximos vencimientos — solo mirando hoy. Un botón compacto arriba de los
+          totales que abre la lista en una ventana, para no alargar la Caja del día. */}
       {proximos.length > 0 && (
         <button type="button" onClick={() => setShowProximos(true)}
           className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
@@ -1834,6 +1824,16 @@ export default function CajaView({ rubros = [], onNavigate }) {
           <ChevronRight size={15} className="text-slate-400 shrink-0" />
         </button>
       )}
+
+      {/* Resumen — al final, después de los gastos que suma. El acceso rápido
+          está arriba (botón "Resta efectivo / Resta transferencia"). */}
+      <div ref={resumenRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 scroll-mt-20">
+        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600"
+          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
+        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600"
+          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
+          labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
+      </div>
 
       {showProximos && proximos.length > 0 && (
         <Modal title={`Próximos vencimientos · ${fmt(proximosFiltrados.reduce((s, m) => s + m.monto, 0))}`} size="xl" onClose={() => setShowProximos(false)}>
