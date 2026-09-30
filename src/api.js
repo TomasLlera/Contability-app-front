@@ -153,15 +153,6 @@ export const rubrosApi = {
   clearAllMovimientos: (id) => api.delete(`/rubros/${id}/movimientos`).then(r => r.data),
 };
 
-export const categoriasApi = {
-  getByRubro: (rubroId) => api.get(`/categorias/${rubroId}`).then(r => r.data),
-  create: (rubroId, nombre, operacion, tipo_calculo, porcentaje_default) =>
-    api.post(`/categorias/${rubroId}`, { nombre, operacion, tipo_calculo, porcentaje_default }).then(r => r.data),
-  update: (id, nombre, operacion, tipo_calculo, porcentaje_default) =>
-    api.put(`/categorias/${id}`, { nombre, operacion, tipo_calculo, porcentaje_default }),
-  delete: (id) => api.delete(`/categorias/${id}`),
-};
-
 export const camposApi = {
   getByRubro: (rubroId) => api.get(`/campos/${rubroId}`).then(r => r.data),
   create: (rubroId, nombre, tipo, orden) => api.post(`/campos/${rubroId}`, { nombre, tipo, orden }).then(r => r.data),
@@ -198,7 +189,6 @@ export const dashboardApi = {
     api.get(`/dashboard/comparacion/${rubroId}`).then(r => r.data),
   getComparativa: () => api.get('/dashboard/comparativa').then(r => r.data),
   getComparativaCaja: () => api.get('/dashboard/comparativa-caja').then(r => r.data),
-  getDeudasCobrar: () => api.get('/dashboard/deudas-cobrar').then(r => r.data),
 };
 
 // Descarga un blob desde una respuesta axios, detectando errores JSON devueltos como blob.
@@ -225,7 +215,7 @@ export const reportesApi = {
     const params = { mes, orden };
     if (subrubroId) params.subrubroId = subrubroId;
     const res = await api.get(`/reportes/subrubros-mensual/${rubroId}`, { params, responseType: 'blob' });
-    const safe = String(nombre).replace(/[^\w\-]+/g, '_').slice(0, 40);
+    const safe = String(nombre).replace(/[^\w-]+/g, '_').slice(0, 40);
     await descargarBlob(res, `analisis_${safe}_${mes}.xlsx`);
   },
   cajaMensual: async ({ mes }) => {
@@ -368,7 +358,6 @@ export const ivaApi = {
   // Ventas (carga manual)
   getVentas: () => api.get('/iva/ventas').then(r => r.data),
   createVenta: (data) => api.post('/iva/ventas', data).then(r => r.data),
-  updateVenta: (id, data) => api.put(`/iva/ventas/${id}`, data).then(r => r.data),
   deleteVenta: (id) => api.delete(`/iva/ventas/${id}`).then(r => r.data),
   // Créditos fiscales (carga manual; restan del saldo mensual)
   getCreditos: () => api.get('/iva/creditos').then(r => r.data),

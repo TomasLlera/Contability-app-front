@@ -17,7 +17,8 @@ import BottomNav from './components/BottomNav';
 import RecordatorioPopup from './components/RecordatorioPopup';
 import useRecordatorios from './hooks/useRecordatorios';
 import { Home, BarChart2, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Pencil, Trash2, Check, LogOut, Menu, ArrowLeft, Moon, Sun, PanelLeft, PanelRight, ChevronUp, Search, Zap, Wallet, Settings, Boxes, Building2, Receipt, ClipboardList, BellRing } from 'lucide-react';
-import { EntityIcon, ICON_LIST, resolveIconKey } from './icons';
+import { EntityIcon } from './icons';
+import { ICON_LIST, resolveIconKey } from './iconos';
 import toast, { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -151,6 +152,21 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, [editingLocal]);
 
+  // Declarada antes del efecto que la usa (antes estaba más abajo: funcionaba, pero
+  // el efecto accedía a una constante todavía no declarada en el código).
+  const cargar = async () => {
+    const [ls, rs] = await Promise.all([localesApi.getAll(), rubrosApi.getAll()]);
+    setLocales(ls);
+    setRubros(rs);
+    setLoading(false);
+    const stats = {};
+    await Promise.all(rs.map(async r => {
+      const subs = await subrubrosApi.getByRubro(r.id);
+      stats[r.id] = subs.length;
+    }));
+    setRubroStats(stats);
+  };
+
   useEffect(() => {
     if (loggedIn) {
       authApi.refreshIfNeeded();
@@ -196,18 +212,6 @@ export default function App() {
     return next;
   });
 
-  const cargar = async () => {
-    const [ls, rs] = await Promise.all([localesApi.getAll(), rubrosApi.getAll()]);
-    setLocales(ls);
-    setRubros(rs);
-    setLoading(false);
-    const stats = {};
-    await Promise.all(rs.map(async r => {
-      const subs = await subrubrosApi.getByRubro(r.id);
-      stats[r.id] = subs.length;
-    }));
-    setRubroStats(stats);
-  };
 
   const toggleLocal = (id) => {
     setExpandedLocales(prev => {

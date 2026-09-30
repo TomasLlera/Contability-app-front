@@ -865,7 +865,11 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   );
 }
 
-function ResumenMetodo({ label, icon: Icon, color, disponible, gastos, sinConfirmar = 0, vencimientos, labelDisponible }) {
+function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 0, vencimientos, labelDisponible }) {
+  // Se renombra a mayúscula para usarlo como componente (<Icon />). Como variable
+  // con mayúscula, ESLint no lo marca como "sin usar" (sin el plugin de React no
+  // cuenta el uso en JSX).
+  const Icon = icon;
   const restante = disponible - gastos;
   const restanteSiConfirma = disponible - gastos - sinConfirmar;
   const [vencAbierto, setVencAbierto] = useState(false);
@@ -944,7 +948,6 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [ocultarSaldos, setOcultarSaldos] = useState(false);
   const resumenRef = useRef(null);
   const [movs, setMovs]             = useState([]);
-  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm]     = useState(false);
   const [tipoForm, setTipoForm]     = useState(null);
@@ -1020,7 +1023,6 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // `forzarSync: false` = refresco automático (foco): respeta el mínimo entre
   // corridas. Después de una acción del usuario se sincroniza siempre.
   const cargar = async ({ forzarSync = true } = {}) => {
-    setLoading(true);
     try {
       // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
       // como gastos pending sin método de pago. Idempotente — no duplica.
@@ -1042,7 +1044,6 @@ export default function CajaView({ rubros = [], onNavigate }) {
       const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
       setSaldoAutoCalculado(tieneSaldoManual ? null : (dia.saldo_anterior?.saldo ?? null));
     } catch { /* se conserva lo último cargado */ }
-    setLoading(false);
   };
 
   const cargarConfig = async () => {
@@ -1054,14 +1055,14 @@ export default function CajaView({ rubros = [], onNavigate }) {
     try {
       const data = await movimientosApi.getVencimientos(7);
       setVencimientos(Array.isArray(data) ? data : (data?.vencimientos || []));
-    } catch {}
+    } catch { /* se conservan los vencimientos ya cargados */ }
   };
 
   const cargarSubrubros = async () => {
     try {
       const results = await Promise.all(rubros.map(r => subrubrosApi.getByRubro(r.id)));
       setAllSubrubros(results.flat());
-    } catch {}
+    } catch { /* sin subrubros: las filas muestran solo el concepto */ }
   };
 
   // Refresca todo lo que depende de datos del servidor (movimientos del día +
@@ -1253,7 +1254,14 @@ export default function CajaView({ rubros = [], onNavigate }) {
     // Borrar el ítem sin revertir dejaría la nota de crédito huérfana, inflando el
     // saldo a favor de la factura.
     if (mov?.confirmado === true && (mov.pago_mov_id || mov.nc_mov_id)) {
-      try { await cajaApi.revertir(id); } catch {}
+      // Si no se pudo revertir, no se borra: el pago quedaría vivo en el subrubro
+      // sin su ítem de Caja.
+      try { await cajaApi.revertir(id); }
+      catch (err) {
+        toast.error(err?.response?.data?.error || 'No se pudo revertir el pago: no se eliminó');
+        setDeleteId(null);
+        return;
+      }
     }
     await cajaApi.delete(id, fecha);
     setMovs(prev => prev.filter(m => m.id !== id));

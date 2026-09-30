@@ -16,11 +16,6 @@ const addDays = sumarDias;
 
 // ── Caja charts config ────────────────────────────────────────────────────────
 const CAJA_PRESETS = { dia: [15, 30, 60], mes: [3, 6, 12], anio: [2, 3, 5] };
-const presetLabel = (v, vista) => {
-  if (vista === 'dia') return `${v}d`;
-  if (vista === 'mes') return `${v}m`;
-  return `${v}a`;
-};
 const CAJA_CHARTS = [
   { key: 'ingresosEfvo',     label: 'Ingreso efectivo',    color: 'bg-green-500',  colorLight: 'bg-green-200 dark:bg-green-900/50',   text: 'text-green-700 dark:text-green-400' },
   { key: 'transDelta',       label: 'Ingreso trans',       color: 'bg-blue-500',   colorLight: 'bg-blue-200 dark:bg-blue-900/50',     text: 'text-blue-600 dark:text-blue-400' },
@@ -431,7 +426,11 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
 
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-        {[['rubros', 'Rubros', BarChart3], ['caja', 'Caja', Wallet], ['stock', 'Stock', Boxes]].map(([key, label, Icon]) => (
+        {[['rubros', 'Rubros', BarChart3], ['caja', 'Caja', Wallet], ['stock', 'Stock', Boxes]].map(([key, label, icono]) => {
+          // Variable con mayúscula para usarla como componente: así ESLint no la
+          // marca como "sin usar" (no cuenta el uso en JSX).
+          const Icon = icono;
+          return (
           <button
             key={key}
             onClick={() => { setTab(key); sessionStorage.setItem('graficas_tab', key); }}
@@ -444,7 +443,8 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
             <Icon size={15} />
             {label}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tab: Rubros */}

@@ -11,17 +11,6 @@ const formatFechaCorta = (dateStr) => {
   return `${d}/${m}`;
 };
 
-// Primer y último día del mes de una fecha dada (YYYY-MM-DD).
-export const rangoMes = (ref = new Date()) => {
-  const y = ref.getFullYear();
-  const m = String(ref.getMonth() + 1).padStart(2, '0');
-  const ultimo = new Date(y, ref.getMonth() + 1, 0).getDate();
-  return { desde: `${y}-${m}-01`, hasta: `${y}-${m}-${String(ultimo).padStart(2, '0')}` };
-};
-export const rangoAnio = (ref = new Date()) => {
-  const y = ref.getFullYear();
-  return { desde: `${y}-01-01`, hasta: `${y}-12-31` };
-};
 
 /**
  * Panel de seguimiento de descuentos por pago.

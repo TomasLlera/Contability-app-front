@@ -9,7 +9,8 @@ import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
 import ReporteMensualModal from '../components/ReporteMensualModal';
 import toast from 'react-hot-toast';
 import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, Eraser, ArrowUp, FileSpreadsheet } from 'lucide-react';
-import { EntityIcon, ICON_LIST } from '../icons';
+import { EntityIcon } from '../icons';
+import { ICON_LIST } from '../iconos';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 
@@ -27,7 +28,7 @@ const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', amb
 const fmtMetodo = (m) => METODO_LABEL[m] || '—';
 
 
-export default function RubroView({ rubro, onBack, initialSubrubro, role }) {
+export default function RubroView({ rubro, initialSubrubro, role }) {
   const isAdmin = role !== 'viewer';
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubro, setSelectedSubrubro] = useState(initialSubrubro ?? null);

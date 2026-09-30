@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
 import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet, HandCoins, Receipt, Percent, ChevronDown, Landmark } from 'lucide-react';
-import { EntityIcon, ICON_LIST } from '../icons';
+import { EntityIcon } from '../icons';
+import { ICON_LIST } from '../iconos';
 import InfoTooltip from './InfoTooltip';
 
 
