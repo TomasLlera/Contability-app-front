@@ -26,8 +26,9 @@ export function useMediaQuery(query) {
 // <640px — layout mobile: tablas como cards, modales full-screen, acciones en menú ⋮.
 export const useIsMobile = () => useMediaQuery(`(max-width: ${BP.sm - 1}px)`);
 
-// <768px — shell mobile: sidebar en drawer + bottom navigation.
-export const useIsMobileShell = () => useMediaQuery(`(max-width: ${BP.md - 1}px)`);
+// <1024px — shell mobile: sidebar en drawer + bottom navigation. Con el sidebar
+// fijo de 256px, una tablet vertical (768px) quedaba con ~470px útiles.
+export const useIsMobileShell = () => useMediaQuery(`(max-width: ${BP.lg - 1}px)`);
 
 // Dispositivo sin hover real. Distinto de "pantalla chica": una tablet grande
 // también es touch y tampoco puede alcanzar acciones escondidas tras :hover.

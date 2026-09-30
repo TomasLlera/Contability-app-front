@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { fmtMoneda } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const getMonday = (d) => {
@@ -42,7 +43,7 @@ function VistaMes({ fecha, movimientos, diaSeleccionado, onSelectDay }) {
     <div>
       <div className="grid grid-cols-7 mb-1">
         {DIAS.map(d => (
-          <div key={d} className="text-center text-xs font-semibold text-slate-400 py-2">{d}</div>
+          <div key={d} className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 py-2">{d}</div>
         ))}
       </div>
 
@@ -100,12 +101,12 @@ function VistaMes({ fecha, movimientos, diaSeleccionado, onSelectDay }) {
         <div className="mt-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
             {Number(diaSeleccionado.split('-')[2])} de {MESES[Number(diaSeleccionado.split('-')[1]) - 1]} {diaSeleccionado.split('-')[0]}
-            <span className="ml-2 text-xs font-normal text-slate-400">
+            <span className="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">
               {panelInfo.count} movimiento{panelInfo.count !== 1 ? 's' : ''}
             </span>
           </p>
           {panelInfo.count === 0 ? (
-            <p className="text-sm text-slate-400">Sin movimientos este día.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Sin movimientos este día.</p>
           ) : (
             <div className="space-y-2">
               {panelInfo.movs.map(m => {
@@ -131,7 +132,7 @@ function VistaMes({ fecha, movimientos, diaSeleccionado, onSelectDay }) {
                         </span>
                       )}
                       {m.campos_extra?.descripcion && (
-                        <span className="text-xs text-slate-400 truncate">{m.campos_extra.descripcion}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{m.campos_extra.descripcion}</span>
                       )}
                     </div>
                     <div className="text-right shrink-0">
@@ -179,11 +180,11 @@ function VistaSemana({ fecha, movimientos }) {
               : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
           }`}>
             <div className={`px-2 py-2 border-b ${esHoy ? 'border-blue-200 dark:border-blue-800' : 'border-slate-100 dark:border-slate-700'}`}>
-              <p className="text-xs text-slate-400">{DIAS[idx]}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{DIAS[idx]}</p>
               <p className={`text-lg font-bold leading-none mt-0.5 ${esHoy ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}>
                 {dia.getDate()}
               </p>
-              <p className="text-xs text-slate-400">{MESES_C[dia.getMonth()]}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{MESES_C[dia.getMonth()]}</p>
             </div>
             <div className="p-1.5 flex-1 space-y-1 overflow-hidden">
               {info.movs.map(m => {
@@ -248,10 +249,10 @@ function VistaAño({ fecha, movimientos, onSelectMes }) {
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{MESES_C[mesIdx]}</p>
             {count > 0 ? (
               <>
-                <p className={`text-sm font-bold mt-1.5 ${neto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                <p className={`text-sm font-bold mt-1.5 ${neto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {neto >= 0 ? '+' : ''}{fmt(neto)}
                 </p>
-                <p className="text-xs text-slate-400 mt-0.5">{count} mov.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{count} mov.</p>
               </>
             ) : (
               <p className="text-xs text-slate-300 dark:text-slate-600 mt-2">Sin datos</p>
@@ -323,13 +324,13 @@ export default function CalendarioSubrubro({ movimientos }) {
         </div>
 
         <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-          <button onClick={navPrev} className="px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-l-lg transition-colors">
+          <button onClick={navPrev} aria-label="Mes anterior" className="px-2 py-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-l-lg transition-colors">
             <ChevronLeft size={15} />
           </button>
           <span className="px-3 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-44 text-center">
             {periodoLabel()}
           </span>
-          <button onClick={navNext} className="px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-r-lg transition-colors">
+          <button onClick={navNext} aria-label="Mes siguiente" className="px-2 py-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-r-lg transition-colors">
             <ChevronRight size={15} />
           </button>
         </div>

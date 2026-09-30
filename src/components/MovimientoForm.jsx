@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
-import { hoyAR } from '../utils/fecha';
-import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2, HandCoins } from 'lucide-react';
+import { useState, useRef, useId } from 'react';
+import { hoyAR, fmtFecha } from '../utils/fecha';
+import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2, HandCoins, ChevronDown } from 'lucide-react';
 import { newIdemKey } from '../api';
+import { fmtMoneda } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 
 const TIPOS = [
   { value: 'factura',      label: 'Factura',          Icon: FileText,   hint: 'Boleta o importe a cobrar/pagar' },
@@ -23,6 +24,9 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const esDeudaSub = tipoSubrubro === 'deuda';
   const palabraDoc = esDeudaSub ? 'deuda' : 'factura';
   const today = hoyAR();
+  const uid = useId();
+  const montoRef = useRef(null);
+  const [errorMonto, setErrorMonto] = useState(null);
 
   const tipoInicial = movimiento?.tipo || 'factura';
   const [tipo, setTipo] = useState(tipoInicial);
@@ -52,6 +56,10 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // al total del comprobante; se acumulan aparte por mes en la sección IVA.
   const [percepcionIva, setPercepcionIva] = useState(movimiento?.percepcion_iva > 0 ? movimiento.percepcion_iva : '');
   const [ingresosBrutos, setIngresosBrutos] = useState(movimiento?.ingresos_brutos > 0 ? movimiento.ingresos_brutos : '');
+  // "Más datos" abierto de entrada si al editar ya hay algo cargado ahí.
+  const [masDatos, setMasDatos] = useState(() =>
+    movimiento?.percepcion_iva > 0 || movimiento?.ingresos_brutos > 0 ||
+    Object.values(movimiento?.campos_extra || {}).some(v => v !== '' && v != null));
 
   // Estado de guardado: deshabilita el botón y bloquea reenvíos mientras la alta
   // está en vuelo (defensa contra el doble clic). El ref bloquea de forma síncrona
@@ -193,7 +201,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
     let payload;
     if (esPagoONC) {
       const p = Number(pago) || 0;
-      if (!p) return;
+      if (!p) { setErrorMonto('Ingresá un monto mayor a 0'); montoRef.current?.focus(); return; }
       // NC mayor al saldo de las facturas vinculadas: bloqueada (el backend
       // también la rechaza con 400).
       if (excedeNC) return;
@@ -216,7 +224,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
       };
     } else {
       const m = Number(monto) || 0;
-      if (!m) return;
+      if (!m) { setErrorMonto('Ingresá un monto mayor a 0'); montoRef.current?.focus(); return; }
       payload = {
         tipo: 'factura',
         monto: m,
@@ -254,279 +262,261 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const camposTexto = campos.filter(c => c.tipo === 'texto');
 
   const inputCls    = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-  const inputNumCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-  const labelCls    = 'block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1';
-  const inputVioletCls = 'w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500';
-  const labelVioletCls = 'block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1';
+  const inputNumCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums';
+  const labelCls    = 'block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1';
+  const hintCls     = 'font-normal text-slate-500 dark:text-slate-400';
+  const errCls      = 'mt-1 text-xs text-red-600 dark:text-red-400';
+  // Control segmentado único (mismo estilo en toda la app): antes el tipo se
+  // marcaba en azul, Factura/Remito en naranja y el método en verde/azul.
+  const segCls = (activo) => `flex-1 min-h-11 sm:min-h-9 px-1 flex items-center justify-center gap-1.5 rounded-md transition-colors ${
+    activo ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100'
+  }`;
+  const segWrap = 'flex rounded-lg bg-slate-100 dark:bg-slate-700/60 p-0.5 text-sm font-medium';
 
   // Percepción IVA / Ingresos Brutos — aplican a facturas y notas de crédito.
-  // No suman al total; el backend las acumula por mes en la sección IVA. Se muestran
-  // como dos inputs simétricos con el resto (sin caja), justo arriba del monto.
+  // No suman al total; el backend las acumula por mes en la sección IVA.
   const percepcionesBlock = (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className={labelVioletCls}>Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>
-        <input type="number" inputMode="decimal" min="0" step="any" className={inputVioletCls} placeholder="0"
+        <label htmlFor={`${uid}-perc`} className={labelCls}>Percepción IVA <span className={hintCls}>(no suma)</span></label>
+        <input id={`${uid}-perc`} type="number" inputMode="decimal" min="0" step="any" className={inputCls} placeholder="0,00"
           value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
       </div>
       <div>
-        <label className={labelVioletCls}>Ingresos Brutos <span className="font-normal text-violet-400/70">(no suma)</span></label>
-        <input type="number" inputMode="decimal" min="0" step="any" className={inputVioletCls} placeholder="0"
+        <label htmlFor={`${uid}-iibb`} className={labelCls}>Ingresos Brutos <span className={hintCls}>(no suma)</span></label>
+        <input id={`${uid}-iibb`} type="number" inputMode="decimal" min="0" step="any" className={inputCls} placeholder="0,00"
           value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
       </div>
     </div>
   );
 
+  const metodoSelector = (bloqueado, activoDe, onElegir) => (
+    <div role="radiogroup" aria-labelledby={`${uid}-metodo`} className={`${segWrap} ${bloqueado ? 'opacity-90' : ''}`}>
+      {[
+        { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
+        { value: 'transferencia', label: 'Transferencia', Icon: ArrowLeftRight },
+      ].map(m => {
+        const active = activoDe === m.value;
+        return (
+          <button key={m.value} type="button" role="radio" aria-checked={active} disabled={bloqueado}
+            onClick={() => { if (!bloqueado) onElegir(active ? null : m.value); }}
+            className={`${segCls(active)} ${bloqueado ? 'cursor-not-allowed' : ''}`}>
+            <m.Icon size={14} /> {m.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const camposExtraFactura = (
+    <>
+      {camposSuma.map(c => (
+        <div key={c.id}>
+          <label htmlFor={`${uid}-c${c.id}`} className={labelCls}>{c.nombre} <span className="font-normal text-green-700 dark:text-green-400">(suma al total)</span></label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-700 dark:text-green-400 text-sm font-semibold">+</span>
+            <input id={`${uid}-c${c.id}`} type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0,00"
+              value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
+          </div>
+        </div>
+      ))}
+      {camposResta.map(c => (
+        <div key={c.id}>
+          <label htmlFor={`${uid}-c${c.id}`} className={labelCls}>{c.nombre} <span className="font-normal text-red-600 dark:text-red-400">(resta del total)</span></label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-600 dark:text-red-400 text-sm font-semibold">−</span>
+            <input id={`${uid}-c${c.id}`} type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0,00"
+              value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+  const camposTextoBlock = camposTexto.map(c => (
+    <div key={c.id}>
+      <label htmlFor={`${uid}-c${c.id}`} className={labelCls}>{c.nombre}</label>
+      <input id={`${uid}-c${c.id}`} type="text" className={inputCls}
+        value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
+    </div>
+  ));
+
+  // "Más datos": lo opcional y menos frecuente, plegado para que el monto quede
+  // a mano. Arranca abierto si alguno ya tiene valor (edición).
+  const hayMasDatos = tipo === 'factura'
+    ? (!esRemito && !esDeudaSub) || camposSuma.length + camposResta.length + camposTexto.length > 0
+    : tipo === 'nota_credito';
+
+  const montoLabel = tipo === 'factura'
+    ? (esDeudaSub ? 'Monto de la deuda' : 'Monto')
+    : tipo === 'nota_credito' ? 'Monto de la nota de crédito' : esDeudaSub ? 'Monto del abono' : 'Monto del pago';
+  const montoValor = tipo === 'factura' ? monto : pago;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
 
       {/* Selector de tipo */}
-      <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
+      <div role="radiogroup" aria-label="Tipo de movimiento" className={segWrap}>
         {(esDeudaSub ? TIPOS_DEUDA : TIPOS).map(t => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => handleChangeTipo(t.value)}
-            title={t.hint}
-            className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
-              tipo === t.value
-                ? (esDeudaSub ? (t.value === 'factura' ? 'bg-orange-500 text-white' : 'bg-green-600 text-white') : 'bg-blue-600 text-white')
-                : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
-            }`}
-          >
-            <t.Icon size={14} />
-            {t.label}
+          <button key={t.value} type="button" role="radio" aria-checked={tipo === t.value}
+            onClick={() => handleChangeTipo(t.value)} title={t.hint} className={segCls(tipo === t.value)}>
+            <t.Icon size={14} className="shrink-0" />
+            <span className="truncate">{t.value === 'nota_credito' ? <><span className="sm:hidden">NC</span><span className="hidden sm:inline">{t.label}</span></> : t.label}</span>
           </button>
         ))}
       </div>
 
-      {/* Fecha */}
+      {/* Monto: el dato principal, primero y grande. */}
       <div>
-        <label className={labelCls}>Fecha</label>
-        <input type="date" className={inputCls} value={fecha} max={today} onChange={e => setFecha(e.target.value)} required />
+        <label htmlFor={`${uid}-monto`} className={labelCls}>
+          {montoLabel}
+          {tipo === 'factura' && esDeudaSub && <span className={hintCls}> (suma a lo que te deben)</span>}
+          {tipo === 'pago' && esDeudaSub && <span className={hintCls}> (reduce la deuda)</span>}
+        </label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500 dark:text-slate-400">$</span>
+          <input id={`${uid}-monto`} ref={montoRef} type="number" inputMode="decimal" min="0" step="any"
+            className={`${inputNumCls} text-base font-semibold ${errorMonto ? 'border-red-400 dark:border-red-500 focus:ring-red-500' : ''}`}
+            placeholder="0,00"
+            value={montoValor}
+            aria-invalid={!!errorMonto}
+            aria-describedby={errorMonto ? `${uid}-monto-err` : undefined}
+            onChange={e => {
+              setErrorMonto(null);
+              if (tipo === 'factura') setMonto(e.target.value);
+              else { pagoManualRef.current = true; setPago(e.target.value); }
+            }} />
+        </div>
+        {errorMonto && <p id={`${uid}-monto-err`} className={errCls}>{errorMonto}</p>}
+      </div>
+
+      {/* Fecha (+ vencimiento en facturas) */}
+      <div className={tipo === 'factura' ? 'grid grid-cols-2 gap-3' : ''}>
+        <div>
+          <label htmlFor={`${uid}-fecha`} className={labelCls}>Fecha</label>
+          <input id={`${uid}-fecha`} type="date" className={inputCls} value={fecha} max={today} onChange={e => setFecha(e.target.value)} required />
+        </div>
+        {tipo === 'factura' && (
+          <div>
+            <label htmlFor={`${uid}-venc`} className={labelCls}>Vencimiento <span className={hintCls}>(opcional)</span></label>
+            <input id={`${uid}-venc`} type="date" className={inputCls} value={fechaVenc} min={fecha} onChange={e => setFechaVenc(e.target.value)} />
+          </div>
+        )}
       </div>
 
       {/* ── FACTURA / DEUDA ── */}
-      {tipo === 'factura' && (
+      {tipo === 'factura' && !esDeudaSub && (
         <>
-          {/* Documento (factura/remito): no aplica a una deuda a cobrar. */}
-          {!esDeudaSub && (
           <div>
-            <label className={labelCls}>Documento</label>
-            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
-              {[
-                { value: 'factura', label: 'Factura' },
-                { value: 'remito',  label: 'Remito'  },
-              ].map(d => (
-                <button key={d.value} type="button" onClick={() => setDocumento(d.value)}
-                  className={`flex-1 py-2 transition-colors ${documento === d.value
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+            <span id={`${uid}-doc`} className={labelCls}>Documento</span>
+            <div role="radiogroup" aria-labelledby={`${uid}-doc`} className={segWrap}>
+              {[{ value: 'factura', label: 'Factura' }, { value: 'remito', label: 'Remito' }].map(d => (
+                <button key={d.value} type="button" role="radio" aria-checked={documento === d.value}
+                  onClick={() => setDocumento(d.value)} className={segCls(documento === d.value)}>
                   {d.label}
                 </button>
               ))}
             </div>
           </div>
-          )}
 
           {/* Método de pago de la factura — viaja a la Caja del Día cuando vence.
-              Remito: fijo en efectivo. Si el subrubro tiene método fijo, tampoco es editable.
-              Una DEUDA a cobrar no genera gasto en Caja: el método se define en el abono. */}
-          {!esDeudaSub && (
+              Remito: fijo en efectivo. Si el subrubro tiene método fijo, tampoco es editable. */}
           <div>
-            <label className={labelCls}>
-              Método de pago <span className="text-slate-400">(al vencer, aparece así en la Caja del Día)</span>
-            </label>
-            <div className={`flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium ${metodoBloqueado ? 'opacity-90' : ''}`}>
-              {[
-                { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
-                { value: 'transferencia', label: 'Transferencia', Icon: ArrowLeftRight },
-              ].map(m => {
-                const active = metodoFacturaActivo === m.value;
-                return (
-                  <button
-                    key={m.value}
-                    type="button"
-                    disabled={metodoBloqueado}
-                    onClick={() => { if (!metodoBloqueado) setMetodoPago(active ? null : m.value); }}
-                    className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
-                      active
-                        ? (m.value === 'efectivo' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white')
-                        : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
-                    } ${metodoBloqueado ? 'cursor-not-allowed' : ''}`}
-                  >
-                    <m.Icon size={14} />
-                    {m.label}
-                  </button>
-                );
-              })}
-            </div>
+            <span id={`${uid}-metodo`} className={labelCls}>
+              Método de pago <span className={hintCls}>(así aparece en la Caja del Día al vencer)</span>
+            </span>
+            {metodoSelector(metodoBloqueado, metodoFacturaActivo, setMetodoPago)}
             {esRemito ? (
-              <p className="mt-1 text-xs text-green-600 dark:text-green-400">Remito — siempre en efectivo. Aparece en la Caja del Día pendiente de confirmar.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Remito: siempre en efectivo. Aparece en la Caja del Día pendiente de confirmar.</p>
             ) : metodoFijo ? (
-              <p className="mt-1 text-xs text-slate-400">Predeterminado del subrubro — no editable.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Predeterminado del subrubro, no editable.</p>
             ) : !metodoPago && (
-              <p className="mt-1 text-xs text-slate-400">Sin definir — al vencer aparece en la Caja sin método asignado.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Sin definir: al vencer aparece en la Caja sin método asignado.</p>
             )}
           </div>
-          )}
-
-          {/* Percepciones — no aplican al remito ni a una deuda a cobrar. */}
-          {!esRemito && !esDeudaSub && percepcionesBlock}
-
-          <div>
-            <label className={labelCls}>
-              {esDeudaSub
-                ? <>Monto de la deuda <span className="text-orange-500">(suma a lo que te deben)</span></>
-                : <>Monto <span className="text-slate-400">(boleta/importe)</span></>}
-            </label>
-            <div className="relative">
-              <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esDeudaSub ? 'text-orange-500' : 'text-green-600'}`}>+</span>
-              <input type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0"
-                value={monto} onChange={e => setMonto(e.target.value)} />
-            </div>
-          </div>
-
-          {camposSuma.map(c => (
-            <div key={c.id}>
-              <label className={labelCls}>
-                {c.nombre} <span className="text-green-600 text-xs">(suma al total)</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 text-sm font-semibold">+</span>
-                <input type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0"
-                  value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
-              </div>
-            </div>
-          ))}
-          {camposResta.map(c => (
-            <div key={c.id}>
-              <label className={labelCls}>
-                {c.nombre} <span className="text-red-500 text-xs">(resta del total)</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 text-sm font-semibold">−</span>
-                <input type="number" inputMode="decimal" min="0" step="any" className={inputNumCls} placeholder="0"
-                  value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
-              </div>
-            </div>
-          ))}
-
-          <div>
-            <label className={labelCls}>
-              Vencimiento <span className="text-slate-400">(opcional)</span>
-            </label>
-            <input type="date" className={inputCls} value={fechaVenc} min={fecha} onChange={e => setFechaVenc(e.target.value)} />
-          </div>
-
-          {camposTexto.map(c => (
-            <div key={c.id}>
-              <label className={labelCls}>{c.nombre}</label>
-              <input type="text" className={inputCls} placeholder={c.nombre}
-                value={camposExtra[c.nombre] ?? ''} onChange={e => setExtra(c.nombre, e.target.value)} />
-            </div>
-          ))}
         </>
       )}
 
-      {/* ── PAGO / ABONO / NOTA DE CRÉDITO ── */}
-      {esPagoONC && (
-        <>
-          {tipo === 'pago' && (
-            <div>
-              <label className={labelCls}>
-                {esDeudaSub
-                  ? <>Método del abono <span className="text-slate-400">(entra como ingreso en la Caja del Día)</span></>
-                  : 'Método de pago'}
-              </label>
-              <div className={`flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium ${metodoFijo ? 'opacity-90' : ''}`}>
-                {[
-                  { value: 'efectivo',      label: 'Efectivo',      Icon: Banknote },
-                  { value: 'transferencia', label: 'Transferencia', Icon: ArrowLeftRight },
-                ].map(m => {
-                  const active = metodoPago === m.value;
-                  return (
-                    <button
-                      key={m.value}
-                      type="button"
-                      disabled={metodoFijo}
-                      onClick={() => { if (!metodoFijo) setMetodoPago(active ? null : m.value); }}
-                      className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
-                        active
-                          ? (m.value === 'efectivo'
-                              ? 'bg-green-600 text-white'
-                              : 'bg-blue-600 text-white')
-                          : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
-                      } ${metodoFijo ? 'cursor-not-allowed' : ''}`}
-                    >
-                      <m.Icon size={14} />
-                      {m.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {metodoFijo ? (
-                <p className="mt-1 text-xs text-slate-400">Predeterminado del subrubro — no editable.</p>
-              ) : !metodoPago && (
-                <p className="mt-1 text-xs text-slate-400">Sin definir — el pago queda registrado sin método.</p>
-              )}
+      {/* ── PAGO / ABONO ── */}
+      {tipo === 'pago' && (
+        <div>
+          <span id={`${uid}-metodo`} className={labelCls}>
+            {esDeudaSub ? <>Método del abono <span className={hintCls}>(entra como ingreso en la Caja del Día)</span></> : 'Método de pago'}
+          </span>
+          {metodoSelector(metodoFijo, metodoPago, setMetodoPago)}
+          {metodoFijo ? (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Predeterminado del subrubro, no editable.</p>
+          ) : !metodoPago && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Sin definir: el pago queda registrado sin método.</p>
+          )}
+        </div>
+      )}
+
+      {/* Más datos (opcional) */}
+      {hayMasDatos && (
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700">
+          <button type="button" onClick={() => setMasDatos(v => !v)} aria-expanded={masDatos}
+            className="w-full min-h-11 flex items-center gap-2 px-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">
+            <span className="flex-1">
+              Más datos <span className={hintCls}>
+                ({[
+                  (tipo === 'nota_credito' || (!esRemito && !esDeudaSub)) && 'percepciones',
+                  tipo === 'factura' && camposTexto.length > 0 && camposTexto.map(c => c.nombre.toLowerCase()).join(', '),
+                  tipo === 'factura' && camposSuma.length + camposResta.length > 0 && 'ajustes',
+                ].filter(Boolean).join(', ')})
+              </span>
+            </span>
+            <ChevronDown size={15} className={`shrink-0 transition-transform ${masDatos ? 'rotate-180' : ''}`} />
+          </button>
+          {masDatos && (
+            <div className="px-3 pb-3 space-y-3">
+              {(tipo === 'nota_credito' || (tipo === 'factura' && !esRemito && !esDeudaSub)) && percepcionesBlock}
+              {tipo === 'factura' && camposExtraFactura}
+              {tipo === 'factura' && camposTextoBlock}
             </div>
           )}
-          {tipo === 'nota_credito' && percepcionesBlock}
+        </div>
+      )}
 
-          <div>
-            <label className={labelCls}>
-              {tipo === 'nota_credito' ? 'Monto de la nota de crédito' : esDeudaSub ? 'Monto del abono' : 'Monto del pago'}
-              {esDeudaSub && <span className="ml-1 font-normal text-green-600">(reduce la deuda)</span>}
-            </label>
-            <div className="relative">
-              <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esDeudaSub ? 'text-green-600' : 'text-blue-500'}`}>−</span>
-              <input type="number" inputMode="decimal" min="0" step="any"
-                className={inputNumCls}
-                placeholder="0"
-                value={pago}
-                onChange={e => { pagoManualRef.current = true; setPago(e.target.value); }} />
-            </div>
-          </div>
-
+      {/* ── Vinculación de pago / NC ── */}
+      {esPagoONC && (
+        <>
           {todasFacturasPendientes.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className={labelCls + ' mb-0'}>
+                <span className={labelCls + ' mb-0'}>
                   Vincular a {esDeudaSub ? 'deudas' : 'facturas'} específicas
-                  <span className="ml-1 text-slate-400 font-normal">(opcional)</span>
-                </label>
+                  <span className={`ml-1 ${hintCls}`}>(opcional)</span>
+                </span>
                 {facturasSeleccionadas.size > 0 && (
                   <button type="button" onClick={() => setFacturasSeleccionadas(new Set())}
-                    className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    Limpiar
+                    className="text-xs px-2 min-h-9 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200">
+                    Quitar selección
                   </button>
                 )}
               </div>
-              <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+              {/* Sin scroll anidado en mobile (MOBILE.md): la lista crece y scrollea el modal. */}
+              <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden sm:max-h-52 sm:overflow-y-auto">
                 {todasFacturasPendientes.map(f => {
                   const sel = facturasSeleccionadas.has(f.id);
                   return (
                     <label key={f.id}
-                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-b border-slate-100 dark:border-slate-700 last:border-0 transition-colors ${
-                        sel
-                          ? 'bg-blue-50 dark:bg-blue-900/30'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                      className={`flex items-center gap-3 px-3 py-2 min-h-11 cursor-pointer border-b border-slate-100 dark:border-slate-700 last:border-0 transition-colors ${
+                        sel ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
                       }`}>
                       <input type="checkbox" checked={sel} onChange={() => toggleFactura(f.id)}
-                        className="shrink-0 accent-blue-600" />
-                      <span className="text-xs text-slate-500 dark:text-slate-400 w-20 shrink-0">{f.fecha}</span>
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex-1 flex items-center gap-1.5">
+                        className="shrink-0 w-4 h-4 accent-blue-600" />
+                      <span className="text-xs text-slate-500 dark:text-slate-400 w-20 shrink-0 tabular-nums">{fmtFecha(f.fecha)}</span>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex-1 flex flex-wrap items-center gap-x-1.5 tabular-nums">
                         {fmt(saldoFactura(f))}
                         {tieneCreditoPrevio(f) && (
                           <>
-                            <span className="text-[10px] font-normal text-slate-400 line-through">{fmt(f.monto)}</span>
-                            <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400">NC/pago aplicado</span>
+                            <span className="text-xs font-normal text-slate-500 line-through">{fmt(f.monto)}</span>
+                            <span className="text-xs font-normal text-amber-700 dark:text-amber-400">NC/pago aplicado</span>
                           </>
                         )}
                       </span>
                       {f.campos_extra?.nro_factura && (
-                        <span className="text-xs text-slate-400 truncate max-w-24">#{f.campos_extra.nro_factura}</span>
+                        <span className="text-xs text-slate-500 truncate max-w-24">#{f.campos_extra.nro_factura}</span>
                       )}
                     </label>
                   );
@@ -534,41 +524,41 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               </div>
 
               {ncMultiple && (
-                <p className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">
-                  ⚠ Una nota de crédito solo puede aplicarse a una boleta — dejá una sola seleccionada.
+                <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                  Una nota de crédito solo puede aplicarse a una boleta: dejá una sola seleccionada.
                 </p>
               )}
 
               {hayVinculacion && (
                 <div className="mt-2 space-y-1 text-xs">
                   {todasFacturasPendientes.some(f => facturasSeleccionadas.has(f.id) && tieneCreditoPrevio(f)) && (
-                    <p className="text-amber-600 dark:text-amber-400">⚠ Esta factura ya tiene una NC/pago vinculado — se muestra el saldo restante.</p>
+                    <p className="text-amber-700 dark:text-amber-400">Esta factura ya tiene una NC/pago vinculado: se muestra el saldo restante.</p>
                   )}
                   <div className="flex justify-between text-slate-600 dark:text-slate-300">
                     <span>Saldo de {esDeudaSub ? 'deudas' : 'facturas'} seleccionadas:</span>
-                    <span className="font-semibold">{fmt(totalSeleccionado)}</span>
+                    <span className="font-semibold tabular-nums">{fmt(totalSeleccionado)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600 dark:text-slate-300">
                     <span>Monto del {tipo === 'nota_credito' ? 'crédito' : esDeudaSub ? 'abono' : 'pago'}:</span>
-                    <span className="font-semibold">{fmt(montoPago)}</span>
+                    <span className="font-semibold tabular-nums">{fmt(montoPago)}</span>
                   </div>
                   {diferencia > 0.005 && (
                     <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
                       <span>Saldo que queda pendiente en la {palabraDoc}:</span>
-                      <span>{fmt(diferencia)}</span>
+                      <span className="tabular-nums">{fmt(diferencia)}</span>
                     </div>
                   )}
                   {diferencia < -0.005 && (
                     tipo === 'nota_credito'
                       ? (
-                        <div className="flex justify-between text-red-600 dark:text-red-400 font-medium">
-                          <span>⚠ La NC supera el saldo de las facturas seleccionadas — bajá el monto:</span>
-                          <span>{fmt(Math.abs(diferencia))} de más</span>
+                        <div role="alert" className="flex justify-between gap-2 text-red-600 dark:text-red-400 font-medium">
+                          <span>La NC supera el saldo de las facturas seleccionadas. Bajá el monto:</span>
+                          <span className="tabular-nums whitespace-nowrap">{fmt(Math.abs(diferencia))} de más</span>
                         </div>
                       ) : (
-                        <div className="flex justify-between text-blue-600 dark:text-blue-400 font-medium">
+                        <div className="flex justify-between text-blue-700 dark:text-blue-400 font-medium">
                           <span>Excedente (queda como crédito libre):</span>
-                          <span>{fmt(Math.abs(diferencia))}</span>
+                          <span className="tabular-nums">{fmt(Math.abs(diferencia))}</span>
                         </div>
                       )
                   )}
@@ -589,17 +579,17 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               {preview.aplicadas.length > 0 && (
                 <ul className="space-y-0.5 mb-1">
                   {preview.aplicadas.map(a => (
-                    <li key={a.id} className="flex items-center gap-1.5 text-green-700 dark:text-green-400 text-xs">
-                      <Check size={11} />
+                    <li key={a.id} className="flex items-center gap-1.5 text-green-800 dark:text-green-400 text-xs">
+                      <Check size={11} className="shrink-0" />
                       <span>
-                        {a.fecha} — saldo {fmt(a.saldo)} − {fmt(a.aplicado)} → {a.saldoNuevo <= 0.005 ? <strong>SALDADA</strong> : <>queda {fmt(a.saldoNuevo)}</>}
+                        {fmtFecha(a.fecha)} — saldo {fmt(a.saldo)} − {fmt(a.aplicado)} → {a.saldoNuevo <= 0.005 ? <strong>SALDADA</strong> : <>queda {fmt(a.saldoNuevo)}</>}
                       </span>
                     </li>
                   ))}
                 </ul>
               )}
               {preview.restante > 0 && (
-                <p className="text-slate-500 dark:text-slate-400 text-xs">Quedan {fmt(preview.restante)} sin asignar.</p>
+                <p className="text-slate-600 dark:text-slate-400 text-xs">Quedan {fmt(preview.restante)} sin asignar.</p>
               )}
               {preview.aplicadas.length === 0 && (
                 <p className="text-amber-700 dark:text-amber-400 text-xs">No hay {esDeudaSub ? 'deudas' : 'facturas'} con saldo pendiente.</p>
@@ -614,10 +604,10 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
               </p>
               <ul className="space-y-0.5">
                 {previewVinculadas().map(({ f, saldo, aplicado, saldoNuevo }) => (
-                  <li key={f.id} className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-                    <Check size={11} />
+                  <li key={f.id} className="flex items-center gap-1.5 text-blue-800 dark:text-blue-400">
+                    <Check size={11} className="shrink-0" />
                     <span>
-                      {f.fecha} — saldo {fmt(saldo)} − {fmt(aplicado)} → {saldoNuevo <= 0.005 ? <strong>SALDADA</strong> : <>queda {fmt(saldoNuevo)} pendiente</>}
+                      {fmtFecha(f.fecha)} — saldo {fmt(saldo)} − {fmt(aplicado)} → {saldoNuevo <= 0.005 ? <strong>SALDADA</strong> : <>queda {fmt(saldoNuevo)} pendiente</>}
                     </span>
                   </li>
                 ))}
@@ -634,13 +624,15 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
                       flex gap-2 bg-white dark:bg-slate-800
                       border-t sm:border-t-0 border-slate-200 dark:border-slate-700">
         <button type="button" onClick={onCancel} disabled={saving}
-          className="flex-1 min-h-11 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40">
+          className="flex-1 min-h-11 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40">
           Cancelar
         </button>
+        {/* Habilitado aunque falten datos: al tocarlo se marca qué falta. Antes
+            quedaba deshabilitado sin explicación. */}
         <button
           type="submit"
-          disabled={saving || excedeNC || ncMultiple || (esPagoONC ? !Number(pago) : !Number(monto))}
-          className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+          disabled={saving}
+          className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-1.5">
           {saving && <Loader2 size={14} className="animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar'}
         </button>

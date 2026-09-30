@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import useDialogFocus from '../hooks/useDialogFocus';
 import { X } from 'lucide-react';
 import { useIsMobile, useViewportHeight } from '../hooks/useMediaQuery';
 
@@ -16,7 +17,9 @@ import { useIsMobile, useViewportHeight } from '../hooks/useMediaQuery';
  * El alto en mobile sale de `visualViewport` y no de `100vh`/`100dvh`: al abrirse
  * el teclado virtual, `vh` no se entera y el input enfocado queda tapado.
  */
-export default function Modal({ title, onClose, children, footer, size = 'lg', closeOnBackdrop = true }) {
+export default function Modal({ title, ariaLabel, onClose, children, footer, size = 'lg', closeOnBackdrop = true }) {
+  const dialogRef = useRef(null);
+  useDialogFocus(dialogRef);
   const isMobile = useIsMobile();
   const vh = useViewportHeight();
 
@@ -35,14 +38,15 @@ export default function Modal({ title, onClose, children, footer, size = 'lg', c
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex bg-slate-950/60 backdrop-blur-sm animate-[fadeIn_150ms_ease-out]
+      className={`fixed inset-0 z-50 flex bg-slate-950/60 backdrop-blur-sm animate-fade-in
                   ${isMobile ? 'items-end' : 'items-center justify-center p-4'}`}
       onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={ariaLabel || (typeof title === 'string' ? title : undefined)}
         onClick={e => e.stopPropagation()}
         // En mobile fijamos el alto al viewport visible: el modal encoge con el
         // teclado en vez de quedar debajo.
@@ -51,8 +55,8 @@ export default function Modal({ title, onClose, children, footer, size = 'lg', c
                     overflow-hidden flex flex-col
                     ring-1 ring-slate-200 dark:ring-slate-700
                     ${isMobile
-                      ? 'rounded-t-2xl h-dvh animate-[sheetIn_220ms_cubic-bezier(0.16,1,0.3,1)]'
-                      : `${maxW} max-h-[90vh] rounded-2xl animate-[modalIn_180ms_cubic-bezier(0.16,1,0.3,1)]`}`}
+                      ? 'rounded-t-2xl h-dvh animate-sheet-in'
+                      : `${maxW} max-h-[90vh] rounded-2xl animate-modal-in`}`}
       >
         <div className="shrink-0 flex items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-3.5 border-b border-slate-200 dark:border-slate-700/80">
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100 tracking-tight min-w-0 truncate">{title}</h2>
@@ -60,7 +64,7 @@ export default function Modal({ title, onClose, children, footer, size = 'lg', c
             onClick={onClose}
             aria-label="Cerrar"
             className="press shrink-0 w-11 h-11 -mr-2 sm:w-auto sm:h-auto sm:mr-0 sm:p-1.5 flex items-center justify-center rounded-lg
-                       text-slate-400 hover:text-slate-700 dark:hover:text-slate-200
+                       text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200
                        hover:bg-slate-100 dark:hover:bg-slate-700/60"
           >
             <X size={20} strokeWidth={2.2} />
@@ -78,14 +82,6 @@ export default function Modal({ title, onClose, children, footer, size = 'lg', c
         )}
       </div>
 
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes modalIn {
-          from { opacity: 0; transform: translateY(8px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes sheetIn { from { transform: translateY(100%) } to { transform: translateY(0) } }
-      `}</style>
     </div>
   );
 }

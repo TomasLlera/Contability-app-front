@@ -9,8 +9,9 @@ import {
   ChevronRight, ChevronDown, Building2, CheckCircle2, AlertTriangle, Banknote,
   ArrowLeftRight, Check, Truck, CalendarClock, Percent
 } from 'lucide-react';
+import { fmtMoneda } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 const todayStr = () => hoyAR();
 
 function greeting() {
@@ -39,14 +40,15 @@ function DesgloseMetodo({ movs }) {
   const sinMetodo     = suma(m => !m.metodo);
   if (efectivo <= 0 && transferencia <= 0 && sinMetodo <= 0) return null;
   return (
-    <div className="flex items-center gap-3 pl-5 mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+    // Montos a 14px como mínimo (MOBILE.md): a 11px el desglose era ilegible en un celular.
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-5 mt-0.5 text-sm text-slate-500 dark:text-slate-400 tabular-nums">
       {efectivo > 0 && (
-        <span className="flex items-center gap-1"><Banknote size={10} /> {fmt(efectivo)}</span>
+        <span className="flex items-center gap-1 whitespace-nowrap"><Banknote size={12} aria-label="Efectivo" /> {fmt(efectivo)}</span>
       )}
       {transferencia > 0 && (
-        <span className="flex items-center gap-1"><ArrowLeftRight size={10} /> {fmt(transferencia)}</span>
+        <span className="flex items-center gap-1 whitespace-nowrap"><ArrowLeftRight size={12} aria-label="Transferencia" /> {fmt(transferencia)}</span>
       )}
-      {sinMetodo > 0 && <span>Sin método {fmt(sinMetodo)}</span>}
+      {sinMetodo > 0 && <span className="whitespace-nowrap">Sin método {fmt(sinMetodo)}</span>}
     </div>
   );
 }
@@ -81,7 +83,7 @@ function StatCard({ label, value, sub, iconBg, iconText, icon, urgent, onClick, 
       {/* En mobile la card mide ~170px: con `truncate` un importe en ARS se corta
           a la mitad. Se deja envolver en dos líneas y recién a partir de sm
           vuelve a una sola línea truncada. */}
-      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 line-clamp-2 sm:truncate">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 sm:truncate">{sub}</p>}
     </div>
   );
 }
@@ -159,7 +161,7 @@ function SaldoCard({ rubro, facturas, pagos, deuda, nombreMes, onOpenGrafica, on
           <Truck size={16} />
         </span>
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{rubro.nombre}</span>
-        <span className="ml-auto text-xs text-slate-400 capitalize">{nombreMes}</span>
+        <span className="ml-auto text-xs text-slate-500 dark:text-slate-400 capitalize">{nombreMes}</span>
       </div>
       {/* Las tres métricas se comparan entre sí, así que en `sm:` van en fila.
           En mobile no: a un tercio de 375px el importe se cortaba. Ver MetricaSaldo. */}
@@ -366,14 +368,14 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{greeting()}</h1>
-          <p className="text-sm text-slate-400 mt-0.5 capitalize">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 capitalize">
             {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
           </p>
           {/* "Locales" era una StatCard con el mismo peso visual que "Facturas
               vencidas". Es un dato de inventario —informativo, nunca accionable—
               así que baja a una línea del header y le deja las cards a lo que
               exige una decisión. */}
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 flex items-center gap-1.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
             <Building2 size={12} className="shrink-0" />
             {locales.length} {locales.length === 1 ? 'local' : 'locales'} · {rubros.length} rubros · {totalSubrubros} subrubros
           </p>
@@ -397,7 +399,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
             {gastosPendientes.length > 0 && (
               <button
                 onClick={() => onViewChange?.('caja')}
-                className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
               >
                 <Clock size={11} /> {gastosPendientes.length} gasto{gastosPendientes.length !== 1 ? 's' : ''} sin confirmar
                 <ChevronRight size={11} />
@@ -414,7 +416,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           value={vencidos.length > 0 ? vencidos.length : '✓'}
           sub={vencidos.length > 0 ? fmt(montoVencido) + ' pendiente' : 'Todo al día'}
           iconBg={vencidos.length > 0 ? 'bg-red-50 dark:bg-red-900/30' : 'bg-green-50 dark:bg-green-900/30'}
-          iconText={vencidos.length > 0 ? 'text-red-500' : 'text-green-500'}
+          iconText={vencidos.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-500'}
           icon={vencidos.length > 0 ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
           onClick={irAVencimientos}
           urgent={vencidos.length > 0} />
@@ -422,7 +424,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           label="Vencen en 7 días"
           value={proximos7d.length}
           sub={proximos7d.length > 0 ? fmt(proximos7d.reduce((s, v) => s + v.monto, 0)) : 'Sin urgencias'}
-          iconBg="bg-amber-50 dark:bg-amber-900/30" iconText="text-amber-500"
+          iconBg="bg-amber-50 dark:bg-amber-900/30" iconText="text-amber-600 dark:text-amber-400"
           icon={<Clock size={18} />}
           onClick={irAVencimientos} />
         {/* En mobile este dato ya lo da "Caja de hoy", que además desglosa
@@ -435,7 +437,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           value={gastosPendientes.length > 0 ? gastosPendientes.length : '✓'}
           sub={gastosPendientes.length > 0 ? fmt(totalPendientes) + ' pendiente' : gastosConfirmados.length > 0 ? `${gastosConfirmados.length} confirmados` : 'Sin gastos hoy'}
           iconBg={gastosPendientes.length > 0 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-green-50 dark:bg-green-900/30'}
-          iconText={gastosPendientes.length > 0 ? 'text-amber-500' : 'text-green-500'}
+          iconText={gastosPendientes.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-500'}
           icon={<ClipboardList size={18} />}
           onClick={() => onViewChange?.('caja')} />
       </div>
@@ -447,11 +449,11 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <ClipboardList size={15} className="text-slate-400" />
+              <ClipboardList size={15} className="text-slate-500 dark:text-slate-400" />
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Caja de hoy</h3>
             </div>
             <button onClick={() => onViewChange?.('caja')}
-              className="text-xs text-blue-500 hover:underline flex items-center gap-0.5 shrink-0 min-h-11 sm:min-h-0 px-1.5 -mr-1.5">
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 shrink-0 min-h-11 sm:min-h-0 px-1.5 -mr-1.5">
               Ver caja <ChevronRight size={13} />
             </button>
           </div>
@@ -459,9 +461,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           {cajaHoy.length === 0 ? (
             <div className="py-8 text-center">
               <ClipboardList size={28} className="mx-auto mb-2 text-slate-200 dark:text-slate-700" />
-              <p className="text-sm text-slate-400">Sin movimientos hoy</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Sin movimientos hoy</p>
               <button onClick={() => onViewChange?.('caja')}
-                className="mt-3 text-xs text-blue-500 hover:underline">
+                className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline">
                 Abrir caja del día →
               </button>
             </div>
@@ -470,7 +472,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               {saldoMov && (
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700">
                   <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Banknote size={12} className="text-slate-400" /> Saldo efectivo
+                    <Banknote size={12} className="text-slate-500 dark:text-slate-400" /> Saldo efectivo
                   </span>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(saldoMov.monto)}</span>
                 </div>
@@ -478,7 +480,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               {saldoCuentaMov && (
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700">
                   <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <ArrowLeftRight size={12} className="text-slate-400" /> Saldo transferencia
+                    <ArrowLeftRight size={12} className="text-slate-500 dark:text-slate-400" /> Saldo transferencia
                   </span>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{fmt(saldoCuentaMov.monto)}</span>
                 </div>
@@ -486,13 +488,13 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               {totalIngresoExtra > 0 && (
                 <div className="flex items-center justify-between py-1.5">
                   <span className="text-xs text-slate-500 dark:text-slate-400">Ingresos extra</span>
-                  <span className="text-sm font-semibold text-amber-600">+ {fmt(totalIngresoExtra)}</span>
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">+ {fmt(totalIngresoExtra)}</span>
                 </div>
               )}
               {totalEmpleados > 0 && (
                 <div className="flex items-center justify-between py-1.5">
                   <span className="text-xs text-slate-500 dark:text-slate-400">Empleados</span>
-                  <span className="text-sm font-semibold text-green-600">+ {fmt(totalEmpleados)}</span>
+                  <span className="text-sm font-semibold text-green-700 dark:text-green-400">+ {fmt(totalEmpleados)}</span>
                 </div>
               )}
               {gastosConfirmados.length > 0 && (
@@ -501,7 +503,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                     <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                       <Check size={11} className="text-green-500" /> {gastosConfirmados.length} gasto{gastosConfirmados.length !== 1 ? 's' : ''} confirmado{gastosConfirmados.length !== 1 ? 's' : ''}
                     </span>
-                    <span className="text-sm font-semibold text-red-500">− {fmt(totalConfirmados)}</span>
+                    <span className="text-sm font-semibold text-red-600 dark:text-red-400">− {fmt(totalConfirmados)}</span>
                   </div>
                   <DesgloseMetodo movs={gastosConfirmados} />
                 </div>
@@ -520,9 +522,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 <div className="py-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                      <Clock size={11} className="text-amber-500" /> {gastosPendientes.length} pago{gastosPendientes.length !== 1 ? 's' : ''} sin confirmar
+                      <Clock size={11} className="text-amber-600 dark:text-amber-400" /> {gastosPendientes.length} pago{gastosPendientes.length !== 1 ? 's' : ''} sin confirmar
                     </span>
-                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{fmt(totalPendientes)}</span>
+                    <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">{fmt(totalPendientes)}</span>
                   </div>
                   <DesgloseMetodo movs={gastosPendientes} />
                 </div>
@@ -531,9 +533,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 <div className="py-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                      <Clock size={11} className="text-orange-500" /> {deudasPendientes.length} deuda{deudasPendientes.length !== 1 ? 's' : ''} por cobrar
+                      <Clock size={11} className="text-orange-700 dark:text-orange-400" /> {deudasPendientes.length} deuda{deudasPendientes.length !== 1 ? 's' : ''} por cobrar
                     </span>
-                    <span className="text-sm font-semibold text-orange-500">{fmt(totalDeudas)}</span>
+                    <span className="text-sm font-semibold text-orange-700 dark:text-orange-400">{fmt(totalDeudas)}</span>
                   </div>
                   <DesgloseMetodo movs={deudasPendientes} />
                 </div>
@@ -549,11 +551,11 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
               contador de vista. El título se encoge (min-w-0 + truncate) antes
               que los chips, que son el control. */}
           <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle size={15} className="text-amber-500 shrink-0" />
+            <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate min-w-0">Próximos vencimientos</h3>
             {!loadingVenc && vencimientos.length > 0 && (
               <>
-                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium shrink-0">
+                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium shrink-0">
                   {vencFiltrados.length}
                 </span>
                 <div className="flex bg-slate-100 dark:bg-slate-700/60 rounded-lg p-0.5 ml-auto shrink-0">
@@ -561,7 +563,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                     <button
                       key={d}
                       onClick={() => { setRangoVenc(d); setVerTodosVenc(false); }}
-                      className={`min-w-11 min-h-9 sm:min-w-0 sm:min-h-0 px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                      className={`min-w-11 min-h-9 sm:min-w-0 sm:min-h-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11 px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
                         rangoVenc === d
                           ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -587,7 +589,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                 <span className="text-base font-bold text-slate-800 dark:text-slate-100 tabular-nums">
                   {fmt(totalVencFiltrados)}
                 </span>
-                <span className="text-xs text-slate-400 dark:text-slate-500">a pagar en {rangoVenc} días</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">a pagar en {rangoVenc} días</span>
               </div>
 
               {/* Filtro por local: dropdown desplegable. Solo con 2+ locales. */}
@@ -607,7 +609,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                         onClick={limpiarLocales}
                         className="w-full flex items-center gap-2 text-sm sm:text-xs px-2 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                       >
-                        <span className="w-3.5 shrink-0">{localesSel.size === 0 && <Check size={13} className="text-blue-500" />}</span>
+                        <span className="w-3.5 shrink-0">{localesSel.size === 0 && <Check size={13} className="text-blue-600 dark:text-blue-400" />}</span>
                         Todos los locales
                       </button>
                       <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
@@ -619,7 +621,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
                             onClick={() => toggleLocal(l.id)}
                             className="w-full flex items-center gap-2 text-sm sm:text-xs px-2 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-left text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                           >
-                            <span className="w-3.5 shrink-0">{activo && <Check size={13} className="text-blue-500" />}</span>
+                            <span className="w-3.5 shrink-0">{activo && <Check size={13} className="text-blue-600 dark:text-blue-400" />}</span>
                             <EntityIcon value={l.icon} fallback="home" size={13} />
                             <span className="truncate">{l.nombre}</span>
                           </button>
@@ -641,11 +643,11 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           ) : vencimientos.length === 0 ? (
             <div className="py-8 text-center">
               <TrendingUp size={28} className="mx-auto mb-2 text-green-300 dark:text-green-700" />
-              <p className="text-sm text-slate-400">Sin vencimientos en 30 días</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Sin vencimientos en 30 días</p>
             </div>
           ) : vencFiltrados.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {localesSel.size > 0
                   ? `Sin vencimientos en ${rangoVenc} días para los locales elegidos`
                   : `Sin vencimientos en los próximos ${rangoVenc} días`}
@@ -715,7 +717,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
           lo que habla (los números del mes). */}
       <div>
         <div className="flex items-center justify-between gap-3 mb-3">
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             {saldos.length > 0 ? 'Saldos mensuales' : ''}
           </p>
           <button
@@ -744,7 +746,7 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
         <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
           <FolderOpen size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
           <p className="font-semibold text-slate-600 dark:text-slate-300">No hay rubros todavía</p>
-          <p className="text-sm text-slate-400 mt-1">Creá tu primer rubro desde el menú lateral para empezar</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Creá tu primer rubro desde el menú lateral para empezar</p>
         </div>
       )}
     </div>

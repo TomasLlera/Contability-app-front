@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { appConfigApi, usersApi, auditApi, rubrosApi, subrubrosApi, authApi, backupApi, cotizacionesApi, getErrorMsg } from '../api';
+import { confirmar } from '../utils/confirmar';
+import RowActions from '../components/RowActions';
+import TableScroll from '../components/TableScroll';
 import toast from 'react-hot-toast';
-import { Mail, Bell, BellRing, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
+import { PauseCircle, PlayCircle, Mail, Bell, BellRing, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
 import AuditDetailModal from '../components/AuditDetailModal';
 import InfoTooltip from '../components/InfoTooltip';
 import RecordatoriosManager from '../components/RecordatoriosManager';
+import Skeleton from '../components/Skeleton';
 
 // Metadatos visuales por rol (jerarquía: superadmin > admin > viewer).
 const ROLE_META = {
@@ -92,7 +96,7 @@ function AuditoriaSection() {
     <div className="space-y-4">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Auditoría</h2>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {vista === 'historial' ? `Historial de cambios en el sistema (${total} registros)` : 'Verificaciones de integridad entre la Caja y los subrubros'}
         </p>
       </div>
@@ -117,7 +121,7 @@ function AuditoriaSection() {
       {filtroRecursoId !== '' && (
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <span>Filtrando por registro <span className="font-mono">#{filtroRecursoId}</span></span>
-          <button onClick={() => { setFiltroRecursoId(''); cargar(1, { recursoId: '' }); }} className="text-blue-500 hover:underline">Quitar</button>
+          <button onClick={() => { setFiltroRecursoId(''); cargar(1, { recursoId: '' }); }} className="text-blue-600 dark:text-blue-400 hover:underline">Quitar</button>
         </div>
       )}
 
@@ -145,9 +149,9 @@ function AuditoriaSection() {
           come un tercio del ancho, y con cinco columnas la tabla no entra. */}
       <div className="sm:hidden border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
         {loading ? (
-          <p className="px-3 py-6 text-center text-slate-400">Cargando...</p>
+          <p className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">Cargando...</p>
         ) : items.length === 0 ? (
-          <p className="px-3 py-6 text-center text-slate-400">Sin registros</p>
+          <p className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">Sin registros</p>
         ) : items.map(it => (
           <button
             key={it._id}
@@ -160,7 +164,7 @@ function AuditoriaSection() {
                 {' '}<span className="text-slate-500 dark:text-slate-400">{it.recurso}</span>
                 {it.recurso_id != null && <span className="text-blue-600 dark:text-blue-400 font-mono text-xs"> #{it.recurso_id}</span>}
               </p>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {it.usuario} · {new Date(it.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -183,9 +187,9 @@ function AuditoriaSection() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {loading ? (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Cargando...</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">Cargando...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Sin registros</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">Sin registros</td></tr>
               ) : items.map(it => (
                 <tr key={it._id} onClick={() => setDetalle(it)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40">
                   <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -204,7 +208,7 @@ function AuditoriaSection() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-400">
+      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>Página {page} de {totalPages}</span>
         <div className="flex gap-1">
           <button
@@ -267,9 +271,9 @@ function InconsistenciasPanel({ onVerHistorial }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-600 dark:text-slate-300">
           {!data ? 'Revisando…' : data.total_errores === 0
-            ? <span className="inline-flex items-center gap-1.5 text-green-600 dark:text-green-400"><CheckCircle size={15} /> Sin errores de sincronización</span>
+            ? <span className="inline-flex items-center gap-1.5 text-green-700 dark:text-green-400"><CheckCircle size={15} /> Sin errores de sincronización</span>
             : <span className="inline-flex items-center gap-1.5 text-red-600 dark:text-red-400"><AlertTriangle size={15} /> {data.total_errores} error{data.total_errores !== 1 ? 'es' : ''} para revisar</span>}
-          {data && data.total_avisos > 0 && <span className="text-slate-400"> · {data.total_avisos} aviso{data.total_avisos !== 1 ? 's' : ''}</span>}
+          {data && data.total_avisos > 0 && <span className="text-slate-500 dark:text-slate-400"> · {data.total_avisos} aviso{data.total_avisos !== 1 ? 's' : ''}</span>}
         </p>
         <button onClick={revisar} disabled={cargando}
           className="min-h-11 sm:min-h-0 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 inline-flex items-center gap-1.5">
@@ -279,7 +283,7 @@ function InconsistenciasPanel({ onVerHistorial }) {
 
       {data?.checks.map(c => {
         const abierto = abiertos.has(c.key);
-        const tono = c.cantidad === 0 ? 'text-slate-400' : c.severidad === 'error' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
+        const tono = c.cantidad === 0 ? 'text-slate-500 dark:text-slate-400' : c.severidad === 'error' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
         return (
           <div key={c.key} className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
             <button type="button" onClick={() => c.cantidad > 0 && toggle(c.key)} disabled={c.cantidad === 0}
@@ -289,10 +293,10 @@ function InconsistenciasPanel({ onVerHistorial }) {
                 : <AlertTriangle size={15} className={`${tono} shrink-0`} />}
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">{c.titulo}</span>
-                <span className="block text-xs text-slate-400">{c.descripcion}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">{c.descripcion}</span>
               </span>
               <span className={`text-sm font-semibold tabular-nums ${tono}`}>{c.cantidad}</span>
-              {c.cantidad > 0 && <ChevronRight size={15} className={`text-slate-400 shrink-0 transition-transform ${abierto ? 'rotate-90' : ''}`} />}
+              {c.cantidad > 0 && <ChevronRight size={15} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${abierto ? 'rotate-90' : ''}`} />}
             </button>
             {abierto && (
               <ul className="border-t border-slate-100 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700 max-h-80 overflow-y-auto">
@@ -300,14 +304,14 @@ function InconsistenciasPanel({ onVerHistorial }) {
                   <li key={i} className="px-3 py-2 flex items-center gap-2 text-xs">
                     <span className="flex-1 min-w-0">
                       <span className="block text-slate-700 dark:text-slate-200 truncate">{it.subrubro || it.concepto || it.usuario || '—'}</span>
-                      <span className="block text-slate-400">{it.detalle}</span>
+                      <span className="block text-slate-500 dark:text-slate-400">{it.detalle}</span>
                     </span>
                     {(it.caja_id != null || it.pago_id != null || it.factura_id != null) && (
-                      <button onClick={() => verHistorial(it)} className="shrink-0 min-h-11 sm:min-h-0 px-2 text-blue-500 hover:underline">Ver historial</button>
+                      <button onClick={() => verHistorial(it)} className="shrink-0 min-h-11 sm:min-h-0 px-2 text-blue-600 dark:text-blue-400 hover:underline">Ver historial</button>
                     )}
                   </li>
                 ))}
-                {c.cantidad > c.items.length && <li className="px-3 py-2 text-xs text-slate-400">… y {c.cantidad - c.items.length} más</li>}
+                {c.cantidad > c.items.length && <li className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">… y {c.cantidad - c.items.length} más</li>}
               </ul>
             )}
           </div>
@@ -322,7 +326,7 @@ function Proximamente({ label }) {
     <div className="flex flex-col items-center justify-center h-48 text-center">
       <p className="text-2xl mb-3">🚧</p>
       <p className="font-semibold text-slate-600 dark:text-slate-300">{label}</p>
-      <p className="text-sm text-slate-400 mt-1">Próximamente</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Próximamente</p>
     </div>
   );
 }
@@ -357,17 +361,17 @@ function DashboardSection() {
     }
   };
 
-  if (rubros === null) return <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Cargando...</div>;
+  if (rubros === null) return <Skeleton variante="lista" filas={3} />;
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Tablas del dashboard</h2>
-        <p className="text-xs text-slate-400">Elegí qué rubros mostrar como tablas de "Saldos mensuales". Cada uno incluye su gráfico. Si no elegís ninguno, se muestra Proveedores por defecto.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Elegí qué rubros mostrar como tablas de "Saldos mensuales". Cada uno incluye su gráfico. Si no elegís ninguno, se muestra Proveedores por defecto.</p>
       </div>
 
       {rubros.length === 0 ? (
-        <p className="text-sm text-slate-400">No hay rubros creados todavía.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">No hay rubros creados todavía.</p>
       ) : (
         <div className="space-y-1.5">
           {rubros.map(r => {
@@ -449,13 +453,13 @@ function AlertasSection() {
     }
   };
 
-  if (!config) return <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Cargando...</div>;
+  if (!config) return <Skeleton variante="lista" filas={3} />;
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Alertas por email</h2>
-        <p className="text-xs text-slate-400">Recibí un email cuando haya facturas por vencer</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Recibí un email cuando haya facturas por vencer</p>
       </div>
 
       <div className="space-y-4">
@@ -493,7 +497,7 @@ function AlertasSection() {
             <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${activas ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </div>
           <div className="flex items-center gap-1.5">
-            <Bell size={13} className={activas ? 'text-blue-600' : 'text-slate-400'} />
+            <Bell size={13} className={activas ? 'text-blue-600' : 'text-slate-500 dark:text-slate-400'} />
             <span className="text-sm text-slate-700 dark:text-slate-300">
               {activas ? 'Alertas activadas' : 'Alertas desactivadas'}
             </span>
@@ -519,7 +523,7 @@ function AlertasSection() {
           {testing ? 'Enviando...' : 'Enviar prueba'}
         </button>
       </div>
-      <p className="text-xs text-slate-400 dark:text-slate-500">"Enviar prueba" manda un email ahora con los vencimientos actuales.</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">"Enviar prueba" manda un email ahora con los vencimientos actuales.</p>
     </div>
   );
 }
@@ -553,7 +557,14 @@ function UsuariosSection() {
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (u) => {
+    const ok = await confirmar({
+      message: `¿Eliminar el usuario "${u.usuario}"?`,
+      detail: 'Pierde el acceso de inmediato. Si solo querés suspenderlo, usá "Pausar". No se puede deshacer.',
+      confirmLabel: 'Eliminar usuario',
+    });
+    if (!ok) return;
+    const id = u.id;
     try {
       await usersApi.delete(id);
       toast.success('Usuario eliminado');
@@ -561,7 +572,20 @@ function UsuariosSection() {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
-  const handleChangeRole = async (id, role) => {
+  // Cambiar el rol cambia qué puede hacer esa persona: se confirma antes (antes
+  // bastaba tocar el select para pasar a alguien de Solo lectura a Super Admin).
+  const handleChangeRole = async (u, role) => {
+    if (role === u.role) return;
+    const de = (ROLE_META[u.role] || ROLE_META.viewer).label;
+    const a = (ROLE_META[role] || ROLE_META.viewer).label;
+    const ok = await confirmar({
+      message: `¿Cambiar el rol de "${u.usuario}" de ${de} a ${a}?`,
+      detail: (ROLE_META[role] || ROLE_META.viewer).desc,
+      confirmLabel: 'Cambiar rol',
+      dangerous: false,
+    });
+    if (!ok) return;
+    const id = u.id;
     try {
       await usersApi.update(id, { role });
       toast.success('Rol actualizado');
@@ -570,6 +594,15 @@ function UsuariosSection() {
   };
 
   const handleToggleActivo = async (u) => {
+    if (u.activo !== false) {
+      const ok = await confirmar({
+        message: `¿Pausar el acceso de "${u.usuario}"?`,
+        detail: 'No va a poder iniciar sesión hasta que lo actives de nuevo.',
+        confirmLabel: 'Pausar',
+        dangerous: false,
+      });
+      if (!ok) return;
+    }
     try {
       await usersApi.update(u.id, { activo: !u.activo });
       toast.success(u.activo ? 'Usuario desactivado' : 'Usuario activado');
@@ -594,13 +627,13 @@ function UsuariosSection() {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Cargando...</div>;
+  if (loading) return <Skeleton variante="lista" filas={3} />;
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Usuarios</h2>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {isSuper ? 'Gestioná quién puede acceder y con qué permisos' : 'Listado de usuarios del sistema'}
         </p>
       </div>
@@ -623,9 +656,9 @@ function UsuariosSection() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
                   {u.usuario}
-                  {u.activo === false && <span className="text-[10px] uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">Inactivo</span>}
+                  {u.activo === false && <span className="text-xs uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">Inactivo</span>}
                 </p>
-                <p className="text-xs text-slate-400">{meta.label}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{meta.label}</p>
               </div>
 
               {isSuper && changingPassId === u.id ? (
@@ -635,33 +668,38 @@ function UsuariosSection() {
                     value={newPassValue}
                     onChange={e => setNewPassValue(e.target.value)}
                     placeholder="Nueva contraseña"
+                    aria-label={`Nueva contraseña para ${u.usuario}`}
+                    autoComplete="new-password"
                     autoFocus
-                    className="flex-1 sm:flex-none sm:w-36 min-w-0 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 sm:flex-none sm:w-44 min-w-0 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <button onClick={() => handleChangePass(u.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700">OK</button>
-                  <button onClick={() => { setChangingPassId(null); setNewPassValue(''); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                  <button onClick={() => handleChangePass(u.id)} className="min-h-11 sm:min-h-9 text-sm bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700">Guardar</button>
+                  <button onClick={() => { setChangingPassId(null); setNewPassValue(''); }} aria-label="Cancelar" className="min-w-11 min-h-11 sm:min-h-9 text-slate-500 hover:text-slate-700">✕</button>
                 </div>
               ) : isSuper ? (
-                <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
                   <select
                     value={u.role}
-                    onChange={e => handleChangeRole(u.id, e.target.value)}
+                    onChange={e => handleChangeRole(u, e.target.value)}
+                    aria-label={`Rol de ${u.usuario}`}
                     title="Cambiar rol"
-                    className="text-xs border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="superadmin">Super Admin</option>
                     <option value="admin">Administrador</option>
                     <option value="viewer">Solo lectura</option>
                   </select>
-                  <button onClick={() => handleToggleActivo(u)} className="text-slate-400 hover:text-amber-600 transition-colors text-xs px-1.5 py-1 rounded" title={u.activo === false ? 'Activar' : 'Desactivar'}>
-                    {u.activo === false ? 'Activar' : 'Pausar'}
-                  </button>
-                  <button onClick={() => { setChangingPassId(u.id); setNewPassValue(''); }} className="text-slate-400 hover:text-blue-600 transition-colors" title="Cambiar contraseña">
-                    <KeyRound size={14} />
-                  </button>
-                  <button onClick={() => handleDelete(u.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
-                    <Trash2 size={14} />
-                  </button>
+                  {/* Mobile/touch: menú ⋮ con etiquetas. Desktop: acciones en línea. */}
+                  <RowActions
+                    title={u.usuario}
+                    iconGap="gap-1"
+                    acciones={[
+                      { key: 'activo', label: u.activo === false ? 'Activar acceso' : 'Pausar acceso', icon: u.activo === false ? <PlayCircle size={16} /> : <PauseCircle size={16} />, onClick: () => handleToggleActivo(u) },
+                      { key: 'pass', label: 'Cambiar contraseña', icon: <KeyRound size={16} />, onClick: () => { setChangingPassId(u.id); setNewPassValue(''); } },
+                      { key: 'borrar', label: 'Eliminar usuario', icon: <Trash2 size={16} />, tone: 'danger', onClick: () => handleDelete(u),
+                        className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shrink-0 ml-2' },
+                    ]}
+                  />
                 </div>
               ) : null}
             </div>
@@ -673,16 +711,16 @@ function UsuariosSection() {
         <div className="pt-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nuevo usuario</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input value={nuevoUser} onChange={e => setNuevoUser(e.target.value)} placeholder="Usuario" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
+            <input value={nuevoUser} onChange={e => setNuevoUser(e.target.value)} placeholder="Usuario" aria-label="Usuario" autoComplete="off" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
             <div className="relative">
-              <input type={showPass ? 'text' : 'password'} value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} placeholder="Contraseña (mín. 6)" className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
-              <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+              <input type={showPass ? 'text' : 'password'} value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} placeholder="Contraseña (mín. 6)" aria-label="Contraseña (mínimo 6 caracteres)" autoComplete="new-password" className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" />
+              <button type="button" onClick={() => setShowPass(v => !v)} aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'} className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-slate-500">
                 {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
           </div>
           <div className="flex gap-2">
-            <select value={nuevoRole} onChange={e => setNuevoRole(e.target.value)} className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select value={nuevoRole} onChange={e => setNuevoRole(e.target.value)} aria-label="Rol del nuevo usuario" className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="viewer">Solo lectura</option>
               <option value="admin">Administrador</option>
               <option value="superadmin">Super Admin</option>
@@ -724,7 +762,23 @@ function BackupSection() {
 
   const handleImport = async () => {
     if (!file) { toast.error('Elegí un archivo de backup'); return; }
-    if (mode === 'replace' && !window.confirm('Modo REEMPLAZAR: se borrarán los datos actuales de cada módulo antes de cargar el backup. ¿Continuar?')) return;
+    // Los dos modos pisan datos: "combinar" sobrescribe los registros con el mismo
+    // ID y "reemplazar" borra y carga. Antes "combinar" (el default) no pedía nada
+    // y "reemplazar" usaba el confirm nativo del navegador.
+    const ok = await confirmar(mode === 'replace'
+      ? {
+          message: `¿Reemplazar los datos actuales con "${file.name}"?`,
+          detail: 'Se BORRAN los datos actuales de cada módulo incluido en el backup y se cargan los del archivo. Descargá un backup actual antes si no lo hiciste.',
+          requireText: 'RESTAURAR',
+          confirmLabel: 'Reemplazar datos',
+        }
+      : {
+          message: `¿Importar "${file.name}" combinando con los datos actuales?`,
+          detail: 'Los registros con el mismo ID se sobrescriben con los del archivo; el resto se agrega. Descargá un backup actual antes si no lo hiciste.',
+          requireText: 'IMPORTAR',
+          confirmLabel: 'Importar',
+        });
+    if (!ok) return;
     setImporting(true);
     try {
       const res = await backupApi.importFile(file, mode);
@@ -750,7 +804,7 @@ function BackupSection() {
     <div className="space-y-5">
       <div>
         <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Backup y Recuperación</h2>
-        <p className="text-xs text-slate-400">Exportá todos los datos (sectorizados por módulo) o restaurá desde un backup anterior.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Exportá todos los datos (sectorizados por módulo) o restaurá desde un backup anterior.</p>
       </div>
 
       {/* Exportar */}
@@ -772,23 +826,35 @@ function BackupSection() {
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Importar backup</h3>
           <InfoTooltip text="Subí un .zip o .json generado por esta app. No modifica usuarios ni auditoría." width="w-64" />
         </div>
-        <input
-          type="file"
-          accept=".zip,.json,application/zip,application/json"
-          onChange={e => setFile(e.target.files?.[0] || null)}
-          className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 mb-3"
-        />
+        {/* Selector de archivo propio: el nativo mostraba "Ningún arch...eleccionado". */}
+        <label className="flex items-center gap-3 mb-3 px-3 py-3 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-blue-500">
+          <Upload size={18} className="text-slate-500 dark:text-slate-400 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file ? file.name : 'Elegir archivo de backup'}</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">{file ? `${(file.size / 1024).toFixed(0)} KB` : '.zip o .json generado por esta app'}</span>
+          </span>
+          <input
+            type="file"
+            accept=".zip,.json,application/zip,application/json"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            className="sr-only"
+          />
+        </label>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={mode} onChange={e => setMode(e.target.value)} className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="merge">Combinar (upsert por ID)</option>
+          <select value={mode} onChange={e => setMode(e.target.value)} aria-label="Modo de importación" className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="merge">Combinar (sobrescribe por ID)</option>
             <option value="replace">Reemplazar (borra y carga)</option>
           </select>
-          <button onClick={handleImport} disabled={importing || !file} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
-            <Upload size={14} /> {importing ? 'Importando...' : 'Importar'}
+          {/* Estilo de acción peligrosa: importar pisa datos. */}
+          <button onClick={handleImport} disabled={importing || !file} className="min-h-11 sm:min-h-0 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 disabled:opacity-50 flex items-center gap-1.5">
+            <Upload size={14} /> {importing ? 'Importando...' : 'Importar backup'}
+          </button>
+          <button onClick={handleExport} disabled={exporting} className="min-h-11 sm:min-h-0 text-sm text-emerald-700 dark:text-emerald-400 hover:underline px-2">
+            {exporting ? 'Generando…' : 'Descargar backup actual antes'}
           </button>
         </div>
         {mode === 'replace' && (
-          <p className="flex items-center gap-1.5 text-xs text-red-500 dark:text-red-400 mt-2">
+          <p className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 mt-2">
             <AlertTriangle size={13} /> Reemplazar borra los datos actuales de cada módulo del backup. Hacé un backup nuevo antes.
           </p>
         )}
@@ -798,18 +864,18 @@ function BackupSection() {
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Últimos backups exportados</h3>
         {historial.length === 0 ? (
-          <p className="text-xs text-slate-400">Todavía no se exportó ningún backup.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Todavía no se exportó ningún backup.</p>
         ) : (
           <ul className="space-y-1.5">
             {historial.map(h => (
               <li key={h._id} className="flex items-center justify-between text-xs">
                 <span className="text-slate-600 dark:text-slate-300">{new Date(h.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</span>
-                <span className="text-slate-400">{h.usuario}</span>
+                <span className="text-slate-500 dark:text-slate-400">{h.usuario}</span>
               </li>
             ))}
           </ul>
         )}
-        <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
           Para backups automáticos de fin de mes, programá un Cron Job (Render) que descargue <code className="text-slate-500">/api/backup/export</code> el último día del mes.
         </p>
       </div>
@@ -847,10 +913,10 @@ function FilaCotizacion({ clave, nombre, compra, venta, actualizado }) {
       <span className={`absolute left-0 inset-y-0 w-1 ${c.barra}`} />
       <div className="flex items-baseline gap-2 min-w-0">
         <span className={`text-sm font-semibold truncate ${c.texto}`}>{nombre}</span>
-        {actualizado && <span className="text-xs text-slate-400 shrink-0">{fmtFecha(actualizado)}</span>}
+        {actualizado && <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{fmtFecha(actualizado)}</span>}
       </div>
       <span className="text-sm font-semibold text-rose-600 dark:text-rose-400 tabular-nums w-20 text-right">{fmtCotiz(compra)}</span>
-      <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums w-20 text-right">{fmtCotiz(venta)}</span>
+      <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums w-20 text-right">{fmtCotiz(venta)}</span>
     </div>
   );
 }
@@ -893,7 +959,7 @@ function MonedaSection() {
             Cotizaciones
             <InfoTooltip text="Valores de referencia del mercado argentino tomados de dolarapi.com. Se actualizan solos cada 5 minutos; el botón fuerza una consulta nueva. No afectan los montos cargados en la app." width="w-72" />
           </h2>
-          <p className="text-xs text-slate-400">Dólar y euro, compra y venta.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Dólar y euro, compra y venta.</p>
         </div>
         <button
           onClick={() => cargar(true)}
@@ -906,20 +972,20 @@ function MonedaSection() {
       </div>
 
       {error && !data ? (
-        <div className="flex items-center gap-2 text-sm text-red-500 dark:text-red-400 px-3 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
+        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 px-3 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
           <AlertTriangle size={14} className="shrink-0" /> {error}
         </div>
       ) : !data ? (
-        <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Cargando cotizaciones...</div>
+        <div className="flex items-center justify-center h-40 text-slate-500 dark:text-slate-400 text-sm">Cargando cotizaciones...</div>
       ) : (
         <>
           {data.desactualizado && (
-            <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+            <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
               <AlertTriangle size={13} /> No se pudo contactar la fuente. Mostrando la última cotización obtenida.
             </p>
           )}
 
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2 pl-4 pr-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2 pl-4 pr-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <span>Moneda</span>
             <span className="w-20 text-right text-rose-400 dark:text-rose-500">Compra</span>
             <span className="w-20 text-right text-emerald-500 dark:text-emerald-600">Venta</span>
@@ -930,7 +996,7 @@ function MonedaSection() {
             {data.euro && <FilaCotizacion {...data.euro} clave="euro" nombre="Euro oficial" />}
           </div>
 
-          <p className="text-xs text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700">
+          <p className="text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700">
             Fuente: dolarapi.com{data.consultado ? ` · consultado ${fmtFecha(data.consultado)}` : ''}
           </p>
         </>
@@ -949,7 +1015,10 @@ export default function SettingsView() {
 
         {/* Secciones: tabs horizontales con scroll en mobile, barra lateral en desktop.
             Fija, la barra de 11rem no deja ancho usable al contenido en un celular. */}
-        <nav className="flex sm:flex-col sm:w-44 shrink-0 overflow-x-auto sm:overflow-x-visible border-b sm:border-b-0 sm:border-r border-slate-100 dark:border-slate-700 sm:py-2">
+        {/* TableScroll aporta el degradé en el borde cuando quedan tabs a la derecha:
+            sin él, "Dashboard" cortado no parecía scrolleable. */}
+        <TableScroll hint={null} className="shrink-0 sm:w-44 border-b sm:border-b-0 sm:border-r border-slate-100 dark:border-slate-700">
+        <nav aria-label="Secciones de configuración" className="flex sm:flex-col sm:py-2">
           {SECCIONES.map(s => {
             const Icon = s.icon;
             const isActive = seccion === s.key;
@@ -957,7 +1026,8 @@ export default function SettingsView() {
               <button
                 key={s.key}
                 onClick={() => setSeccion(s.key)}
-                className={`shrink-0 sm:w-full flex items-center gap-2.5 px-4 py-2.5 text-sm whitespace-nowrap transition-colors text-left ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`shrink-0 sm:w-full flex items-center gap-2.5 px-4 py-2.5 min-h-11 text-sm whitespace-nowrap transition-colors text-left ${
                   isActive
                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium border-b-2 sm:border-b-0 sm:border-r-2 border-blue-600 dark:border-blue-400 sm:-mr-px'
                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-200'
@@ -966,7 +1036,7 @@ export default function SettingsView() {
                 <Icon size={15} className="shrink-0" />
                 <span className="sm:flex-1">{s.label}</span>
                 {!s.ready && (
-                  <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 px-1 rounded">
+                  <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1 rounded">
                     pronto
                   </span>
                 )}
@@ -974,6 +1044,7 @@ export default function SettingsView() {
             );
           })}
         </nav>
+        </TableScroll>
 
         {/* Contenido */}
         <div className="flex-1 min-w-0 p-4 sm:p-6">

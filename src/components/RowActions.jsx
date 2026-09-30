@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import ActionSheet from './ActionSheet';
-import { useIsMobile } from '../hooks/useMediaQuery';
+import { useIsMobile, useIsTouch } from '../hooks/useMediaQuery';
 
 /**
  * Acciones de una fila / card.
@@ -20,20 +20,23 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 export default function RowActions({ acciones = [], title, className = '', iconGap = 'gap-3' }) {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
+  // Una tablet también es touch: sin hover y con dedos, los íconos de 20px en línea
+  // (pensados para mouse) quedaban pegados entre sí. Ahí también va el menú ⋮.
+  const isTouch = useIsTouch();
   const visibles = acciones.filter(Boolean);
 
   if (visibles.length === 0) return null;
 
-  if (isMobile) {
+  if (isMobile || isTouch) {
     return (
       <>
         <button
           type="button"
-          aria-label="Acciones"
+          aria-label={title ? `Acciones: ${title}` : 'Acciones'}
           aria-haspopup="menu"
           onClick={(e) => { e.stopPropagation(); setOpen(true); }}
           className={`shrink-0 w-11 h-11 -mr-1.5 flex items-center justify-center rounded-full
-                      text-slate-400 active:bg-slate-100 dark:active:bg-slate-700/60 transition-colors ${className}`}
+                      text-slate-500 dark:text-slate-400 active:bg-slate-100 dark:active:bg-slate-700/60 transition-colors ${className}`}
         >
           <MoreVertical size={18} />
         </button>
@@ -58,7 +61,7 @@ export default function RowActions({ acciones = [], title, className = '', iconG
           aria-label={a.label}
           disabled={a.disabled}
           onClick={(e) => { e.stopPropagation(); a.onClick?.(); }}
-          className={a.className || 'p-1.5 rounded-lg text-slate-400 hover:text-blue-500 transition-colors shrink-0 disabled:opacity-40'}
+          className={a.className || 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0 disabled:opacity-40'}
         >
           {a.iconDesktop || a.icon}
         </button>

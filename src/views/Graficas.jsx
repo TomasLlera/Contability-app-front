@@ -4,9 +4,9 @@ import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList, CalendarRange, CalendarClock, Wallet, Boxes } from 'lucide-react';
 import { EntityIcon } from '../icons';
 import ComparativaCard from '../components/ComparativaCard';
+import { fmtMoneda, fmtNum, fmtPct } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
-const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
+const fmt = fmtMoneda;
 
 const MESES = { '01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun',
                 '07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic' };
@@ -33,7 +33,7 @@ function FinancialCard({ label, value, negative, sub }) {
       <p className={`text-2xl font-bold ${negative && value > 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-100'}`}>
         {fmt(value)}
       </p>
-      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{sub}</p>}
     </div>
   );
 }
@@ -41,14 +41,14 @@ function FinancialCard({ label, value, negative, sub }) {
 function Delta({ current, previous, positiveIsGood = false }) {
   if (!previous || previous === 0) return null;
   const pct = ((current - previous) / previous) * 100;
-  const abs = Math.abs(pct).toFixed(1);
-  if (Math.abs(pct) < 1) return <span className="inline-flex items-center gap-0.5 text-xs text-slate-400"><Minus size={11} /> Sin cambio</span>;
+  const abs = fmtPct(pct, { signo: false });
+  if (Math.abs(pct) < 1) return <span className="inline-flex items-center gap-0.5 text-xs text-slate-500 dark:text-slate-400"><Minus size={11} /> Sin cambio</span>;
   if (pct > 0) {
-    const color = positiveIsGood ? 'text-green-600' : 'text-red-500';
-    return <span className={`inline-flex items-center gap-0.5 text-xs ${color} font-medium`}><TrendingUp size={11} /> +{abs}% vs ant.</span>;
+    const color = positiveIsGood ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+    return <span className={`inline-flex items-center gap-0.5 text-xs ${color} font-medium`}><TrendingUp size={11} /> +{abs} vs ant.</span>;
   }
-  const color = positiveIsGood ? 'text-red-500' : 'text-green-600';
-  return <span className={`inline-flex items-center gap-0.5 text-xs ${color} font-medium`}><TrendingDown size={11} /> -{abs}% vs ant.</span>;
+  const color = positiveIsGood ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400';
+  return <span className={`inline-flex items-center gap-0.5 text-xs ${color} font-medium`}><TrendingDown size={11} /> −{abs} vs ant.</span>;
 }
 
 const METRICAS = [
@@ -67,7 +67,7 @@ function GraficoRanking({ comparacion, metrica, selectedId, onSelect }) {
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Ranking de subrubros</h4>
         {selectedId && (
-          <button onClick={() => onSelect(null)} className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700">
+          <button onClick={() => onSelect(null)} className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700">
             <RotateCcw size={11} /> Ver todos
           </button>
         )}
@@ -106,7 +106,7 @@ function GraficoTendencia({ tendencia, metrica }) {
   // en un teléfono el gráfico quedaba mudo. Ahora también se abre al tocar la barra
   // (`activo`), y se cierra al tocar otra o la misma de nuevo.
   const [activo, setActivo] = useState(null);
-  if (tendencia.length === 0) return <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos para este período</div>;
+  if (tendencia.length === 0) return <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Sin datos para este período</div>;
   return (
     <div>
       <div className="flex items-end gap-2 h-40 mb-2">
@@ -132,8 +132,8 @@ function GraficoTendencia({ tendencia, metrica }) {
               <div className="w-full flex-1 flex items-end">
                 <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? m.color : m.colorLight} ${abierto ? 'ring-2 ring-blue-400/60' : ''}`} style={{ height: `${Math.max(pct, 2)}%` }} />
               </div>
-              <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{MESES[mes]}</p>
-              {isLast && <p className="text-xs text-slate-400">{anio}</p>}
+              <p className={`text-xs ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}>{MESES[mes]}</p>
+              {isLast && <p className="text-xs text-slate-500 dark:text-slate-400">{anio}</p>}
             </button>
           );
         })}
@@ -142,12 +142,12 @@ function GraficoTendencia({ tendencia, metrica }) {
         const last = tendencia[tendencia.length - 1];
         const prev = tendencia[tendencia.length - 2];
         return (
-          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 border-t border-slate-100 dark:border-slate-700">
             <div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Mes actual</p>
-              <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{fmt(last[metrica] ?? 0)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Mes actual</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums whitespace-nowrap">{fmt(last[metrica] ?? 0)}</p>
             </div>
-            <div className="ml-2"><Delta current={last[metrica] ?? 0} previous={prev[metrica] ?? 0} positiveIsGood={metrica === 'pagado'} /></div>
+            <div><Delta current={last[metrica] ?? 0} previous={prev[metrica] ?? 0} positiveIsGood={metrica === 'pagado'} /></div>
           </div>
         );
       })()}
@@ -164,7 +164,7 @@ function CajaBarChart({ datos, chartCfg }) {
   const maxVal = Math.max(...vals, 1);
   const total = vals.reduce((s, v) => s + v, 0);
 
-  if (datos.length === 0) return <div className="h-40 flex items-center justify-center text-slate-400 text-sm">Sin datos para este período</div>;
+  if (datos.length === 0) return <div className="h-40 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Sin datos para este período</div>;
 
   const minBarW = 22;
   const needsScroll = datos.length > 14;
@@ -177,7 +177,7 @@ function CajaBarChart({ datos, chartCfg }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className={`text-2xl font-bold ${chartCfg.text}`}>{fmt(total)}</p>
-        <p className="text-xs text-slate-400">Total del período</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Total del período</p>
       </div>
       <div className={needsScroll ? 'overflow-x-auto -mx-1 px-1' : ''}>
         <div className="flex items-end gap-1.5 h-40 mb-2" style={needsScroll ? { minWidth: `${datos.length * (minBarW + 6)}px` } : {}}>
@@ -207,7 +207,7 @@ function CajaBarChart({ datos, chartCfg }) {
                   <div className={`w-full rounded-t-lg transition-all duration-500 ${isLast ? chartCfg.color : chartCfg.colorLight} ${abierto ? 'ring-2 ring-blue-400/60' : ''}`}
                     style={{ height: `${Math.max(pct, val > 0 ? 2 : 0)}%` }} />
                 </div>
-                <p className={`text-xs h-4 ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>
+                <p className={`text-xs h-4 ${isLast ? 'font-bold text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}>
                   {mostrarLabel ? d.label : ''}
                 </p>
               </button>
@@ -245,7 +245,7 @@ function DetalleEspeciales({ movs, open, onToggle }) {
       <div className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="overflow-hidden">
           {movs.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-slate-400">Sin pagos especiales en este período</p>
+            <p className="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">Sin pagos especiales en este período</p>
           ) : (
             <>
               <div className="max-h-72 overflow-y-auto">
@@ -278,7 +278,7 @@ function DetalleEspeciales({ movs, open, onToggle }) {
                 <span className="text-xs text-slate-500 dark:text-slate-400">
                   Total de especiales · {movs.length} {movs.length === 1 ? 'transacción' : 'transacciones'}
                 </span>
-                <span className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{fmt(total)}</span>
+                <span className="text-sm font-bold text-amber-700 dark:text-amber-400 tabular-nums">{fmt(total)}</span>
               </div>
             </>
           )}
@@ -489,7 +489,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                 </div>
                 {pctProy !== null && (
                   <p className={`mt-1 font-medium ${pctProy >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                    {pctProy >= 0 ? '↑ Vas a cerrar mejor' : '↓ Vas a cerrar peor'} que {fmtMes(meta.mesAnterior)} ({pctProy >= 0 ? '+' : ''}{pctProy.toFixed(1)}%)
+                    {pctProy >= 0 ? '↑ Vas a cerrar mejor' : '↓ Vas a cerrar peor'} que {fmtMes(meta.mesAnterior)} ({fmtPct(pctProy)})
                   </p>
                 )}
               </div>
@@ -499,14 +499,14 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                 <ComparativaCard
                   titulo="Primera quincena"
                   subtitulo={`Días 1–15 · ${fmtMes(meta.mesActual)} vs ${fmtMes(meta.mesAnterior)}`}
-                  icon={<span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0"><CalendarRange size={16} /></span>}
+                  icon={<span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0"><CalendarRange size={16} /></span>}
                   actual={quincena.actual}
                   anterior={quincena.anterior}
                 />
                 <ComparativaCard
                   titulo="Cierre de mes"
                   subtitulo={`${fmtMes(meta.mesActual)} a la fecha vs ${fmtMes(meta.mesAnterior)} completo`}
-                  icon={<span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 shrink-0"><CalendarClock size={16} /></span>}
+                  icon={<span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0"><CalendarClock size={16} /></span>}
                   actual={mes.actual}
                   anterior={mes.anterior}
                   footer={footerCierre}
@@ -518,7 +518,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
           <div>
             <button
               onClick={() => setShowResumen(v => !v)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors mb-2"
+              className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors mb-2"
             >
               {showResumen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               {showResumen ? 'Ocultar resumen del mes' : 'Ver resumen del mes'}
@@ -539,7 +539,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                 <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
                   {METRICAS.map(m => (
                     <button key={m.key} onClick={() => setMetrica(m.key)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${metrica === m.key ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                      className={`px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-md text-xs font-medium transition-colors ${metrica === m.key ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                       {m.label}
                     </button>
                   ))}
@@ -560,16 +560,16 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                     </select>
                   </>
                 )}
-                <span className="hidden sm:block text-xs text-slate-400 dark:text-slate-500 shrink-0">últimos 6 meses</span>
+                <span className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 shrink-0">últimos 6 meses</span>
               </div>
               {loadingTendencia
-                ? <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+                ? <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Cargando...</div>
                 : <GraficoTendencia tendencia={tendencia} metrica={metrica} />}
               {comparacion.length > 0 && (
                 <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700">
                   <button
                     onClick={() => setShowRanking(v => !v)}
-                    className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                    className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
                     {showRanking ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                     {showRanking ? 'Ocultar ranking de subrubros' : 'Ver ranking de subrubros'}
@@ -582,7 +582,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
             <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
               <BarChart3 size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-600" />
               <p className="font-semibold text-slate-600 dark:text-slate-300">Sin rubros para graficar</p>
-              <p className="text-sm text-slate-400 mt-1">Creá rubros y cargá movimientos para ver las tendencias</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Creá rubros y cargá movimientos para ver las tendencias</p>
             </div>
           )}
         </>
@@ -615,7 +615,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
               </div>
               {pctProy !== null && (
                 <p className={`mt-1 font-medium ${pctProy >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                  {pctProy >= 0 ? '↑ Vas a cerrar mejor' : '↓ Vas a cerrar peor'} que {fmtMes(meta.mesAnterior)} ({pctProy >= 0 ? '+' : ''}{pctProy.toFixed(1)}%)
+                  {pctProy >= 0 ? '↑ Vas a cerrar mejor' : '↓ Vas a cerrar peor'} que {fmtMes(meta.mesAnterior)} ({fmtPct(pctProy)})
                 </p>
               )}
             </div>
@@ -625,7 +625,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
               <ComparativaCard
                 titulo="Primera quincena"
                 subtitulo={`Días 1–15 · ${fmtMes(meta.mesActual)} vs ${fmtMes(meta.mesAnterior)}`}
-                icon={<span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 shrink-0"><CalendarRange size={16} /></span>}
+                icon={<span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0"><CalendarRange size={16} /></span>}
                 actual={quincena.actual}
                 anterior={quincena.anterior}
                 metricas={CAJA_METRICAS}
@@ -633,7 +633,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
               <ComparativaCard
                 titulo="Cierre de mes"
                 subtitulo={`${fmtMes(meta.mesActual)} a la fecha vs ${fmtMes(meta.mesAnterior)} completo`}
-                icon={<span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 shrink-0"><CalendarClock size={16} /></span>}
+                icon={<span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0"><CalendarClock size={16} /></span>}
                 actual={mes.actual}
                 anterior={mes.anterior}
                 footer={footerCierre}
@@ -646,12 +646,12 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2 mr-auto">
-              <ClipboardList size={14} className="text-blue-500" /> Historial de caja
+              <ClipboardList size={14} className="text-blue-600 dark:text-blue-400" /> Historial de caja
             </h3>
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
               {[['dia','Día'],['mes','Mes'],['anio','Año']].map(([v, l]) => (
                 <button key={v} onClick={() => { setCajaVista(v); setCajaPreset(CAJA_PRESETS[v][1]); }}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${cajaVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                  className={`px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-md text-xs font-medium transition-colors ${cajaVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                   {l}
                 </button>
               ))}
@@ -659,7 +659,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
             <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
               {CAJA_PRESETS[cajaVista].map(n => (
                 <button key={n} onClick={() => setCajaPreset(n)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${cajaPreset === n ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                  className={`px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-md text-xs font-medium transition-colors ${cajaPreset === n ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                   {n}{cajaVista === 'dia' ? 'd' : cajaVista === 'mes' ? 'm' : 'a'}
                 </button>
               ))}
@@ -680,9 +680,9 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
           </div>
 
           {cajaLoading ? (
-            <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+            <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Cargando...</div>
           ) : cajaAggregated.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Sin datos de caja para este período</div>
+            <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Sin datos de caja para este período</div>
           ) : (
             <CajaBarChart datos={cajaAggregated} chartCfg={activeCajaCfg} />
           )}
@@ -703,24 +703,24 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
               <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
                 {[['dia','Días'],['mes','Meses'],['anio','Años']].map(([v, l]) => (
                   <button key={v} onClick={() => setStockVista(v)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${stockVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
+                    className={`px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-md text-xs font-medium transition-colors ${stockVista === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
                     {l}
                   </button>
                 ))}
               </div>
               {stockVista !== 'dia' && (
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setStockAnio(a => a - 1)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs">‹</button>
+                  <button onClick={() => setStockAnio(a => a - 1)} className="w-6 h-6 rounded flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs">‹</button>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200 w-10 text-center">{stockAnio}</span>
-                  <button onClick={() => setStockAnio(a => a + 1)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs">›</button>
+                  <button onClick={() => setStockAnio(a => a + 1)} className="w-6 h-6 rounded flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs">›</button>
                 </div>
               )}
             </div>
 
             {stockLoading ? (
-              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Cargando...</div>
+              <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Cargando...</div>
             ) : !stockData || stockData.datos.every(d => d.ganancia === 0 && d.ingresos === 0) ? (
-              <div className="h-48 flex flex-col items-center justify-center text-slate-400 gap-2">
+              <div className="h-48 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 gap-2">
                 <span className="text-3xl">📦</span>
                 <p className="text-sm">Sin ventas registradas en este período</p>
                 <p className="text-xs text-slate-300 dark:text-slate-600">Los datos aparecen al registrar salidas de stock con precio de venta cargado</p>
@@ -738,7 +738,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                       { label: 'Unidades vendidas', value: fmtNum(stockData.totales.unidades), color: 'text-slate-700 dark:text-slate-200' },
                     ].map(k => (
                       <div key={k.label} className="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 text-center">
-                        <p className="text-xs text-slate-400 mb-1">{k.label}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{k.label}</p>
                         <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
                       </div>
                     ))}
@@ -754,7 +754,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                             <div className="w-full bg-emerald-500 dark:bg-emerald-600 rounded-t transition-all group-hover:bg-emerald-400"
                               style={{ height: `${Math.max(pct, d.ganancia > 0 ? 3 : 0)}%` }}
                               title={`${d.label}: ${fmt(d.ganancia)}`} />
-                            <span className="text-xs text-slate-400 truncate w-full text-center leading-none pb-0.5">{d.label}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate w-full text-center leading-none pb-0.5">{d.label}</span>
                           </div>
                         );
                       })}
@@ -770,7 +770,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                             <div className="w-full bg-blue-400 dark:bg-blue-600 rounded-t transition-all group-hover:bg-blue-300"
                               style={{ height: `${Math.max(pct, d.ingresos > 0 ? 3 : 0)}%` }}
                               title={`${d.label}: ${fmt(d.ingresos)}`} />
-                            <span className="text-xs text-slate-400 truncate w-full text-center leading-none pb-0.5">{d.label}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate w-full text-center leading-none pb-0.5">{d.label}</span>
                           </div>
                         );
                       })}

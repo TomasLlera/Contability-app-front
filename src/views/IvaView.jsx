@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { hoyAR, mesAR } from '../utils/fecha';
+import { hoyAR, mesAR, fmtFecha } from '../utils/fecha';
+import { confirmar } from '../utils/confirmar';
 import { ivaApi, getErrorMsg } from '../api';
 import ComprasImportModal from '../components/ComprasImportModal';
 import Modal from '../components/Modal';
@@ -9,12 +10,14 @@ import FiltroSheet from '../components/FiltroSheet';
 import TableScroll from '../components/TableScroll';
 import { Upload, Plus, Trash2, FileSpreadsheet, TrendingUp, TrendingDown, Minus, FileClock, FileText, Search, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, ArrowUp, Columns3, Pencil, RotateCcw, Check, ListFilter } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { fmtMoneda, fmtNum2 } from '../utils/formato';
+import Skeleton from '../components/Skeleton';
 
-const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = fmtMoneda;
 // Mismo redondeo que el backend: encadenar restas de acumulados deja restos binarios
 // (…0000004) que se colarían en el input del ajuste manual.
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
-const fmtNum = (n) => (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtNum = fmtNum2;
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const labelMes = (mes) => {
   if (!mes) return '';
@@ -35,7 +38,7 @@ const GRID_CREDITOS = 'grid grid-cols-[4.9rem_1fr_auto_3rem] sm:grid-cols-[7rem_
 // Encabezados de columna: con peso y versalita se leen como la estructura de la
 // tabla y no como una fila más de datos. TH va sin color para que cada columna le
 // sume el suyo (dos clases de color en el mismo elemento no tienen orden garantizado).
-const TH = 'text-[11px] font-semibold uppercase tracking-wide';
+const TH = 'text-xs font-semibold uppercase tracking-wide';
 const TH_MUTED = `${TH} text-slate-500 dark:text-slate-300`;
 const fmtFechaHora = (iso) => {
   if (!iso) return '';
@@ -102,7 +105,8 @@ export default function IvaView({ initialTab = 'compras', role }) {
   };
 
   const handleDeleteLote = async (lote) => {
-    if (!window.confirm('¿Borrar todas las filas de este archivo?')) return;
+    const n = compras.filter(c => c.lote === lote).length;
+    if (!(await confirmar({ message: `¿Borrar las ${n} filas de este archivo?`, detail: 'Se quitan de IVA Compras y se recalcula la diferencia del mes. No se puede deshacer.', confirmLabel: 'Borrar filas' }))) return;
     try {
       await ivaApi.clearCompras(lote);
       setCompras(prev => prev.filter(c => c.lote !== lote));
@@ -184,7 +188,7 @@ export default function IvaView({ initialTab = 'compras', role }) {
   const creditosPorMes = creditos.reduce((acc, c) => { (acc[c.mes] ||= []).push(c); return acc; }, {});
   const mesesCreditos = Object.keys(creditosPorMes).sort((a, b) => b.localeCompare(a));
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando…</div>;
+  if (loading) return <Skeleton />;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -196,7 +200,7 @@ export default function IvaView({ initialTab = 'compras', role }) {
       {/* Corte explícito entre el resumen (solo lectura) y la zona de carga: sin él
           los tabs se leían como parte de la tabla de arriba. */}
       <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Cargar movimiento</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Cargar movimiento</h3>
       </div>
 
       <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700 -mt-4">
@@ -261,7 +265,7 @@ const saldoTexto = (valor) => {
 // eso siempre va acompañado de la etiqueta que lo dice con palabras.
 const Resultado = ({ valor, ajustado = false }) => {
   const Icono = valor === 0 ? Minus : valor > 0 ? TrendingUp : TrendingDown;
-  const color = valor === 0 ? 'text-slate-400'
+  const color = valor === 0 ? 'text-slate-500 dark:text-slate-400'
     : valor > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400';
   return (
     <span className={`inline-flex flex-col items-end leading-tight ${color}`}>
@@ -269,7 +273,7 @@ const Resultado = ({ valor, ajustado = false }) => {
         <Icono size={12} className="shrink-0" />
         {valor > 0 ? '+' : ''}{fmt(valor)}
       </span>
-      <span className="text-[10px] font-normal opacity-80 flex items-center gap-1">
+      <span className="text-xs font-normal opacity-80 flex items-center gap-1">
         {ajustado && <Pencil size={9} className="shrink-0" />}
         {saldoTexto(valor)}
       </span>
@@ -290,14 +294,14 @@ const tituloAjuste = (m) => {
 
 // Rojo = a pagar, verde = saldo libre, gris = 0. Mismo criterio que <Resultado>.
 const tonoSaldo = (v) => v > 0 ? 'text-red-600 dark:text-red-400'
-  : v < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400';
+  : v < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400';
 
 // Cada lado de la comparación "original vs nuevo" del modal de ajuste.
 const CeldaSaldo = ({ label, valor }) => (
   <div className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
-    <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-0.5">{label}</p>
+    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-0.5">{label}</p>
     <p className={`text-sm font-semibold tabular-nums ${tonoSaldo(valor)}`}>{fmt(valor)}</p>
-    <p className="text-[10px] text-slate-400">{saldoTexto(valor)}</p>
+    <p className="text-xs text-slate-500 dark:text-slate-400">{saldoTexto(valor)}</p>
   </div>
 );
 
@@ -312,11 +316,12 @@ function AjusteSaldoModal({ mes, calculado, actual, ajustado, onClose, onGuardar
 
   const guardar = async () => {
     if (!valido || saving) return;
-    if (!window.confirm(
-      `¿Estás seguro de modificar el saldo calculado de ${labelMes(mes)}?\n\n`
-      + `El valor original era ${fmt(calculado)}.\n`
-      + `Vas a guardar ${fmt(nuevo)}.`
-    )) return;
+    if (!(await confirmar({
+      message: `¿Modificar el saldo calculado de ${labelMes(mes)}?`,
+      detail: `El valor calculado es ${fmt(calculado)}. Vas a guardar ${fmt(nuevo)}.`,
+      confirmLabel: 'Guardar ajuste',
+      dangerous: false,
+    }))) return;
     setSaving(true);
     try { await onGuardar(nuevo); onClose(); }
     catch (err) { toast.error(getErrorMsg(err)); }
@@ -325,7 +330,7 @@ function AjusteSaldoModal({ mes, calculado, actual, ajustado, onClose, onGuardar
 
   const restaurar = async () => {
     if (saving) return;
-    if (!window.confirm(`¿Descartar el ajuste manual y volver al valor calculado (${fmt(calculado)})?`)) return;
+    if (!(await confirmar({ message: '¿Descartar el ajuste manual?', detail: `Vuelve al valor calculado: ${fmt(calculado)}.`, confirmLabel: 'Descartar ajuste', dangerous: false }))) return;
     setSaving(true);
     try { await onRestaurar(); onClose(); }
     catch (err) { toast.error(getErrorMsg(err)); }
@@ -341,15 +346,15 @@ function AjusteSaldoModal({ mes, calculado, actual, ajustado, onClose, onGuardar
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">
+          <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
             Saldo manual
-            <span className="ml-1 text-slate-400">(positivo = a pagar, negativo = saldo libre)</span>
+            <span className="ml-1 text-slate-500 dark:text-slate-400">(positivo = a pagar, negativo = saldo libre)</span>
           </label>
           <input
             type="number" inputMode="decimal" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} autoFocus
             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          <p className="mt-1.5 text-[11px] text-slate-400">
+          <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
             El valor calculado se conserva: podés volver a él cuando quieras. El cambio queda registrado en Auditoría.
           </p>
         </div>
@@ -459,7 +464,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
           {/* Este bloque muestra SIEMPRE todos los meses cargados: decirlo evita
               leerlo como desincronizado con el selector de mes de más abajo, que
               filtra el listado de comprobantes y no este resumen. */}
-          <p className="text-[11px] text-slate-400">Todos los meses cargados</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Todos los meses cargados</p>
         </div>
 
         {/* Desktop: los dos exports a la vista. */}
@@ -494,7 +499,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
           {/* Desktop: los chips en línea, que se leen de un vistazo. */}
           <div className="hidden sm:flex flex-wrap items-center gap-1 mb-2">
             <button onClick={() => setTiposSel([])}
-              className={`text-[11px] px-2.5 py-1 min-h-9 rounded-full border transition-colors ${
+              className={`text-xs px-2.5 py-1 min-h-9 pointer-coarse:min-h-11 rounded-full border transition-colors ${
                 !filtrando ? 'bg-blue-600 text-white border-blue-600'
                   : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}>
               Todas
@@ -505,12 +510,12 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
               return (
                 <button key={tipo} onClick={() => toggleTipo(tipo)}
                   title={n === 0 ? 'Sin comprobantes de este tipo en los meses cargados' : `${n} comprobante${n === 1 ? '' : 's'}${es_nc ? ' · resta del total' : ''}`}
-                  className={`text-[11px] px-2.5 py-1 min-h-9 rounded-full border transition-colors ${
+                  className={`text-xs px-2.5 py-1 min-h-9 pointer-coarse:min-h-11 rounded-full border transition-colors ${
                     activo ? 'bg-blue-600 text-white border-blue-600'
                       : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/40'}`}>
                   {tipo}
                   {es_nc && <span className="ml-1 opacity-60">−</span>}
-                  <span className={`ml-1 ${activo ? 'opacity-70' : 'text-slate-400'}`}>{n}</span>
+                  <span className={`ml-1 ${activo ? 'opacity-70' : 'text-slate-500 dark:text-slate-400'}`}>{n}</span>
                 </button>
               );
             })}
@@ -527,7 +532,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
             <ListFilter size={15} className="shrink-0" />
             <span className="flex-1 text-left text-sm truncate">Filtrar por comprobante</span>
             {filtrando && (
-              <span className="shrink-0 min-w-5 px-1.5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-semibold tabular-nums">
+              <span className="shrink-0 min-w-5 px-1.5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold tabular-nums">
                 {tiposSel.length}
               </span>
             )}
@@ -557,13 +562,13 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
           los ajustes manuales (que valen para el mes entero) quedan fuera. Decirlo
           evita que un saldo distinto al de siempre se lea como un error. */}
       {filtrando && hayAjustes && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           Con el filtro por tipo activo se muestra el saldo recalculado del subconjunto: los ajustes manuales no se aplican.
         </p>
       )}
 
       {meses.length === 0 ? (
-        <p className="text-sm text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+        <p className="text-sm text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           Cargá compras, ventas o créditos fiscales para ver el saldo mensual.
         </p>
       ) : (
@@ -590,7 +595,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
             <thead className="bg-slate-100 dark:bg-slate-900/60">
               <tr>
                 <th className={`sticky left-0 z-10 bg-slate-100 dark:bg-slate-900 text-left px-3 py-2 ${TH_MUTED}`}>Mes</th>
-                <th className={`text-right px-3 py-2 ${TH} text-amber-600 dark:text-amber-400`}>Compras (Imp.Total)</th>
+                <th className={`text-right px-3 py-2 ${TH} text-amber-700 dark:text-amber-400`}>Compras (Imp.Total)</th>
                 <th className={`text-right px-3 py-2 ${TH} text-sky-600 dark:text-sky-400`}>IVA compras</th>
                 <th className={`text-right px-3 py-2 border-l border-slate-200 dark:border-slate-700 ${TH} text-violet-600 dark:text-violet-400`}>
                   <span className="inline-flex items-center gap-1">
@@ -617,7 +622,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
                     <InfoTooltip width="w-72" text={
                       <span className="block space-y-1.5">
                         <span className="block font-semibold">Cómo se calcula</span>
-                        <span className="block font-mono text-[11px] leading-relaxed">
+                        <span className="block font-mono text-xs leading-relaxed">
                           (IVA Ventas − IVA Compras)<br />
                           − Percep. IVA<br />
                           − Créditos Fiscales
@@ -649,7 +654,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
                     <td className={`sticky left-0 z-10 px-3 py-1.5 font-medium text-slate-700 dark:text-slate-200 border-l-2 ${bgMes} ${esActual ? 'border-blue-500' : 'border-transparent'}`}>
                       {labelMes(m.mes)}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-amber-600 dark:text-amber-400 tabular-nums">{fmt(m.imp)}</td>
+                    <td className="px-3 py-1.5 text-right text-amber-700 dark:text-amber-400 tabular-nums">{fmt(m.imp)}</td>
                     <td className="px-3 py-1.5 text-right text-sky-600 dark:text-sky-400 tabular-nums">{fmt(m.iva)}</td>
                     <td className="px-3 py-1.5 text-right text-violet-600 dark:text-violet-400 tabular-nums border-l border-slate-100 dark:border-slate-700/60">
                       {m.percepcion_iva ? fmt(m.percepcion_iva) : <span className="text-slate-300 dark:text-slate-600">·</span>}
@@ -671,7 +676,7 @@ function CrucePanel({ resumen, isViewer, onSaveAjuste, onRestaurarAjuste }) {
                           className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 -mr-1.5 hover:bg-slate-100 dark:hover:bg-slate-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors">
                           {m.ajustado && (
                             <span title={tituloAjuste(m)}
-                              className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                              className="inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
                               <Pencil size={9} /> Ajustado
                             </span>
                           )}
@@ -731,16 +736,16 @@ function MesCard({ m, esActual, puedeAjustar, onAjustar }) {
         className="w-full text-left px-3 py-2.5 active:bg-slate-50 dark:active:bg-slate-700/40 transition-colors"
       >
         <div className="flex items-center gap-1.5">
-          <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+          <ChevronDown size={15} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{labelMes(m.mes)}</span>
           {esActual && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
               En curso
             </span>
           )}
           {m.ajustado && (
             <span title={tituloAjuste(m)}
-              className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              className="inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
               <Pencil size={9} /> Ajustado
             </span>
           )}
@@ -750,11 +755,11 @@ function MesCard({ m, esActual, puedeAjustar, onAjustar }) {
             compara y Diferencia el que se decide. El resto va en el acordeón. */}
         <div className="mt-2 flex items-end justify-between gap-3">
           <span className="min-w-0">
-            <span className="block text-[11px] uppercase tracking-wide text-slate-400">Ventas</span>
+            <span className="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Ventas</span>
             <span className="block text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">{fmt(m.ventas)}</span>
           </span>
           <span className="text-right shrink-0">
-            <span className="block text-[11px] uppercase tracking-wide text-slate-400">Diferencia</span>
+            <span className="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Diferencia</span>
             <span className="block text-sm font-semibold"><Resultado valor={m.diferencia} /></span>
           </span>
         </div>
@@ -799,7 +804,7 @@ const FILAS_POR_PAGINA = 50;
 function Dato({ label, valor, tono = 'text-slate-700 dark:text-slate-200' }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
-      <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">{label}</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{label}</span>
       <span className={`text-sm tabular-nums text-right ${tono}`}>{valor}</span>
     </div>
   );
@@ -820,15 +825,15 @@ function CompraCard({ c, detalle, isViewer, onDelete }) {
           <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug break-words">
             {c.razon_social || '—'}
           </p>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <span className="tabular-nums">{c.fecha}</span>
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <span className="tabular-nums">{fmtFecha(c.fecha)}</span>
             {c.tipo && <><span aria-hidden>·</span><span className="truncate">{c.tipo}</span></>}
             <ChevronDown size={12} className={`shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
           </p>
         </button>
 
         <div className="shrink-0 text-right">
-          <p className="text-base font-bold text-amber-600 dark:text-amber-400 tabular-nums whitespace-nowrap">
+          <p className="text-base font-bold text-amber-700 dark:text-amber-400 tabular-nums whitespace-nowrap">
             {fmtNum(c.imp_total)}
           </p>
           <p className="text-xs text-sky-600 dark:text-sky-400 tabular-nums whitespace-nowrap">
@@ -905,7 +910,7 @@ function PaginacionMes({ total, pagina, onPagina }) {
   const hasta = Math.min(total, (pagina + 1) * FILAS_POR_PAGINA);
   const btn = 'p-1 rounded text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors';
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/60 dark:bg-slate-900/30 text-[11px] text-slate-400">
+    <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/60 dark:bg-slate-900/30 text-xs text-slate-500 dark:text-slate-400">
       <span className="tabular-nums">{desde}–{hasta} de {total}</span>
       <div className="flex items-center gap-0.5">
         <button onClick={() => onPagina(pagina - 1)} disabled={pagina === 0} title="Página anterior" aria-label="Página anterior" className={btn}>
@@ -932,12 +937,12 @@ function LotesCard({ lotes, isViewer, onDeleteLote }) {
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
       <button type="button" onClick={() => setAbierto(v => !v)}
         className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors text-left">
-        <FileClock size={13} className="text-slate-400 shrink-0" />
+        <FileClock size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
         <span className="font-semibold text-slate-600 dark:text-slate-300 shrink-0">Archivos cargados</span>
-        <span className="text-slate-400 shrink-0">({lotes.length})</span>
-        <span className="text-slate-400 truncate hidden sm:inline">· {filas.toLocaleString('es-AR')} filas</span>
+        <span className="text-slate-500 dark:text-slate-400 shrink-0">({lotes.length})</span>
+        <span className="text-slate-500 dark:text-slate-400 truncate hidden sm:inline">· {filas.toLocaleString('es-AR')} filas</span>
         <span className="ml-auto flex items-center gap-2 shrink-0">
-          <span className="text-amber-600 dark:text-amber-400 tabular-nums">{fmt(total)}</span>
+          <span className="text-amber-700 dark:text-amber-400 tabular-nums">{fmt(total)}</span>
           <ChevronDown size={13} className={`text-slate-400 transition-transform ${abierto ? '' : '-rotate-90'}`} />
         </span>
       </button>
@@ -949,12 +954,12 @@ function LotesCard({ lotes, isViewer, onDeleteLote }) {
               <li key={l.lote} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/60 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700/40">
                 <FileSpreadsheet size={13} className="text-emerald-500 shrink-0" />
                 <span className="truncate font-medium">{l.archivo}</span>
-                <span className="text-slate-400 shrink-0 hidden sm:inline">· {l.filas} filas · {fmtFechaHora(l.created_at)}</span>
+                <span className="text-slate-500 dark:text-slate-400 shrink-0 hidden sm:inline">· {l.filas} filas · {fmtFechaHora(l.created_at)}</span>
                 <span className="ml-auto flex items-center gap-2 shrink-0">
-                  <span className="text-amber-600 dark:text-amber-400 tabular-nums">{fmt(l.imp_total)}</span>
+                  <span className="text-amber-700 dark:text-amber-400 tabular-nums">{fmt(l.imp_total)}</span>
                   {!isViewer && (
                     <button onClick={() => onDeleteLote(l.lote)} title="Eliminar importación" aria-label="Eliminar importación"
-                      className="text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
+                      className="text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
                   )}
                 </span>
               </li>
@@ -969,7 +974,7 @@ function LotesCard({ lotes, isViewer, onDeleteLote }) {
 // Dato secundario de la barra de totales del mes: chico y de peso normal, para que
 // el Imp. Total (grande y ámbar) siga siendo lo primero que se lee.
 const TotalMes = ({ label, valor, tono = 'text-slate-600 dark:text-slate-300' }) => (
-  <span className="text-xs text-slate-400 whitespace-nowrap">
+  <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
     {label} <span className={`font-medium tabular-nums ${tono}`}>{fmt(valor)}</span>
   </span>
 );
@@ -1080,7 +1085,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           aria-label="Volver arriba"
           // En mobile sube por encima de la bottom nav (56px + safe area): en
           // `bottom-6` quedaba justo debajo de la barra y era intocable.
-          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-[fadeIn_150ms_ease-out]"
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-fade-in"
         >
           <ArrowUp size={18} strokeWidth={2.5} />
         </button>
@@ -1100,12 +1105,12 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           etiquetado para no confundirse con el resumen de arriba, que muestra
           todos los meses: sin etiqueta parecían el mismo control desincronizado. */}
       <div className="text-xs">
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Mes del listado</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mes del listado</p>
         <div className="flex flex-wrap items-center gap-2">
           {/* Navegador de mes (segmented) — siempre visible: es el filtro de uso
               diario, y por eso en mobile va a ancho completo. */}
           <div className="flex sm:inline-flex w-full sm:w-auto items-center h-11 sm:h-8 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 overflow-hidden">
-            <button onClick={() => irMes(-1)} title="Mes anterior"
+            <button onClick={() => irMes(-1)} title="Mes anterior" aria-label="Mes anterior"
               className="h-full px-3 sm:px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
               <ChevronLeft size={14} />
             </button>
@@ -1117,7 +1122,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
               <input type="month" value={mesSel} onChange={e => setMesSel(e.target.value)} title="Elegir mes"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
             </div>
-            <button onClick={() => irMes(1)} title="Mes siguiente"
+            <button onClick={() => irMes(1)} title="Mes siguiente" aria-label="Mes siguiente"
               className="h-full px-3 sm:px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
               <ChevronRight size={14} />
             </button>
@@ -1181,11 +1186,11 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           <div className="overflow-hidden">
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <div className="inline-flex items-center h-8 gap-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-2.5">
-                <CalendarDays size={13} className="text-slate-400 shrink-0" />
+                <CalendarDays size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
                 <input type="date" value={desde} onChange={e => setDesde(e.target.value)} title="Desde"
                   tabIndex={fechasAbierto ? 0 : -1}
                   className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none" />
-                <span className="text-slate-300 dark:text-slate-500">→</span>
+                <span className="text-slate-300 dark:text-slate-400">→</span>
                 <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} title="Hasta"
                   tabIndex={fechasAbierto ? 0 : -1}
                   className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none" />
@@ -1202,7 +1207,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
               {hayFiltroFecha && (
                 <button onClick={limpiarFechas} title="Quitar filtros"
                   tabIndex={fechasAbierto ? 0 : -1}
-                  className="inline-flex items-center gap-1 h-11 sm:h-8 px-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                  className="inline-flex items-center gap-1 h-11 sm:h-8 px-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
                   <X size={13} /> Limpiar
                 </button>
               )}
@@ -1215,7 +1220,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
           Apilado y a ancho completo en mobile: buscador y select mezclados con
           los botones de acción en la misma fila no se leían como un grupo. */}
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Buscar y filtrar</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Buscar y filtrar</p>
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
           <div className="relative w-full sm:w-auto">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -1224,7 +1229,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
               className="w-full sm:w-56 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 rounded-lg pl-7 pr-9 py-1.5 min-h-11 sm:min-h-0 text-sm sm:text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
             {busqueda && (
               <button onClick={() => setBusqueda('')} title="Limpiar" aria-label="Limpiar búsqueda"
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-auto sm:h-auto sm:right-2 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">×</button>
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-auto sm:h-auto sm:right-2 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">×</button>
             )}
           </div>
           {tiposDisponibles.length > 0 && (
@@ -1264,7 +1269,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
 
       {/* Tablas por mes con todas las columnas */}
       {meses.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">
           {mesSel ? `Sin comprobantes en ${labelMes(mesSel)}.`
             : (q || tipoSel || desde || hasta) ? 'No hay comprobantes que coincidan con el filtro.'
             : 'Todavía no hay compras importadas.'}
@@ -1285,9 +1290,9 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
             <button type="button" onClick={() => toggleMes(mes)}
               className="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-3 sm:px-4 py-2.5 min-h-14 sm:min-h-0 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/70 transition-colors text-left">
               <span className="flex items-center gap-1.5 sm:min-w-32 mr-1">
-                <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+                <ChevronDown size={16} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
                 <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">{labelMes(mes)}</span>
-                <span className="text-xs font-normal text-slate-400">({filas.length})</span>
+                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">({filas.length})</span>
               </span>
               {/* Los subtotales intermedios se ocultan en mobile: con flex-wrap los
                   siete chips convertían cada cabecera de mes en un bloque de ~140px,
@@ -1308,8 +1313,8 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                 ) : null}
               </span>
               <span className="ml-auto flex items-baseline gap-1.5 whitespace-nowrap">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">Imp. Total</span>
-                <span className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{fmt(subtotal(filas, 'imp_total'))}</span>
+                <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Imp. Total</span>
+                <span className="text-sm font-bold text-amber-700 dark:text-amber-400 tabular-nums">{fmt(subtotal(filas, 'imp_total'))}</span>
               </span>
             </button>
 
@@ -1341,7 +1346,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                         {detalle && <th className={`text-right px-3 py-2 ${TH} text-sky-600 dark:text-sky-400`}>IVA 21%</th>}
                         <th className={`text-right px-3 py-2 ${TH} text-sky-600 dark:text-sky-400`}>Total IVA</th>
                         {detalle && <th className={`text-left px-3 py-2 ${TH_MUTED}`}>Otros Atrib.</th>}
-                        <th className={`text-right px-3 py-2 ${TH} text-amber-600 dark:text-amber-400`}>Imp. Total</th>
+                        <th className={`text-right px-3 py-2 ${TH} text-amber-700 dark:text-amber-400`}>Imp. Total</th>
                         <th className={`text-right px-3 py-2 ${TH} text-violet-600 dark:text-violet-400`}>Percep. IVA</th>
                         <th className={`text-right px-3 py-2 ${TH} text-violet-600 dark:text-violet-400`}>Ing. Brutos</th>
                         <th className="w-8"></th>
@@ -1354,7 +1359,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                         const repetida = i > 0 && pagFilas[i - 1].fecha === c.fecha;
                         return (
                           <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
-                            <td className={`px-3 py-1 tabular-nums ${repetida ? 'text-slate-300 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>{c.fecha}</td>
+                            <td className={`px-3 py-1 tabular-nums ${repetida ? 'text-slate-300 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>{fmtFecha(c.fecha)}</td>
                             <td className="px-3 py-1">{c.tipo || '—'}</td>
                             <td className="px-3 py-1">{c.documento || '—'}</td>
                             <td className="px-3 py-1">{c.nro_doc || '—'}</td>
@@ -1370,7 +1375,7 @@ function ComprasTab({ isViewer, onOpenWizard, compras, lotes, onDeleteCompra, on
                               <MontoUnificado total={c.total_iva} parcial={c.iva_21} labelTotal="Total IVA" labelParcial="IVA 21%" />
                             </td>
                             {detalle && <td className="px-3 py-1 max-w-30"><TextoTruncado texto={c.otros_atributos} /></td>}
-                            <td className="px-3 py-1 text-right font-medium tabular-nums text-amber-600 dark:text-amber-400">{fmtNum(c.imp_total)}</td>
+                            <td className="px-3 py-1 text-right font-medium tabular-nums text-amber-700 dark:text-amber-400">{fmtNum(c.imp_total)}</td>
                             <td className="px-3 py-1 text-right tabular-nums text-violet-600 dark:text-violet-400">{(c.percepcion_iva || 0) ? fmtNum(c.percepcion_iva) : <span className="text-slate-300 dark:text-slate-600">—</span>}</td>
                             <td className="px-3 py-1 text-right tabular-nums text-violet-600 dark:text-violet-400">{(c.ingresos_brutos || 0) ? fmtNum(c.ingresos_brutos) : <span className="text-slate-300 dark:text-slate-600">—</span>}</td>
                             <td className="px-2 py-1 text-right">
@@ -1423,7 +1428,7 @@ function CompraManualForm({ onSubmit, onCancel }) {
   };
 
   const inputCls = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500';
-  const labelCls = 'block text-[11px] text-slate-400 mb-0.5';
+  const labelCls = 'block text-xs text-slate-500 dark:text-slate-400 mb-0.5';
   const num = (k, label, extraCls = '') => (
     <div>
       <label className={labelCls}>{label}</label>
@@ -1434,7 +1439,7 @@ function CompraManualForm({ onSubmit, onCancel }) {
   // aclara que no suman al Imp. Total. Van arriba del Imp. Total (que se carga último).
   const numV = (k, label) => (
     <div>
-      <label className="block text-[11px] text-violet-500 dark:text-violet-400 mb-0.5">{label} <span className="text-violet-400/70">(no suma)</span></label>
+      <label className="block text-xs text-violet-500 dark:text-violet-400 mb-0.5">{label} <span className="text-violet-400/70">(no suma)</span></label>
       <input type="number" inputMode="decimal" step="0.01" value={f[k]} onChange={e => set(k, e.target.value)} placeholder="0" className={`${inputCls} border-violet-200 dark:border-violet-800 focus:ring-violet-500`} />
     </div>
   );
@@ -1498,17 +1503,17 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
         <form onSubmit={onAdd} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-end">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Fecha</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Fecha</label>
               <input type="date" value={vFecha} onChange={e => setVFecha(e.target.value)}
                 className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Monto de ventas</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Monto de ventas</label>
               <input type="number" inputMode="decimal" min="0" step="0.01" value={vTotal} onChange={e => setVTotal(e.target.value)} placeholder="0"
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Concepto (opcional)</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Concepto (opcional)</label>
               <input type="text" value={vConcepto} onChange={e => setVConcepto(e.target.value)} placeholder="Detalle"
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
             </div>
@@ -1525,7 +1530,7 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
           mes como fila divisoria plegable en vez de una card propia. Las columnas se
           alinean con un grid compartido entre el encabezado y las filas. */}
       {mesesVentas.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">Todavía no hay ventas cargadas.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">Todavía no hay ventas cargadas.</p>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
           <div className={`${GRID_VENTAS} sticky top-0 z-10 px-3 py-2 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 ${TH_MUTED}`}>
@@ -1545,9 +1550,9 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
               <div key={mes}>
                 <button type="button" onClick={() => toggleMes(mes)}
                   className="w-full flex items-center gap-2 px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/70 transition-colors text-left">
-                  <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+                  <ChevronDown size={15} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{labelMes(mes)}</span>
-                  <span className="text-xs text-slate-400 shrink-0">({cantidad})</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">({cantidad})</span>
                   <span className="ml-auto text-sm font-bold text-blue-600 dark:text-blue-400 tabular-nums shrink-0">{fmt(sub)}</span>
                 </button>
 
@@ -1557,7 +1562,7 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
                     {filas.map(v => (
                       <div key={v.id}
                         className={`${GRID_VENTAS} items-center px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 group hover:bg-slate-50 dark:hover:bg-slate-700/30`}>
-                        <span className="text-xs text-slate-400 tabular-nums truncate">{v.fecha}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums truncate">{fmtFecha(v.fecha)}</span>
                         <span className="min-w-0">
                           <span className="text-sm truncate text-slate-700 dark:text-slate-200">
                             {v.concepto || '—'}
@@ -1568,7 +1573,7 @@ function VentasTab({ isViewer, vFecha, setVFecha, vTotal, setVTotal, vConcepto, 
                         </span>
                         <span className="text-right">
                           {!isViewer && (
-                            <button onClick={() => onDelete(v.id)} title="Eliminar"
+                            <button onClick={() => onDelete(v.id)} title="Eliminar" aria-label="Eliminar"
                               className="text-slate-300 hover:text-red-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
                               <Trash2 size={14} />
                             </button>
@@ -1618,8 +1623,9 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
     finally { setSaving(false); }
   };
 
-  const eliminar = (id) => {
-    if (!window.confirm('¿Eliminar este crédito fiscal? El saldo del mes se recalcula.')) return;
+  const eliminar = async (id) => {
+    const c = Object.values(creditosPorMes).flat().find(x => x.id === id);
+    if (!(await confirmar({ message: c ? `¿Eliminar el crédito fiscal de ${fmt(c.monto)}?` : '¿Eliminar este crédito fiscal?', detail: 'El saldo del mes se recalcula.', confirmLabel: 'Eliminar' }))) return;
     onDelete(id);
   };
 
@@ -1631,11 +1637,11 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
         <form onSubmit={agregar} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-end">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Fecha</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Fecha</label>
               <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="flex items-center gap-1 text-xs text-slate-400 mb-1">
+              <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-1">
                 Monto del crédito
                 <InfoTooltip text="Se acumula con los demás créditos del mismo mes y se resta del saldo mensual de IVA. Cargalo en positivo: la resta la hace el cálculo." />
               </label>
@@ -1643,7 +1649,7 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
                 className={`w-full ${inputCls}`} />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Concepto (opcional)</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Concepto (opcional)</label>
               <input type="text" value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Saldo técnico, retención sufrida…"
                 className={`w-full ${inputCls}`} />
             </div>
@@ -1660,7 +1666,7 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
       </p>
 
       {mesesCreditos.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">
           Todavía no hay créditos fiscales cargados. Los meses sin créditos restan $0.
         </p>
       ) : (
@@ -1681,9 +1687,9 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
               <div key={mes}>
                 <button type="button" onClick={() => toggleMes(mes)}
                   className="w-full flex items-center gap-2 px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/70 transition-colors text-left">
-                  <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+                  <ChevronDown size={15} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${abierto ? '' : '-rotate-90'}`} />
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{labelMes(mes)}</span>
-                  <span className="text-xs text-slate-400 shrink-0">({filas.length})</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">({filas.length})</span>
                   <span className="ml-auto text-sm font-bold text-indigo-600 dark:text-indigo-400 tabular-nums shrink-0">{fmt(sub)}</span>
                 </button>
 
@@ -1697,7 +1703,7 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
                       ) : (
                         <div key={c.id}
                           className={`${GRID_CREDITOS} items-center px-3 py-1.5 border-t border-slate-100 dark:border-slate-700/60 group hover:bg-slate-50 dark:hover:bg-slate-700/30`}>
-                          <span className="text-xs text-slate-400 tabular-nums truncate">{c.fecha}</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums truncate">{fmtFecha(c.fecha)}</span>
                           <span className="min-w-0">
                             <TextoTruncado texto={c.concepto} className="text-sm text-slate-700 dark:text-slate-200" />
                           </span>
@@ -1707,11 +1713,11 @@ function CreditosTab({ isViewer, mesesCreditos, creditosPorMes, onAdd, onUpdate,
                           <span className="flex items-center justify-end gap-1">
                             {!isViewer && (
                               <>
-                                <button onClick={() => setEditando(c.id)} title="Editar"
+                                <button onClick={() => setEditando(c.id)} title="Editar" aria-label="Editar"
                                   className="text-slate-300 hover:text-blue-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
                                   <Pencil size={13} />
                                 </button>
-                                <button onClick={() => eliminar(c.id)} title="Eliminar"
+                                <button onClick={() => eliminar(c.id)} title="Eliminar" aria-label="Eliminar"
                                   className="text-slate-300 hover:text-red-500 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
                                   <Trash2 size={14} />
                                 </button>
@@ -1758,10 +1764,10 @@ function CreditoEditRow({ credito, onSave, onCancel }) {
       <input type="number" inputMode="decimal" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
         className={`${cls} text-right tabular-nums w-28`} />
       <span className="flex items-center justify-end gap-1">
-        <button onClick={guardar} disabled={saving} title="Guardar"
-          className="text-emerald-600 hover:text-emerald-700 disabled:opacity-40"><Check size={14} /></button>
-        <button onClick={onCancel} disabled={saving} title="Cancelar"
-          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40"><X size={14} /></button>
+        <button onClick={guardar} disabled={saving} title="Guardar" aria-label="Guardar"
+          className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-700 disabled:opacity-40"><Check size={14} /></button>
+        <button onClick={onCancel} disabled={saving} title="Cancelar" aria-label="Cancelar"
+          className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40"><X size={14} /></button>
       </span>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { hoyAR } from '../utils/fecha';
+import { hoyAR, fmtFecha } from '../utils/fecha';
 import { registroApi, cajaApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import InfoTooltip from '../components/InfoTooltip';
@@ -13,8 +13,10 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Scale,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { fmtMoneda } from '../utils/formato';
+import Skeleton from '../components/Skeleton';
 
-const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = fmtMoneda;
 const hoy = () => hoyAR();
 const shiftDia = (fecha, d) => {
   const dt = new Date(`${fecha}T12:00:00`);
@@ -162,7 +164,7 @@ export default function TarjetasView({ role }) {
   };
 
   const handleDelete = (t) => setConfirm({
-    message: `¿Eliminar el ingreso de ${tipoDef(t.tipo).label} del ${t.fecha} por ${fmt(t.monto)}?`,
+    message: `¿Eliminar el ingreso de ${tipoDef(t.tipo).label} del ${fmtFecha(t.fecha)} por ${fmt(t.monto)}?`,
     onConfirm: async () => {
       try {
         await registroApi.tarjetas.delete(t.id);
@@ -173,7 +175,7 @@ export default function TarjetasView({ role }) {
     },
   });
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando…</div>;
+  if (loading) return <Skeleton />;
 
   if (error && !dia) return (
     <div className="max-w-6xl mx-auto">
@@ -221,17 +223,17 @@ export default function TarjetasView({ role }) {
       {/* Navegador de día */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex w-44 items-center h-9 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
-          <button onClick={() => setFecha(shiftDia(fecha, -1))} title="Día anterior"
+          <button onClick={() => setFecha(shiftDia(fecha, -1))} title="Día anterior" aria-label="Día anterior"
             className="h-full px-2 shrink-0 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <ChevronLeft size={15} />
           </button>
           <div className="relative h-full flex-1 min-w-0 flex items-center justify-center border-x border-slate-300 dark:border-slate-600 px-3 cursor-pointer">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{fecha}</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{fmtFecha(fecha)}</span>
             <input type="date" value={fecha} onChange={e => e.target.value && setFecha(e.target.value)} title="Elegir día"
               onClick={e => e.currentTarget.showPicker?.()}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-sm" />
           </div>
-          <button onClick={() => setFecha(shiftDia(fecha, 1))} title="Día siguiente"
+          <button onClick={() => setFecha(shiftDia(fecha, 1))} title="Día siguiente" aria-label="Día siguiente"
             className="h-full px-2 shrink-0 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <ChevronRight size={15} />
           </button>
@@ -274,21 +276,21 @@ export default function TarjetasView({ role }) {
                   <ChevronDown size={13} className={`text-slate-400 transition-transform ${abierto ? 'rotate-180' : ''}`} />
                 </div>
                 <p className={`mt-1 text-lg font-bold ${text}`}>{fmt(g.total)}</p>
-                <p className="text-xs text-slate-400">{g.transacciones} {g.transacciones === 1 ? 'ingreso' : 'ingresos'}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{g.transacciones} {g.transacciones === 1 ? 'ingreso' : 'ingresos'}</p>
               </button>
               {abierto && (
                 <div className="border-t border-slate-200/70 dark:border-slate-700/70 bg-white/60 dark:bg-slate-800/40 px-3 py-2 space-y-1">
                   {detalle.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-1">Sin cargas para este día.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 py-1">Sin cargas para este día.</p>
                   ) : detalle.map(t => (
                     <div key={t.id} className="flex items-center justify-between gap-2 text-xs group">
                       <span className="truncate text-slate-600 dark:text-slate-300">
-                        {fmt(t.monto)} <span className="text-slate-400">· {t.empleado || 'Sin asignar'}</span>
+                        {fmt(t.monto)} <span className="text-slate-500 dark:text-slate-400">· {t.empleado || 'Sin asignar'}</span>
                       </span>
                       {!isViewer && (
                         <span className="flex items-center gap-1 shrink-0 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
-                          <button onClick={() => startEdit(t)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
-                          <button onClick={() => handleDelete(t)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
+                          <button onClick={() => startEdit(t)} title="Editar" aria-label="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
+                          <button onClick={() => handleDelete(t)} title="Eliminar" aria-label="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
                         </span>
                       )}
                     </div>
@@ -317,17 +319,17 @@ export default function TarjetasView({ role }) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Tipo</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Tipo</label>
               <select value={form.tipo} onChange={e => { setForm(f => ({ ...f, tipo: e.target.value })); setAnchorTipo(e.target.value); }} className={inputCls}>
                 {TIPOS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Monto</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Monto</label>
               <input type="number" inputMode="decimal" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0" className={inputCls} />
             </div>
             <div>
-              <label className="flex items-center gap-1 text-xs text-slate-400 mb-1">
+              <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-1">
                 Empleado
                 <InfoTooltip text="La lista sale de los empleados cargados en Caja del día → Configuración. Si el nombre no está, elegí “Otro” y escribilo." />
               </label>
@@ -353,14 +355,14 @@ export default function TarjetasView({ role }) {
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
           <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
             <span className="font-semibold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-              <Users size={14} className="text-green-600" /> Ingresos por empleado — {fecha}
+              <Users size={14} className="text-green-700 dark:text-green-400" /> Ingresos por empleado — {fecha}
             </span>
           </div>
           {/* Se queda como tabla: es una matriz empleado × tipo de tarjeta, y el
               valor está justamente en comparar filas y columnas entre sí. */}
           <TableScroll hint="Deslizá para ver todos los tipos de tarjeta">
             <table className="w-full text-sm whitespace-nowrap">
-              <thead className="text-slate-400 text-xs">
+              <thead className="text-slate-500 dark:text-slate-400 text-xs">
                 <tr>
                   <th className="text-left px-4 py-1.5 font-medium sticky left-0 z-10 bg-white dark:bg-slate-800">Empleado</th>
                   {TIPOS.map(t => <th key={t.key} className={`text-right px-4 py-1.5 font-medium ${t.text}`}>{t.label}</th>)}
@@ -386,11 +388,11 @@ export default function TarjetasView({ role }) {
       {/* Detalle del día */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
-          <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">Ingresos del {fecha}</span>
-          <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{fmt(totalDia)} <span className="text-xs font-normal text-slate-400">({txsDia.length})</span></span>
+          <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">Ingresos del {fmtFecha(fecha)}</span>
+          <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{fmt(totalDia)} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">({txsDia.length})</span></span>
         </div>
         {txsDia.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-8">Sin ingresos cargados para este día.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">Sin ingresos cargados para este día.</p>
         ) : (
           <>
           {/* Mobile: cards. Editar apila los campos a ancho completo en vez de
@@ -423,7 +425,7 @@ export default function TarjetasView({ role }) {
                 <div key={t.id} className="flex items-center gap-2 px-3 py-2.5">
                   <div className="flex-1 min-w-0">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">{t.empleado || 'Sin asignar'}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">{t.empleado || 'Sin asignar'}</p>
                   </div>
                   <span className="shrink-0 text-base font-bold text-slate-700 dark:text-slate-200 tabular-nums">{fmt(t.monto)}</span>
                   {!isViewer && (
@@ -442,7 +444,7 @@ export default function TarjetasView({ role }) {
 
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-slate-400 text-xs">
+              <thead className="text-slate-500 dark:text-slate-400 text-xs">
                 <tr>
                   <th className="text-left px-4 py-1.5 font-medium w-44">Tipo</th>
                   <th className="text-left px-4 py-1.5 font-medium">Empleado</th>
@@ -479,8 +481,8 @@ export default function TarjetasView({ role }) {
                       </td>
                       <td className="px-2 py-1.5">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={saveEdit} title="Guardar" className="text-green-500 hover:text-green-600"><Check size={15} /></button>
-                          <button onClick={() => setEditId(null)} title="Cancelar" className="text-slate-400 hover:text-slate-600"><X size={15} /></button>
+                          <button onClick={saveEdit} title="Guardar" aria-label="Guardar" className="text-green-500 hover:text-green-600"><Check size={15} /></button>
+                          <button onClick={() => setEditId(null)} title="Cancelar" aria-label="Cancelar" className="text-slate-500 dark:text-slate-400 hover:text-slate-600"><X size={15} /></button>
                         </div>
                       </td>
                     </tr>
@@ -489,13 +491,13 @@ export default function TarjetasView({ role }) {
                       <td className="px-4 py-2">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>
                       </td>
-                      <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{t.empleado || <span className="text-slate-400">Sin asignar</span>}</td>
+                      <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{t.empleado || <span className="text-slate-500 dark:text-slate-400">Sin asignar</span>}</td>
                       <td className="px-4 py-2 text-right font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">{fmt(t.monto)}</td>
                       <td className="px-2 py-2">
                         {!isViewer && (
                           <div className="flex items-center justify-end gap-1 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
-                            <button onClick={() => startEdit(t)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={13} /></button>
-                            <button onClick={() => handleDelete(t)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
+                            <button onClick={() => startEdit(t)} title="Editar" aria-label="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={13} /></button>
+                            <button onClick={() => handleDelete(t)} title="Eliminar" aria-label="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
                           </div>
                         )}
                       </td>
@@ -523,8 +525,8 @@ function EmpleadoPicker({ empleados, value, otro, setOtro, onChange, cls }) {
         <input type="text" value={value} onChange={e => onChange(e.target.value)}
           placeholder="Nombre del empleado" className={cls} />
         {empleados.length > 0 && (
-          <button type="button" onClick={() => { setOtro(false); onChange(''); }} title="Volver a la lista"
-            className="px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={15} /></button>
+          <button type="button" onClick={() => { setOtro(false); onChange(''); }} title="Volver a la lista" aria-label="Volver a la lista"
+            className="px-2 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={15} /></button>
         )}
       </div>
     );

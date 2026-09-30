@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Percent, ChevronDown, Loader2 } from 'lucide-react';
 import { cajaApi } from '../api';
 import InfoTooltip from './InfoTooltip';
+import { fmtMoneda, fmtPct } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 
 const formatFechaCorta = (dateStr) => {
   if (!dateStr) return '';
@@ -45,7 +46,7 @@ export default function DescuentosPanel({ subrubroId = null, desde, hasta, titul
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 py-2">
         <Loader2 size={12} className="animate-spin" /> Cargando descuentos...
       </div>
     );
@@ -67,7 +68,7 @@ export default function DescuentosPanel({ subrubroId = null, desde, hasta, titul
           </h4>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {data.count} {data.count === 1 ? 'pago' : 'pagos'}
-            {pctEfectivo !== null && ` · ${pctEfectivo.toFixed(1)}% promedio`}
+            {pctEfectivo !== null && ` · ${fmtPct(pctEfectivo, { signo: false })} promedio`}
           </p>
         </div>
         <span className={`font-bold text-purple-700 dark:text-purple-300 whitespace-nowrap ${compact ? 'text-base' : 'text-xl'}`}>
@@ -94,11 +95,11 @@ export default function DescuentosPanel({ subrubroId = null, desde, hasta, titul
           <div className="border-t border-purple-200 dark:border-purple-900 pt-2 space-y-1.5 max-h-64 overflow-y-auto">
             {data.items.map(i => (
               <div key={i.id} className="flex items-baseline gap-2 text-xs">
-                <span className="text-slate-400 shrink-0 tabular-nums">{formatFechaCorta(i.fecha)}</span>
+                <span className="text-slate-500 dark:text-slate-400 shrink-0 tabular-nums">{formatFechaCorta(i.fecha)}</span>
                 <span className="truncate min-w-0 text-slate-700 dark:text-slate-200">
                   {i.subrubro_nombre || i.concepto}
                 </span>
-                <span className="ml-auto shrink-0 text-slate-400 line-through">{fmt(i.monto_bruto ?? i.monto)}</span>
+                <span className="ml-auto shrink-0 text-slate-500 dark:text-slate-400 line-through">{fmt(i.monto_bruto ?? i.monto)}</span>
                 <span className="shrink-0 font-medium text-purple-700 dark:text-purple-300">
                   −{fmt(i.descuento)}{i.descuento_pct ? ` (${i.descuento_pct}%)` : ''}
                 </span>

@@ -75,14 +75,14 @@ export default function CamposManager({ rubro, onClose }) {
 
       {/* Columnas base (siempre presentes) */}
       <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Columnas base (fijas)</p>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Columnas base (fijas)</p>
         <div className="grid grid-cols-2 gap-2">
           {BASE_COLS.map(c => (
             <div key={c.nombre} className="flex items-center gap-2 p-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg border border-slate-200 dark:border-slate-600">
               <span className="w-6 h-6 flex items-center justify-center rounded bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-300 shrink-0"><c.Icon size={13} /></span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{c.nombre}</p>
-                <p className="text-xs text-slate-400 leading-tight">{c.desc}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">{c.desc}</p>
               </div>
             </div>
           ))}
@@ -91,7 +91,7 @@ export default function CamposManager({ rubro, onClose }) {
 
       {/* Columnas custom */}
       <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
           Columnas adicionales ({campos.length})
         </p>
 
@@ -133,17 +133,17 @@ export default function CamposManager({ rubro, onClose }) {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{c.nombre}</p>
-                      <p className="text-xs text-slate-400">{info?.label}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{info?.label}</p>
                     </div>
-                    <button onClick={() => { setEditingId(c.id); setEditNombre(c.nombre); setEditTipo(c.tipo); }} className="text-xs text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0">Editar</button>
-                    <button onClick={() => handleDelete(c.id)} className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0">Borrar</button>
+                    <button onClick={() => { setEditingId(c.id); setEditNombre(c.nombre); setEditTipo(c.tipo); }} className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0">Editar</button>
+                    <button onClick={() => handleDelete(c.id)} className="text-xs text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors shrink-0">Borrar</button>
                   </div>
                 )}
               </div>
             );
           })}
           {campos.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-3 bg-slate-50 dark:bg-slate-700/40 rounded-lg border border-dashed border-slate-200 dark:border-slate-600">
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-3 bg-slate-50 dark:bg-slate-700/40 rounded-lg border border-dashed border-slate-200 dark:border-slate-600">
               Sin columnas adicionales. Agregá las que necesites.
             </p>
           )}
@@ -171,7 +171,7 @@ export default function CamposManager({ rubro, onClose }) {
                   <span className={`text-xs font-bold px-1 rounded border ${t.color}`}>{t.icon}</span>
                   <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{t.label}</p>
                 </div>
-                <p className="text-xs text-slate-400 leading-tight">{t.desc}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">{t.desc}</p>
               </button>
             ))}
           </div>

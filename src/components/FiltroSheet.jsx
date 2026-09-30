@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import useDialogFocus from '../hooks/useDialogFocus';
 import { createPortal } from 'react-dom';
 import { Check } from 'lucide-react';
 
@@ -25,6 +26,8 @@ export default function FiltroSheet({
   onTodas,
   onClose,
 }) {
+  const dialogRef = useRef(null);
+  useDialogFocus(dialogRef);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
     window.addEventListener('keydown', onKey);
@@ -44,17 +47,18 @@ export default function FiltroSheet({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-60 flex items-end bg-slate-950/50 backdrop-blur-[2px] animate-[fadeIn_120ms_ease-out]"
+      className="fixed inset-0 z-60 flex items-end bg-slate-950/50 backdrop-blur-[2px] animate-fade-in"
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-label={title}
         onClick={e => e.stopPropagation()}
         className="w-full bg-white dark:bg-slate-800 rounded-t-2xl shadow-2xl
                    ring-1 ring-slate-200 dark:ring-slate-700
                    pb-[max(0.5rem,env(safe-area-inset-bottom))]
-                   animate-[sheetIn_220ms_cubic-bezier(0.16,1,0.3,1)]"
+                   animate-sheet-in"
       >
         {/* Agarradera: señal visual de que la hoja se cierra tirando hacia abajo. */}
         <div className="flex justify-center pt-2.5 pb-1">
@@ -88,11 +92,11 @@ export default function FiltroSheet({
                   <span className={`block truncate text-sm font-medium ${activo ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}>
                     {o.label}
                   </span>
-                  {o.hint && <span className="block truncate text-xs font-normal text-slate-400">{o.hint}</span>}
+                  {o.hint && <span className="block truncate text-xs font-normal text-slate-500 dark:text-slate-400">{o.hint}</span>}
                 </span>
                 {/* Un 0 no deshabilita la opción: dice que no hay comprobantes
                     de ese tipo cargados, que es otra cosa. */}
-                <span className="shrink-0 text-xs tabular-nums text-slate-400">{o.count ?? ''}</span>
+                <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{o.count ?? ''}</span>
               </button>
             );
           })}
@@ -110,10 +114,6 @@ export default function FiltroSheet({
         </div>
       </div>
 
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes sheetIn { from { transform: translateY(100%) } to { transform: translateY(0) } }
-      `}</style>
     </div>,
     document.body
   );

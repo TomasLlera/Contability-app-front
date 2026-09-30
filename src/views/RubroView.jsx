@@ -8,27 +8,22 @@ import ConfirmModal from '../components/ConfirmModal';
 import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
 import ReporteMensualModal from '../components/ReporteMensualModal';
 import toast from 'react-hot-toast';
-import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, Eraser, ArrowUp, FileSpreadsheet } from 'lucide-react';
+import { Upload, Settings2, Trash2, ChevronRight, Plus, IdCard, Eraser, FileSpreadsheet } from 'lucide-react';
 import { EntityIcon } from '../icons';
 import { ICON_LIST } from '../iconos';
+import { fmtMoneda } from '../utils/formato';
+import { fmtFechaCorta as fmtFechaCortaAR } from '../utils/fecha';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 
-// '2026-08-15' → '15 Ago'. Devuelve '—' si no hay fecha.
-const MESES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const fmtFechaCorta = (iso) => {
-  if (!iso) return '—';
-  const [, m, d] = iso.split('-');
-  const mi = Number(m) - 1;
-  if (!d || mi < 0 || mi > 11) return '—';
-  return `${Number(d)} ${MESES_ABBR[mi]}`;
-};
+// dd/mm (formato único de la app, utils/fecha). '—' si no hay fecha.
+const fmtFechaCorta = (iso) => fmtFechaCortaAR(iso) || '—';
 
 const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', ambas: 'Ambas' };
 const fmtMetodo = (m) => METODO_LABEL[m] || '—';
 
 
-export default function RubroView({ rubro, initialSubrubro, role }) {
+export default function RubroView({ rubro, initialSubrubro, nonce = 0, role }) {
   const isAdmin = role !== 'viewer';
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubro, setSelectedSubrubro] = useState(initialSubrubro ?? null);
@@ -45,15 +40,6 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
   const [stats, setStats] = useState({});
   const [editingMetadataSub, setEditingMetadataSub] = useState(null);
   const [creatingSub, setCreatingSub] = useState(false);
-  const topRef = useRef(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  useEffect(() => {
-    const el = topRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => setShowScrollTop(!e.isIntersecting));
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
 
   const cargarStats = () => {
     dashboardApi.getComparacion(rubro.id)
@@ -76,7 +62,8 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
 
   // Otro rubro u otro subrubro inicial (navegación desde fuera) → se abre ese.
   // Ajuste durante el render, el patrón que recomienda React en vez de un efecto.
-  const claveSeleccion = `${rubro.id}|${initialSubrubro?.id ?? ''}`;
+  // `nonce` lo incrementa el breadcrumb del header para volver a la lista.
+  const claveSeleccion = `${rubro.id}|${initialSubrubro?.id ?? ''}|${nonce}`;
   const [claveSeleccionPrevia, setClaveSeleccionPrevia] = useState(claveSeleccion);
   if (claveSeleccionPrevia !== claveSeleccion) {
     setClaveSeleccionPrevia(claveSeleccion);
@@ -165,17 +152,6 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
 
   return (
     <div>
-      <div ref={topRef} aria-hidden />
-      {showScrollTop && (
-        <button
-          onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          title="Volver arriba"
-          aria-label="Volver arriba"
-          className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-colors animate-[fadeIn_150ms_ease-out]"
-        >
-          <ArrowUp size={18} strokeWidth={2.5} />
-        </button>
-      )}
       {/* Barra de herramientas */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
         <input
@@ -187,7 +163,7 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
         {isAdmin && (
           <button
             onClick={() => setCreatingSub(true)}
-            className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5"
+            className="bg-blue-600 text-white px-3 py-1.5 pointer-coarse:min-h-11 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5"
           >
             <Plus size={14} /> Nuevo subrubro
           </button>
@@ -196,7 +172,8 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
           <button
             onClick={() => setShowImport(true)}
             title="Importar Excel"
-            className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+            aria-label="Importar Excel"
+            className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 min-w-11 pointer-coarse:min-h-11 justify-center rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
           >
             <Upload size={14} /> <span className="hidden sm:inline">Importar Excel</span>
           </button>
@@ -204,14 +181,16 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
         <button
           onClick={() => setShowCampos(true)}
           title="Columnas"
-          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+          aria-label="Columnas"
+          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 min-w-11 pointer-coarse:min-h-11 justify-center rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
           <Settings2 size={14} /> <span className="hidden sm:inline">Columnas</span>
         </button>
         <button
           onClick={() => setShowReporte(true)}
           title="Análisis mensual (Excel)"
-          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 px-2.5 py-1.5 rounded-lg text-sm hover:bg-emerald-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
+          aria-label="Análisis mensual (Excel)"
+          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 px-2.5 py-1.5 min-w-11 pointer-coarse:min-h-11 justify-center rounded-lg text-sm hover:bg-emerald-50 dark:hover:bg-slate-600 flex items-center gap-1.5"
         >
           <FileSpreadsheet size={14} /> <span className="hidden sm:inline">Análisis mensual</span>
         </button>
@@ -227,7 +206,8 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
               },
             })}
             title="Vaciar todo"
-            className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-2.5 py-1.5 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
+            aria-label="Vaciar todos los movimientos del rubro"
+            className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-2.5 py-1.5 min-w-11 pointer-coarse:min-h-11 justify-center rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
           >
             <Trash2 size={14} /> <span className="hidden sm:inline">Vaciar todo</span>
           </button>
@@ -248,7 +228,7 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
                     type="button"
                     onClick={() => setShowIconPicker(o => !o)}
                     className="text-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg px-2 py-1 shrink-0"
-                    title="Cambiar ícono"
+                    title="Cambiar ícono" aria-label="Cambiar ícono"
                   ><EntityIcon value={editIcon} size={18} /></button>
                   <input
                     className="flex-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -265,6 +245,7 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
                       <button
                         key={ic}
                         type="button"
+                    aria-label={ic}
                         onClick={() => { setEditIcon(ic); setShowIconPicker(false); }}
                         className={`flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors text-slate-600 dark:text-slate-300 ${editIcon === ic ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300' : ''}`}
                       ><EntityIcon value={ic} size={18} /></button>
@@ -290,7 +271,7 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
                         {sub.nombre}
                       </p>
                       {sub.tipo_subrubro === 'deuda' && (
-                        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
                           Deuda
                         </span>
                       )}
@@ -300,34 +281,34 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
 
                   {/* Indicadores: próximo vencimiento → importe a vencer → saldo pendiente → forma de pago */}
                   {stats[sub.id] !== undefined && (
-                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-2 text-center">
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-x-2 gap-y-2 text-center">
                       <div className="min-w-0">
-                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Próx. vencimiento</p>
-                        <p className={`text-xs sm:text-sm font-semibold truncate ${stats[sub.id].vencido ? 'text-red-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">Próx. vencimiento</p>
+                        <p className={`text-sm font-semibold whitespace-nowrap tabular-nums ${stats[sub.id].vencido ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
                           {fmtFechaCorta(stats[sub.id].proximo_vencimiento)}
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Importe a vencer</p>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">Importe a vencer</p>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
                           {stats[sub.id].importe_proximo_vencimiento != null ? fmt(stats[sub.id].importe_proximo_vencimiento) : '—'}
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">
                           {sub.tipo_subrubro === 'deuda' ? 'A cobrar' : 'Saldo pendiente'}
                         </p>
-                        <p className={`text-xs sm:text-sm font-bold truncate ${
+                        <p className={`text-sm font-bold whitespace-nowrap tabular-nums ${
                           stats[sub.id].saldo > 0
-                            ? (sub.tipo_subrubro === 'deuda' ? 'text-orange-600' : 'text-red-600')
-                            : 'text-emerald-600'
+                            ? (sub.tipo_subrubro === 'deuda' ? 'text-orange-700 dark:text-orange-400' : 'text-red-600 dark:text-red-400')
+                            : 'text-emerald-700 dark:text-emerald-400'
                         }`}>
                           {fmt(stats[sub.id].saldo)}
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mb-0.5 truncate">Forma de pago</p>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">Forma de pago</p>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
                           {fmtMetodo(sub.metodo_pago_default || 'ambas')}
                         </p>
                       </div>
@@ -340,7 +321,7 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
                   <div className="px-4 pb-3 flex justify-center gap-4 sm:gap-3 border-t border-slate-100 dark:border-slate-700 pt-2 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
                     <button
                       onClick={e => { e.stopPropagation(); setEditingMetadataSub(sub); }}
-                      className="text-xs text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1"
+                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1"
                       title="Editar nombre, ícono y datos fiscales"
                     ><IdCard size={11} /> Editar</button>
                     <button
@@ -355,11 +336,11 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
                           },
                         });
                       }}
-                      className="text-xs text-slate-400 hover:text-orange-500 transition-colors inline-flex items-center gap-1"
+                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-orange-500 transition-colors inline-flex items-center gap-1"
                     ><Eraser size={11} /> Vaciar</button>
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(sub.id); }}
-                      className="text-xs text-slate-400 hover:text-red-500 transition-colors inline-flex items-center gap-1"
+                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors inline-flex items-center gap-1"
                     ><Trash2 size={11} /> Borrar</button>
                   </div>
                 )}
@@ -369,7 +350,7 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
         ))}
 
         {filtrados.length === 0 && search && (
-          <div className="col-span-full text-center py-8 text-slate-400">
+          <div className="col-span-full text-center py-8 text-slate-500 dark:text-slate-400">
             <p>Sin resultados para "<strong>{search}</strong>"</p>
           </div>
         )}

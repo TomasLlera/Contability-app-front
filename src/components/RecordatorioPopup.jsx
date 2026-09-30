@@ -91,7 +91,7 @@ function Chip({ sub, hecho, prefijo, onToggle, onNavegar, navegable }) {
         title={hecho ? 'Marcar como pendiente' : 'Marcar como hecho'}
         className={`flex items-center gap-1.5 pl-2 pr-2 py-1.5 text-sm font-medium min-w-0 transition-colors ${
           hecho
-            ? 'text-slate-400 dark:text-slate-500 line-through'
+            ? 'text-slate-400 dark:text-slate-400 line-through'
             : sub.prioritario
               ? 'text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/45'
               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -113,7 +113,7 @@ function Chip({ sub, hecho, prefijo, onToggle, onNavegar, navegable }) {
           aria-label={`Ir a ${sub.nombre}`}
           title={`Ir a ${sub.nombre}`}
           className="shrink-0 px-1.5 flex items-center border-l border-slate-200 dark:border-slate-600
-                     text-slate-400 hover:text-blue-600 dark:hover:text-blue-400
+                     text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400
                      hover:bg-slate-50 dark:hover:bg-slate-700"
         >
           <ChevronRight size={14} />
@@ -162,7 +162,7 @@ function Tarjeta({ rec, posicion, total, onAnterior, onSiguiente, onCompletar, o
         <div className="flex-1 min-w-0">
           <p className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">{rec.titulo}</p>
           {rec.rubro && (
-            <span className="inline-block mt-1 text-[11px] font-medium uppercase tracking-wide
+            <span className="inline-block mt-1 text-xs font-medium uppercase tracking-wide
                              text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/60
                              px-1.5 py-0.5 rounded">
               {rec.rubro.nombre}
@@ -171,7 +171,7 @@ function Tarjeta({ rec, posicion, total, onAnterior, onSiguiente, onCompletar, o
         </div>
         <div className="flex items-center gap-1 shrink-0 -mr-1.5 -mt-1">
           {total > 1 && (
-            <div className="flex items-center gap-0.5 text-xs text-slate-400">
+            <div className="flex items-center gap-0.5 text-xs text-slate-500 dark:text-slate-400">
               <button onClick={onAnterior} aria-label="Anterior" className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 disabled:opacity-30" disabled={posicion === 0}>
                 <ChevronLeft size={15} />
               </button>
@@ -184,7 +184,7 @@ function Tarjeta({ rec, posicion, total, onAnterior, onSiguiente, onCompletar, o
           <button
             onClick={() => onDescartar(rec.id)}
             aria-label="Cerrar"
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400
                        hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60"
           >
             <X size={18} />
@@ -201,7 +201,7 @@ function Tarjeta({ rec, posicion, total, onAnterior, onSiguiente, onCompletar, o
       {subrubros.length > 0 && (
         <div className="px-4 sm:px-5 pb-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-slate-400">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
               {hechos.size} de {subrubros.length} {hechos.size === 1 ? 'marcado' : 'marcados'}
             </p>
             <div className="flex-1 h-1 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
@@ -216,7 +216,7 @@ function Tarjeta({ rec, posicion, total, onAnterior, onSiguiente, onCompletar, o
             {visibles.map(entrada => (
               entrada.tipo === 'grupo' ? (
                 <div key={entrada.clave} className="w-full flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-100 dark:border-slate-700/70 px-2 py-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400 shrink-0">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 shrink-0">
                     {entrada.prefijo}
                   </span>
                   {entrada.items.map(sub => (
@@ -280,7 +280,7 @@ function Tarjeta({ rec, posicion, total, onAnterior, onSiguiente, onCompletar, o
                        hover:bg-white dark:hover:bg-slate-700"
           >
             <span className="flex items-center gap-1.5 text-sm font-medium"><Clock size={15} /> Más tarde</span>
-            <span className="text-[11px] text-slate-400 leading-tight">
+            <span className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
               {rec.proxima_vuelta ? `Vuelve ${rec.proxima_vuelta}` : 'Vuelve mañana'}
             </span>
           </button>

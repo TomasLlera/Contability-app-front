@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
   Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink, HandCoins,
-  HelpCircle, Percent, Coins, Receipt
+  HelpCircle, Percent, Coins, Receipt, RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EntityIcon } from '../icons';
@@ -13,9 +13,11 @@ import CajaExportModal from '../components/CajaExportModal';
 import InfoTooltip from '../components/InfoTooltip';
 import RowActions from '../components/RowActions';
 import Modal from '../components/Modal';
-import { hoyAR, sumarDias } from '../utils/fecha';
+import { hoyAR, sumarDias, fmtFechaCorta as fmtFechaCortaAR } from '../utils/fecha';
+import { confirmar } from '../utils/confirmar';
+import { fmtMoneda, fmtPct } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 // "Hoy" en Argentina: con UTC, entre las 21 y las 24 la Caja abría en el día siguiente.
 const todayStr = () => hoyAR();
 const addDays = sumarDias;
@@ -30,18 +32,14 @@ const formatFechaMobile = (dateStr) => {
   const s = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
-const formatFechaCorta = (dateStr) => {
-  if (!dateStr) return '';
-  const [, m, d] = dateStr.split('-');
-  return `${d}/${m}`;
-};
+const formatFechaCorta = fmtFechaCortaAR;
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const selectCls = inputCls;
 
 // Botón del toolbar de la Caja. Mobile: columna ícono + etiqueta, repartiéndose
 // el ancho a 44px de alto. Desktop: el ícono solo de siempre.
-const toolbarBtn = 'flex-1 sm:flex-none min-h-11 sm:w-auto sm:h-auto sm:p-2 flex flex-col sm:flex-row items-center justify-center gap-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0';
-const toolbarLbl = 'sm:hidden text-[11px] leading-none font-medium';
+const toolbarBtn = 'flex-1 sm:flex-none min-h-11 sm:w-auto sm:h-auto sm:p-2 flex flex-col sm:flex-row items-center justify-center gap-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0';
+const toolbarLbl = 'sm:hidden text-xs leading-none font-medium';
 
 // ── Panel de configuración ──────────────────────────────────────────────────
 function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
@@ -134,7 +132,7 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
             <div className="px-4 pb-4 -mt-1">
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Las boletas de estos rubros aparecerán automáticamente en la caja cuando estén por vencer.</p>
               {allRubros.length === 0
-                ? <p className="text-xs text-slate-400">No hay rubros disponibles.</p>
+                ? <p className="text-xs text-slate-500 dark:text-slate-400">No hay rubros disponibles.</p>
                 : allRubros.map(r => (
                   <label key={r.id} className="flex items-center gap-2 py-1.5 cursor-pointer">
                     <input type="checkbox" className="accent-blue-600"
@@ -165,12 +163,12 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
           <button type="button" onClick={() => setEmpleadosOpen(v => !v)}
             className="w-full flex items-center justify-between gap-2 mb-2 text-left">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Users size={13} className="text-green-600" /> Empleados
+              <Users size={13} className="text-green-700 dark:text-green-400" /> Empleados
               {!empleadosOpen && empleados.length > 0 && (
-                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">· {empleados.length}</span>
+                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">· {empleados.length}</span>
               )}
             </h3>
-            <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={15} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
           </button>
           {empleadosOpen && (
             <>
@@ -180,7 +178,7 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                     <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{e.nombre}</span>
                     <button onClick={() => setEmpleados(prev => prev.filter((_, j) => j !== i))}
                       aria-label={`Quitar ${e.nombre}`}
-                      className="tap shrink-0 text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
+                      className="tap shrink-0 text-slate-500 dark:text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
                   </div>
                 ))}
               </div>
@@ -200,17 +198,17 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
           <button type="button" onClick={() => setProveedoresOpen(v => !v)}
             className="w-full flex items-center justify-between gap-2 mb-2 text-left">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <ShoppingCart size={13} className="text-red-500" /> Proveedores
+              <ShoppingCart size={13} className="text-red-600 dark:text-red-400" /> Proveedores
               {!proveedoresOpen && proveedoresVisibles.length > 0 && (
-                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">· {proveedoresVisibles.length}</span>
+                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">· {proveedoresVisibles.length}</span>
               )}
             </h3>
-            <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${proveedoresOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={15} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${proveedoresOpen ? 'rotate-180' : ''}`} />
           </button>
           {proveedoresOpen && (
             <>
               {proveedores.length > proveedoresVisibles.length && (
-                <p className="text-xs text-slate-400 dark:text-slate-500 mb-2 italic">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 italic">
                   {proveedores.length - proveedoresVisibles.length} oculto{proveedores.length - proveedoresVisibles.length === 1 ? '' : 's'} (ya sincronizado{proveedores.length - proveedoresVisibles.length === 1 ? '' : 's'} por rubro)
                 </p>
               )}
@@ -218,10 +216,10 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
                 {proveedoresVisibles.map(({ p, i }) => (
                   <div key={i} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-1.5">
                     <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{p.nombre}</span>
-                    {p.subrubro_id && <span className="text-xs text-blue-500">vinculado</span>}
+                    {p.subrubro_id && <span className="text-xs text-blue-600 dark:text-blue-400">vinculado</span>}
                     <button onClick={() => setProveedores(prev => prev.filter((_, j) => j !== i))}
                       aria-label={`Quitar ${p.nombre}`}
-                      className="tap shrink-0 text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
+                      className="tap shrink-0 text-slate-500 dark:text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
                   </div>
                 ))}
               </div>
@@ -255,8 +253,11 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
 }
 
 // ── Formulario de entrada ───────────────────────────────────────────────────
+// En un <Modal> con los botones fijos al pie: antes se abría en línea en medio
+// de la lista y en mobile Guardar quedaba debajo de la bottom navigation.
+// Orden: tipo → concepto → monto → método → (opcional) vincular a subrubro.
 function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList, rubros, allSubrubros }) {
-  const ref = useRef(null);
+  const uid = useId();
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
   const [monto, setMonto]       = useState(initial?.monto || '');
@@ -266,7 +267,11 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     initial && 'metodo' in initial ? initial.metodo : 'efectivo'
   );
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
-  const [seleccion, setSeleccion] = useState('');
+  // Errores visibles tras intentar guardar (antes el botón quedaba deshabilitado
+  // sin decir qué faltaba).
+  const [errores, setErrores] = useState({});
+  const conceptoRef = useRef(null);
+  const montoRef = useRef(null);
 
   // Anti doble-clic: bloqueo síncrono (ref) + estado para deshabilitar/spinner.
   const [saving, setSaving] = useState(false);
@@ -276,6 +281,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   if (idemKeyRef.current === null) idemKeyRef.current = newIdemKey();
 
   // Vinculación a subrubro (solo para gastos nuevos)
+  const [vincularOpen, setVincularOpen] = useState(false);
   const [rubroSel, setRubroSel]       = useState('');
   const [subrubroSel, setSubrubroSel] = useState('');
   const [facturasSub, setFacturasSub] = useState([]);
@@ -286,20 +292,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     ? allSubrubros.filter(s => String(s.rubro_id) === rubroSel)
     : [];
 
-  // Cerrar al tocar afuera solo con mouse. En touch, `mousedown` también dispara
-  // y cualquier tap al scrollear descartaba el formulario a medio llenar. En
-  // mobile se cierra con Cancelar, que está siempre visible.
-  useEffect(() => {
-    if (!window.matchMedia('(hover: hover)').matches) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onCancel();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onCancel]);
-
-  // Elegir subrubro carga sus boletas pendientes. Se hace en el handler (antes era
-  // un efecto que dependía de subrubroSel).
+  // Elegir subrubro carga sus boletas pendientes.
   const elegirSubrubro = (id) => {
     setSubrubroSel(id);
     setFacturaSel('');
@@ -330,13 +323,17 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     : initial.confirmado === false && initial.movimiento_id != null ? 'Para pagar una parte usá "Pago parcial"; para corregir el importe de la boleta, "Editar boleta" (menú de la fila).'
     : null;
 
-  const handleSeleccion = (val) => {
-    setSeleccion(val);
-    if (val && val !== '__otro__') setConcepto(val);
+  // Un solo campo para el concepto: escribir libre o elegir de la lista (datalist).
+  // Antes eran dos controles para el mismo dato: un select "Elegir de la lista"
+  // y un input "Proveedor o concepto".
+  const handleConcepto = (val) => {
+    setConcepto(val);
+    if (errores.concepto) setErrores(e => ({ ...e, concepto: null }));
     // Proveedor vinculado a un subrubro → lo auto-selecciona (y carga sus boletas).
-    const prov = val ? proveedoresList.find(p => p.nombre === val) : null;
+    const prov = proveedoresList.find(p => p.nombre === val);
     const sub = prov?.subrubro_id ? allSubrubros.find(s => s.id === prov.subrubro_id) : null;
-    if (sub) {
+    if (sub && tipo === 'gasto' && !initial) {
+      setVincularOpen(true);
       setRubroSel(String(sub.rubro_id));
       elegirSubrubro(String(sub.id));
     }
@@ -345,7 +342,15 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (savingRef.current) return;
-    if (!concepto.trim() || !Number(monto)) return;
+    const nuevosErrores = {
+      concepto: !concepto.trim() ? (tipo === 'empleado' ? 'Ingresá el nombre del empleado' : 'Ingresá el concepto o proveedor') : null,
+      monto: !Number(monto) ? 'Ingresá un monto mayor a 0' : null,
+    };
+    if (nuevosErrores.concepto || nuevosErrores.monto) {
+      setErrores(nuevosErrores);
+      (nuevosErrores.concepto ? conceptoRef : montoRef).current?.focus();
+      return;
+    }
     const data = {
       // Al editar se conserva la fecha del ítem: editarlo mirando otro día lo mudaba
       // a ese día (un pendiente arrastrado, por ejemplo, saltaba a la fecha vista).
@@ -369,120 +374,152 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   };
 
   const TIPOS_FORM = [
-    { value: 'empleado',      label: 'Empleado',     color: 'bg-green-600' },
-    { value: 'gasto',         label: 'Gasto',        color: 'bg-red-500' },
-    { value: 'ingreso_extra', label: 'Ingreso extra', color: 'bg-amber-500' },
+    { value: 'empleado',      label: 'Empleado' },
+    { value: 'gasto',         label: 'Gasto' },
+    { value: 'ingreso_extra', label: 'Ingreso extra' },
   ];
+  const TITULOS = { empleado: 'Caja de empleado', gasto: 'Gasto o pago a proveedor', ingreso_extra: 'Ingreso extra' };
 
   const esGastoNuevo = tipo === 'gasto' && !initial;
+  const labelCls = 'block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1';
+  const errCls = 'mt-1 text-xs text-red-600 dark:text-red-400';
+  const conError = (campo) => errores[campo] ? 'border-red-400 dark:border-red-500 focus:ring-red-500' : '';
 
   return (
-    <form ref={ref} onSubmit={handleSubmit} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 space-y-3 border border-slate-200 dark:border-slate-600">
+    <Modal
+      title={initial ? `Editar — ${TITULOS[tipo] || 'movimiento'}` : TITULOS[tipo] || 'Nuevo movimiento'}
+      size="md"
+      onClose={saving ? undefined : onCancel}
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex gap-2">
+          <button type="button" onClick={onCancel} disabled={saving}
+            className="flex-1 min-h-11 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium disabled:opacity-40">
+            Cancelar
+          </button>
+          <button type="submit" form={`${uid}-form`} disabled={saving}
+            className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-1.5">
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      }
+    >
+    <form id={`${uid}-form`} onSubmit={handleSubmit} noValidate className="space-y-4">
       {!tipoForzado && (
-        <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+        <div role="radiogroup" aria-label="Tipo" className="flex rounded-lg bg-slate-100 dark:bg-slate-700/60 p-0.5 text-sm font-medium">
           {TIPOS_FORM.map(t => (
-            <button key={t.value} type="button" onClick={() => { setTipo(t.value); setSeleccion(''); setConcepto(''); setRubroSel(''); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}
-              className={`flex-1 min-h-11 sm:min-h-0 py-2 transition-colors ${tipo === t.value ? `${t.color} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+            <button key={t.value} type="button" role="radio" aria-checked={tipo === t.value}
+              onClick={() => { setTipo(t.value); setConcepto(''); setRubroSel(''); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}
+              className={`flex-1 min-h-11 sm:min-h-9 rounded-md transition-colors ${tipo === t.value ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-300'}`}>
               {t.label}
             </button>
           ))}
         </div>
       )}
 
-      {lista.length > 0 && (
-        <select className={selectCls} value={seleccion} onChange={e => handleSeleccion(e.target.value)}>
-          <option value="">— Elegir de la lista —</option>
-          {lista.map((item, i) => <option key={i} value={item.nombre}>{item.nombre}</option>)}
-          <option value="__otro__">Otro (escribir)</option>
-        </select>
-      )}
+      <div>
+        <label htmlFor={`${uid}-concepto`} className={labelCls}>
+          {tipo === 'empleado' ? 'Empleado' : tipo === 'ingreso_extra' ? 'Descripción' : 'Proveedor o concepto'}
+        </label>
+        <input id={`${uid}-concepto`} ref={conceptoRef} type="text" list={lista.length ? `${uid}-lista` : undefined}
+          className={`${inputCls} ${conError('concepto')}`}
+          placeholder={lista.length ? 'Escribí o elegí de la lista' : tipo === 'ingreso_extra' ? 'Ej: venta de cajas' : 'Nombre'}
+          value={concepto} onChange={e => handleConcepto(e.target.value)}
+          aria-invalid={!!errores.concepto} aria-describedby={errores.concepto ? `${uid}-concepto-err` : undefined}
+          autoComplete="off" autoFocus={!initial} />
+        {lista.length > 0 && (
+          <datalist id={`${uid}-lista`}>
+            {lista.map((item, i) => <option key={i} value={item.nombre} />)}
+          </datalist>
+        )}
+        {errores.concepto && <p id={`${uid}-concepto-err`} className={errCls}>{errores.concepto}</p>}
+      </div>
 
-      {(lista.length === 0 || seleccion === '__otro__' || !seleccion) && !subrubroSel && (
-        <input type="text" className={inputCls}
-          placeholder={tipo === 'empleado' ? 'Nombre del empleado' : tipo === 'ingreso_extra' ? 'Descripción del ingreso' : 'Proveedor o concepto'}
-          value={concepto} onChange={e => setConcepto(e.target.value)} required autoFocus={!lista.length} />
-      )}
+      <div>
+        <label htmlFor={`${uid}-monto`} className={labelCls}>Monto</label>
+        <input id={`${uid}-monto`} ref={montoRef} type="number" inputMode="decimal" min="0" step="any"
+          className={`${inputCls} text-base font-semibold tabular-nums ${conError('monto')} ${montoBloqueado ? 'opacity-60 cursor-not-allowed' : ''}`}
+          placeholder="0,00"
+          value={monto} onChange={e => { setMonto(e.target.value); if (errores.monto) setErrores(er => ({ ...er, monto: null })); }}
+          disabled={!!montoBloqueado}
+          aria-invalid={!!errores.monto} aria-describedby={errores.monto ? `${uid}-monto-err` : montoBloqueado ? `${uid}-monto-info` : undefined} />
+        {errores.monto && <p id={`${uid}-monto-err`} className={errCls}>{errores.monto}</p>}
+        {montoBloqueado && <p id={`${uid}-monto-info`} className="mt-1 text-xs text-slate-500 dark:text-slate-400">{montoBloqueado}</p>}
+      </div>
 
-      {/* Selector de subrubro directo en gastos nuevos */}
+      <div>
+        <span className={labelCls} id={`${uid}-metodo`}>Método</span>
+        <div role="radiogroup" aria-labelledby={`${uid}-metodo`} className="flex rounded-lg bg-slate-100 dark:bg-slate-700/60 p-0.5 text-sm font-medium">
+          {[['efectivo', 'Efectivo'], ['transferencia', 'Transferencia']].map(([v, l]) => (
+            <button key={v} type="button" role="radio" aria-checked={metodo === v} onClick={() => setMetodo(v)}
+              className={`flex-1 min-h-11 sm:min-h-9 rounded-md transition-colors ${metodo === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-300'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {metodo == null && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Sin método definido: elegí uno para poder confirmar el pago.</p>}
+      </div>
+
+      {/* Vincular a subrubro: opcional, plegado para no alargar la carga común. */}
       {esGastoNuevo && rubros.length > 0 && (
-        <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-600">
-          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1"><Link2 size={11} className="text-blue-400" /> Subrubro <span className="text-slate-400">(opcional — registra un pago en el subrubro)</span></p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <select className={selectCls} value={rubroSel} onChange={e => { setRubroSel(e.target.value); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}>
-              <option value="">— Rubro —</option>
-              {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-            </select>
-            <select className={selectCls} value={subrubroSel} onChange={e => {
-              const id = e.target.value;
-              elegirSubrubro(id);
-              if (id) {
-                const sub = subrubrosDel.find(s => String(s.id) === id);
-                if (sub) setConcepto(sub.nombre);
-              }
-            }} disabled={!rubroSel}>
-              <option value="">— Subrubro —</option>
-              {subrubrosDel.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-            </select>
-          </div>
-          {subrubroSel && (
-            loadingFacturas
-              ? <p className="text-xs text-slate-400">Cargando boletas...</p>
-              : facturasSub.length === 0
-                ? <p className="text-xs text-slate-400">Sin boletas pendientes.</p>
-                : (
-                  <select className={selectCls} value={facturaSel} onChange={e => handleFacturaSel(e.target.value)}>
-                    <option value="">— Boleta pendiente (opcional) —</option>
-                    {facturasSub.map(f => (
-                      <option key={f.id} value={f.id}>
-                        {f.concepto || 'Sin concepto'} — {fmt(f.saldo ?? f.monto)}{f.fecha_vencimiento ? ` — vence ${formatFechaCorta(f.fecha_vencimiento)}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700">
+          <button type="button" onClick={() => setVincularOpen(v => !v)} aria-expanded={vincularOpen}
+            className="w-full min-h-11 flex items-center gap-2 px-3 text-left text-sm text-slate-600 dark:text-slate-300">
+            <Link2 size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="flex-1">Registrar el pago en un subrubro <span className="text-slate-500 dark:text-slate-400">(opcional)</span></span>
+            <ChevronDown size={15} className={`shrink-0 transition-transform ${vincularOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {vincularOpen && (
+            <div className="px-3 pb-3 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select aria-label="Rubro" className={selectCls} value={rubroSel} onChange={e => { setRubroSel(e.target.value); setSubrubroSel(''); setFacturasSub([]); setFacturaSel(''); }}>
+                  <option value="">— Rubro —</option>
+                  {rubros.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                </select>
+                <select aria-label="Subrubro" className={selectCls} value={subrubroSel} onChange={e => {
+                  const id = e.target.value;
+                  elegirSubrubro(id);
+                  if (id) {
+                    const sub = subrubrosDel.find(s => String(s.id) === id);
+                    if (sub) setConcepto(sub.nombre);
+                  }
+                }} disabled={!rubroSel}>
+                  <option value="">— Subrubro —</option>
+                  {subrubrosDel.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+              </div>
+              {subrubroSel && (
+                loadingFacturas
+                  ? <p className="text-xs text-slate-500 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Cargando boletas...</p>
+                  : facturasSub.length === 0
+                    ? <p className="text-xs text-slate-500 dark:text-slate-400">Sin boletas pendientes.</p>
+                    : (
+                      <select aria-label="Boleta pendiente" className={selectCls} value={facturaSel} onChange={e => handleFacturaSel(e.target.value)}>
+                        <option value="">— Boleta pendiente (opcional) —</option>
+                        {facturasSub.map(f => (
+                          <option key={f.id} value={f.id}>
+                            {f.concepto || 'Sin concepto'} — {fmt(f.saldo ?? f.monto)}{f.fecha_vencimiento ? ` — vence ${formatFechaCorta(f.fecha_vencimiento)}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )
+              )}
+            </div>
           )}
         </div>
       )}
 
-      {/* Monto y método apilados en mobile: en dos columnas de 150px el toggle
-          Efectivo/Transf. queda en botones de 75px, imposibles de acertar. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <input type="number" inputMode="decimal" min="0" step="any" className={`${inputCls} ${montoBloqueado ? 'opacity-60 cursor-not-allowed' : ''}`} placeholder="Monto"
-          value={monto} onChange={e => setMonto(e.target.value)} required disabled={montoBloqueado}
-          title={montoBloqueado || undefined} />
-        <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm sm:text-xs font-medium">
-          {[['efectivo', 'Efectivo'], ['transferencia', 'Transferencia', 'Transf.']].map(([v, l, corto]) => (
-            <button key={v} type="button" onClick={() => setMetodo(v)}
-              className={`flex-1 min-h-11 sm:min-h-0 py-2 transition-colors ${metodo === v ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-              <span className="sm:hidden">{l}</span>
-              <span className="hidden sm:inline">{corto || l}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {montoBloqueado && <p className="text-xs text-slate-500 dark:text-slate-400 -mt-1">{montoBloqueado}</p>}
-
       {tipo === 'gasto' && (
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" className="accent-amber-500" checked={esEspecial} onChange={e => setEsEspecial(e.target.checked)} />
-          <span className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1">
-            <Star size={11} className="text-amber-500" /> Marcar como pago especial
+        <label className="flex items-center gap-2 min-h-11 sm:min-h-0 cursor-pointer">
+          <input type="checkbox" className="w-4 h-4 accent-amber-500" checked={esEspecial} onChange={e => setEsEspecial(e.target.checked)} />
+          <span className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
+            <Star size={12} className="text-amber-600 dark:text-amber-400" /> Marcar como pago especial
           </span>
         </label>
       )}
-
-      <div className="flex gap-2">
-        <button type="button" onClick={onCancel} disabled={saving}
-          className="flex-1 min-h-11 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 py-2 rounded-lg text-sm disabled:opacity-40">
-          Cancelar
-        </button>
-        <button type="submit" disabled={saving || !concepto.trim() || !Number(monto)}
-          className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
-          {saving && <Loader2 size={14} className="animate-spin" />}
-          {saving ? 'Guardando...' : 'Guardar'}
-        </button>
-      </div>
     </form>
+    </Modal>
   );
 }
 
@@ -500,7 +537,7 @@ function MetodoBadge({ metodo }) {
 function DocumentoBadge({ documento }) {
   // Los dos en gris: el tipo de comprobante es una etiqueta, no un estado. En
   // ámbar competía con "Sin confirmar", que sí pide acción.
-  const cls = 'text-[11px] leading-[18px] px-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium';
+  const cls = 'text-xs leading-[18px] px-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium';
   if (documento === 'factura') return <span className={cls}>Factura</span>;
   if (documento === 'remito')  return <span className={cls}>Remito</span>;
   return null;
@@ -558,10 +595,10 @@ function GrupoHeader({ grupo }) {
   const Icon = grupo.icon;
   const total = grupo.items.reduce((s, m) => s + (m.monto || 0), 0);
   return (
-    <div className={`sticky top-14 z-10 flex items-center gap-2 px-2.5 py-2 mb-2 rounded-lg border backdrop-blur-sm ${grupo.bg} ${grupo.border}`}>
+    <div className={`sticky top-0 z-10 flex items-center gap-2 px-2.5 py-2 mb-2 rounded-lg border backdrop-blur-sm ${grupo.bg} ${grupo.border}`}>
       <Icon size={14} className={`${grupo.color} shrink-0`} />
       <span className={`text-xs font-semibold uppercase tracking-wide ${grupo.color}`}>{grupo.label}</span>
-      <span className="text-xs text-slate-400 dark:text-slate-500">({grupo.items.length})</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400">({grupo.items.length})</span>
       <span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{fmt(total)}</span>
     </div>
   );
@@ -606,9 +643,9 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   //                  poder verlo de un vistazo aunque el pago ya esté confirmado.
   // Los ítems no confirmables (empleados, ingresos manuales) conservan el color que
   // les pasa la sección vía `colorMonto`.
-  const montoColor = conDescuento ? 'text-purple-600 dark:text-purple-400'
+  const montoColor = conDescuento ? 'text-purple-700 dark:text-purple-400'
     : (esGasto || esCobro)
-      ? (esPendiente ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')
+      ? (esPendiente ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400')
       : colorMonto;
 
   const bruto = Number(m.monto_bruto ?? m.monto) || 0;
@@ -667,14 +704,14 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
              title={conceptoLimpio(m)}>
             {conceptoLimpio(m)}
           </p>
-          {m.es_especial && <Star size={11} className="text-amber-500 shrink-0" />}
+          {m.es_especial && <Star size={11} className="text-amber-600 dark:text-amber-400 shrink-0" />}
           {subrubro && onGoToSubrubro && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onGoToSubrubro(m); }}
               title={`Ir al subrubro: ${subrubro.nombre}`}
               aria-label={`Ir al subrubro: ${subrubro.nombre}`}
-              className="tap shrink-0 text-slate-400 hover:text-blue-500 transition-colors"
+              className="tap shrink-0 text-slate-500 dark:text-slate-400 hover:text-blue-500 transition-colors"
             >
               <ExternalLink size={12} />
             </button>
@@ -686,13 +723,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           {!hideMetodo && <MetodoBadge metodo={m.metodo} />}
           <DocumentoBadge documento={m.documento} />
           {/* Rojo, igual que el importe y el borde: un solo código de color por estado. */}
-          {esPendiente && <span className="text-[11px] leading-[18px] px-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium">{esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
-          {/* El ✓ verde de la derecha ya dice que está confirmado: en mobile este
-              badge solo agrega una línea de alto por fila. Se muestra desde `sm`. */}
-          {esConfirmado && m.movimiento_id && <span className="hidden sm:flex text-xs px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 items-center gap-0.5"><Check size={9} /> {esCobro ? 'Cobro confirmado' : 'Pago confirmado'}</span>}
+          {esPendiente && <span className="inline-flex items-center gap-1 text-xs leading-[18px] px-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium"><Clock size={11} /> {esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
           {conDescuento && (
             <span title={`Descuento de ${fmt(m.descuento)}${m.descuento_pct ? ` (${m.descuento_pct}%)` : ''} aplicado sobre ${fmt(bruto)}`}
-              className="text-[11px] leading-[18px] px-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium inline-flex items-center gap-0.5">
+              className="text-xs leading-[18px] px-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium inline-flex items-center gap-0.5">
               <Percent size={9} /> <span className="hidden sm:inline">Con </span>descuento
             </span>
           )}
@@ -710,21 +744,45 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
             gap-2 = los 8px mínimos de separación entre dos targets táctiles
             adyacentes (MOBILE.md): con gap-1 los bordes de 44px se solapaban. */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {confirmable && onConfirmar && (
+          {confirmable && onConfirmar && (esConfirmado ? (
+            // Confirmado: badge de solo lectura. Antes era el mismo botón ✓ al 40% de
+            // opacidad y un toque lo revertía sin preguntar (borraba el pago del
+            // subrubro). Revertir vive ahora en el menú, con confirmación.
+            <span className="inline-flex items-center gap-1 min-h-8 px-2 rounded-lg text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 shrink-0">
+              {confirming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              {esCobro ? 'Cobrado' : 'Pagado'}
+            </span>
+          ) : (
             <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming || confirmarBloqueado}
-              title={confirmarBloqueado ? bloqueoConfirmar : esConfirmado ? 'Revertir confirmación' : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
-              aria-label={confirmarBloqueado ? bloqueoConfirmar : esConfirmado ? 'Revertir confirmación' : 'Confirmar pago'}
-              className={`w-11 h-11 sm:w-auto sm:h-auto sm:p-1.5 flex items-center justify-center rounded-lg shrink-0 transition-colors disabled:opacity-50 ${confirmarBloqueado ? 'disabled:cursor-not-allowed' : 'disabled:cursor-wait'} ${
-                esConfirmado
-                  ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 opacity-40 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400'
-                  : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/70'
-              }`}>
-              {confirming ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+              title={confirmarBloqueado ? bloqueoConfirmar : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
+              aria-label={confirmarBloqueado ? bloqueoConfirmar : `${esCobro ? 'Confirmar cobro' : 'Confirmar pago'}: ${conceptoLimpio(m)}`}
+              className={`min-h-11 sm:min-h-9 px-3 flex items-center justify-center gap-1.5 rounded-lg shrink-0 text-sm font-semibold transition-colors
+                          border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300
+                          hover:bg-green-100 dark:hover:bg-green-900/60 disabled:opacity-50 ${confirmarBloqueado ? 'disabled:cursor-not-allowed' : 'disabled:cursor-wait'}`}>
+              {confirming ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+              {esCobro ? 'Cobrar' : 'Pagar'}
             </button>
-          )}
+          ))}
           <RowActions
             title={conceptoLimpio(m)}
             acciones={[
+              esConfirmado && onConfirmar && {
+                key: 'revertir',
+                label: esCobro ? 'Revertir cobro' : 'Revertir pago',
+                hint: esCobro ? 'Borra el abono del subrubro' : 'Borra el pago del subrubro',
+                icon: <RotateCcw size={16} />,
+                iconDesktop: <RotateCcw size={18} />,
+                tone: 'danger',
+                onClick: async () => {
+                  const ok = await confirmar({
+                    message: `¿Revertir el ${esCobro ? 'cobro' : 'pago'} de ${fmt(m.monto)} a ${conceptoLimpio(m)}?`,
+                    detail: `Se borra el ${esCobro ? 'abono' : 'pago'} registrado en el subrubro y el ítem vuelve a quedar pendiente.`,
+                    confirmLabel: 'Revertir',
+                  });
+                  if (ok) onConfirmar(m);
+                },
+                className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shrink-0',
+              },
               mostrarAcordeon && {
                 key: 'descuento',
                 label: conDescuento ? 'Ver detalle del descuento' : 'Aplicar descuento por pago',
@@ -749,7 +807,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 icon: <Coins size={16} />,
                 iconDesktop: <Coins size={20} />,
                 onClick: () => onPagoParcial(m),
-                className: 'p-1 -m-1 text-slate-400 hover:text-green-600 transition-colors shrink-0',
+                className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-green-600 transition-colors shrink-0',
               },
               esPendiente && m.movimiento_id != null && onEditarBoleta && {
                 key: 'boleta',
@@ -758,7 +816,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 icon: <Receipt size={16} />,
                 iconDesktop: <Receipt size={20} />,
                 onClick: () => onEditarBoleta(m),
-                className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
+                className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
               {
                 key: 'editar',
@@ -766,7 +824,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 icon: <Pencil size={16} />,
                 iconDesktop: <Pencil size={20} />,
                 onClick: () => onEdit(m),
-                className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
+                className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
               {
                 key: 'eliminar',
@@ -775,7 +833,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 iconDesktop: <Trash2 size={20} />,
                 tone: 'danger',
                 onClick: () => onDelete(m.id),
-                className: 'p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0',
+                className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors shrink-0',
               },
             ]}
           />
@@ -803,7 +861,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
               <span>Pagado (neto)</span><span>{fmt(m.monto)}</span>
             </div>
             {m.nc_mov_id && (
-              <p className="text-[11px] text-slate-400 pt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 pt-0.5">
                 Nota de crédito #{m.nc_mov_id} generada automáticamente — el saldo de la factura queda en cero.
               </p>
             )}
@@ -817,7 +875,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
               <div className="flex rounded-lg border border-purple-300 dark:border-purple-800 overflow-hidden text-xs font-medium shrink-0">
                 {[['monto', '$'], ['pct', '%']].map(([v, l]) => (
                   <button key={v} type="button" onClick={() => setDescModo(v)}
-                    className={`w-7 py-1.5 transition-colors ${
+                    className={`w-9 min-h-9 pointer-coarse:w-11 pointer-coarse:min-h-11 transition-colors ${
                       descModo === v ? 'bg-purple-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                     }`}>
                     {l}
@@ -836,26 +894,26 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
             )}
             <div className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
               <span>Monto neto a pagar</span>
-              <span className={`font-bold ${descValido ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400'}`}>
+              <span className={`font-bold ${descValido ? 'text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}>
                 {descValido ? fmt(netoPreview) : fmt(bruto)}
               </span>
             </div>
             {!esPct && descRaw > 0 && descRaw >= bruto && (
-              <p className="text-[11px] text-red-500">El descuento no puede ser mayor o igual al monto de la factura ({fmt(bruto)}).</p>
+              <p className="text-xs text-red-600 dark:text-red-400">El descuento no puede ser mayor o igual al monto de la factura ({fmt(bruto)}).</p>
             )}
             {esPct && descRaw > 0 && descRaw >= 100 && (
-              <p className="text-[11px] text-red-500">El porcentaje debe ser menor a 100.</p>
+              <p className="text-xs text-red-600 dark:text-red-400">El porcentaje debe ser menor a 100.</p>
             )}
             <button type="button" disabled={!descValido || confirming}
               onClick={() => {
                 onConfirmar(m, esPct ? { descuento_pct: descRaw } : { descuento: descNum });
                 setDescOpen(false); setDescInput('');
               }}
-              className="w-full bg-purple-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
+              className="w-full min-h-11 sm:min-h-9 bg-purple-600 text-white py-1.5 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-40 flex items-center justify-center gap-1.5">
               {confirming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
               Confirmar pago con descuento
             </button>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Se registra el pago por el neto y una Nota de Crédito por el descuento, para que el saldo de la factura cierre en cero.
             </p>
           </div>
@@ -896,17 +954,17 @@ function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 
         {sinConfirmar > 0 && (
           <div className="flex justify-between text-slate-600 dark:text-slate-300">
             <span>Sin confirmar</span>
-            <span className="font-semibold text-amber-500 tabular-nums">{fmt(sinConfirmar)}</span>
+            <span className="font-semibold text-amber-700 dark:text-amber-400 tabular-nums">{fmt(sinConfirmar)}</span>
           </div>
         )}
         <div className="border-t border-slate-100 dark:border-slate-700 pt-1.5 flex justify-between font-bold">
           <span className="text-slate-700 dark:text-slate-200">Resta</span>
-          <span className={`tabular-nums ${restante >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(restante)}</span>
+          <span className={`tabular-nums ${restante >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600 dark:text-red-400'}`}>{fmt(restante)}</span>
         </div>
         {sinConfirmar > 0 && (
           <div className="flex justify-between text-xs">
             <span className="text-slate-500 dark:text-slate-400">Si confirmás todo</span>
-            <span className={`font-semibold tabular-nums ${restanteSiConfirma >= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-red-500'}`}>{fmt(restanteSiConfirma)}</span>
+            <span className={`font-semibold tabular-nums ${restanteSiConfirma >= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-red-600 dark:text-red-400'}`}>{fmt(restanteSiConfirma)}</span>
           </div>
         )}
       </div>
@@ -916,7 +974,7 @@ function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 
             className="w-full flex items-center justify-between gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
             <span className="flex items-center gap-1">
               <Clock size={10} /> Próximos a vencer
-              <span className="text-slate-400 dark:text-slate-500">({vencimientos.length})</span>
+              <span className="text-slate-400 dark:text-slate-400">({vencimientos.length})</span>
             </span>
             <span className="flex items-center gap-1.5">
               {!vencAbierto && <span className="text-amber-700 dark:text-amber-400">{fmt(totalVenc)}</span>}
@@ -1381,13 +1439,21 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // --- Selección múltiple de gastos ---
   // Seleccionables: gastos de proveedores y cobros de deuda (ambos confirmables).
   const selectedGastos = [...gastos, ...deudasCobro].filter(m => selectedIds.has(m.id));
-  const selTotal       = selectedGastos.reduce((s, m) => s + m.monto, 0);
   // Subrubros distintos involucrados en la selección (para el panel de resumen).
   const selSubNames    = [...new Set(selectedGastos.map(m => subrubroDe(m)?.nombre).filter(Boolean))];
-  const allGastosSelected = gastos.length > 0 && gastos.every(m => selectedIds.has(m.id));
-  const selectAllGastos   = () => setSelectedIds(prev => new Set([...prev, ...gastos.map(m => m.id)]));
-  const allDeudasSelected = deudasCobro.length > 0 && deudasCobro.every(m => selectedIds.has(m.id));
-  const selectAllDeudas   = () => setSelectedIds(prev => new Set([...prev, ...deudasCobro.map(m => m.id)]));
+  // Solo lo pendiente es seleccionable: la selección sirve para confirmar, y
+  // "Seleccionar todos" incluía los ya pagados, con un total que no era lo que
+  // se iba a confirmar.
+  const gastosPend  = gastos.filter(m => m.confirmado === false);
+  const deudasPend  = deudasCobro.filter(m => m.confirmado === false);
+  const allGastosSelected = gastosPend.length > 0 && gastosPend.every(m => selectedIds.has(m.id));
+  const selectAllGastos   = () => setSelectedIds(prev => new Set([...prev, ...gastosPend.map(m => m.id)]));
+  const allDeudasSelected = deudasPend.length > 0 && deudasPend.every(m => selectedIds.has(m.id));
+  const selectAllDeudas   = () => setSelectedIds(prev => new Set([...prev, ...deudasPend.map(m => m.id)]));
+  // Lo que realmente se confirma: pendientes con método definido.
+  const selAConfirmar  = selectedGastos.filter(m => m.confirmado === false && m.metodo);
+  const selSinMetodo   = selectedGastos.filter(m => m.confirmado === false && !m.metodo).length;
+  const selTotalConf   = selAConfirmar.reduce((s, m) => s + m.monto, 0);
 
   // Marca como pagados/cobrados (confirma) todos los ítems seleccionados que estén
   // sin confirmar y tengan método definido. Reusa la confirmación individual para
@@ -1400,6 +1466,24 @@ export default function CajaView({ rubros = [], onNavigate }) {
     if (aConfirmar.length === 0) {
       toast.error(sinMetodo ? 'Definí el método de pago en los ítems seleccionados' : 'No hay pendientes para confirmar');
       return;
+    }
+    // Confirmar varios de una vez registra varios pagos: se pide confirmación con
+    // el detalle de lo que se va a registrar (antes era un solo toque).
+    if (aConfirmar.length > 1) {
+      const efvo  = aConfirmar.filter(m => m.metodo === 'efectivo');
+      const trans = aConfirmar.filter(m => m.metodo === 'transferencia');
+      const total = aConfirmar.reduce((a, m) => a + m.monto, 0);
+      const partes = [
+        efvo.length && `${efvo.length} en efectivo (${fmt(efvo.reduce((a, m) => a + m.monto, 0))})`,
+        trans.length && `${trans.length} por transferencia (${fmt(trans.reduce((a, m) => a + m.monto, 0))})`,
+      ].filter(Boolean).join(' · ');
+      const ok = await confirmar({
+        message: `¿Confirmar ${aConfirmar.length} pagos por ${fmt(total)}?`,
+        detail: `${partes}.${sinMetodo ? ` Se saltean ${sinMetodo} sin método de pago.` : ''} Cada pago se registra en su subrubro.`,
+        confirmLabel: 'Confirmar pagos',
+        dangerous: false,
+      });
+      if (!ok) return;
     }
     // Un solo aviso de fecha para toda la selección, no uno por ítem.
     if (!validarFechaPago(aConfirmar, {}, fecha)) return;
@@ -1465,12 +1549,16 @@ export default function CajaView({ rubros = [], onNavigate }) {
   };
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
+    // Hasta xl: una columna, con el atajo "Queda" arriba. Desde xl: lista a la
+    // izquierda y el cierre del día fijo a la derecha. Antes era una columna de
+    // 672px siempre y el resumen quedaba al final, detrás de 70+ ítems.
+    <div className="max-w-2xl xl:max-w-6xl mx-auto xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6 xl:items-start">
+    <div className="space-y-5 min-w-0">
       {/* Navegación de fecha. En mobile la fecha va sola en su fila y las acciones
           debajo: no entran los 6 botones más la fecha larga en 360px de ancho. */}
       <div data-date-nav className="flex flex-wrap items-center gap-1 sm:gap-2">
         <button onClick={() => setFecha(addDays(fecha, -1))} aria-label="Día anterior"
-          className="w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
+          className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
           <ChevronLeft size={20} />
         </button>
         <div className="flex-1 min-w-0 text-center">
@@ -1482,11 +1570,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
             <span className="hidden sm:inline">{formatFecha(fecha)}</span>
           </button>
           {fecha !== todayStr() && (
-            <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-500 hover:underline block mx-auto -mt-1 sm:mt-0 pb-1">Ir a hoy</button>
+            <button onClick={() => setFecha(todayStr())} className="text-xs text-blue-600 dark:text-blue-400 hover:underline block mx-auto -mt-1 sm:mt-0 pb-1">Ir a hoy</button>
           )}
         </div>
         <button onClick={() => setFecha(addDays(fecha, 1))} aria-label="Día siguiente"
-          className="w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
+          className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 shrink-0">
           <ChevronRight size={20} />
         </button>
         <input ref={dateInputRef} type="date" value={fecha}
@@ -1499,23 +1587,25 @@ export default function CajaView({ rubros = [], onNavigate }) {
           <button
             onClick={() => setOcultarSaldos(v => !v)}
             className={toolbarBtn}
+            aria-label={ocultarSaldos ? 'Mostrar saldos' : 'Ocultar saldos'}
             title={ocultarSaldos ? 'Mostrar saldos' : 'Ocultar saldos'}>
             {ocultarSaldos ? <EyeOff size={18} /> : <Eye size={18} />}
             <span className={toolbarLbl}>{ocultarSaldos ? 'Mostrar' : 'Ocultar'}</span>
           </button>
           <button onClick={() => refrescarTodo()} disabled={refreshing}
             className={`${toolbarBtn} disabled:opacity-50`}
+            aria-label="Refrescar"
             title={sincronizando ? 'Sincronizando vencimientos…' : 'Refrescar ahora (sincroniza pagos y vencimientos)'}>
             <RefreshCw size={18} className={refreshing || sincronizando ? 'animate-spin' : ''} />
             <span className={toolbarLbl}>Refrescar</span>
           </button>
           <button onClick={() => setShowExport(true)}
-            className={`${toolbarBtn} hover:text-emerald-600 dark:hover:text-emerald-400`} title="Exportar mes a Excel">
+            className={`${toolbarBtn} hover:text-emerald-600 dark:hover:text-emerald-400`} title="Exportar mes a Excel" aria-label="Exportar mes a Excel">
             <FileSpreadsheet size={18} />
             <span className={toolbarLbl}>Excel</span>
           </button>
           <button onClick={() => setShowConfig(true)}
-            className={toolbarBtn} title="Configurar empleados y proveedores">
+            className={toolbarBtn} title="Configurar empleados y proveedores" aria-label="Ajustes de la caja">
             <Settings size={18} />
             <span className={toolbarLbl}>Ajustes</span>
           </button>
@@ -1547,7 +1637,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             </div>
             {!editandoSaldo && (
               <button onClick={() => { setSaldoInput(saldoInicial || ''); setEditandoSaldo(true); }}
-                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-500 hover:underline flex items-center gap-1">
+                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                 <Pencil size={11} /> {saldoMov ? 'Editar' : 'Ajustar'}
               </button>
             )}
@@ -1558,16 +1648,16 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 value={saldoInput} onChange={e => setSaldoInput(e.target.value)} autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleSaldoInicial()} />
               <button onClick={handleSaldoInicial} className="shrink-0 min-w-11 min-h-11 sm:min-h-0 bg-blue-600 text-white px-3 rounded-lg text-sm font-medium hover:bg-blue-700">OK</button>
-              <button onClick={() => setEditandoSaldo(false)} aria-label="Cancelar" className="shrink-0 min-w-11 min-h-11 sm:min-h-0 text-slate-400 hover:text-slate-600 px-2">✕</button>
+              <button onClick={() => setEditandoSaldo(false)} aria-label="Cancelar" className="shrink-0 min-w-11 min-h-11 sm:min-h-0 text-slate-500 dark:text-slate-400 hover:text-slate-600 px-2">✕</button>
             </div>
           ) : (
             <div className="mt-1">
-              <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+              <p className={`text-2xl font-bold ${saldoInicial ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`}>
                 {ocultarSaldos ? '••••••' : (saldoInicial ? fmt(saldoInicial) : '—')}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">💵 Efectivo</span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   {saldoMov ? 'Ajustado manualmente' : saldoAutoCalculado !== null ? 'Efectivo del día anterior' : 'Sin datos del día anterior'}
                 </span>
               </div>
@@ -1578,13 +1668,13 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <ArrowLeftRight size={15} className="text-blue-500 shrink-0" />
+              <ArrowLeftRight size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">Saldo en cuenta</span>
               <InfoTooltip text="Total en la cuenta bancaria hoy. El sistema calcula el ingreso por transferencia restando el saldo de ayer al de hoy." />
             </div>
             {!editandoSaldoCuenta && (
               <button onClick={() => { setSaldoCuentaInput(saldoCuentaHoy ?? ''); setEditandoSaldoCuenta(true); }}
-                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-500 hover:underline flex items-center gap-1">
+                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
                 <Pencil size={11} /> {saldoCuentaMov ? 'Editar' : 'Ingresar'}
               </button>
             )}
@@ -1595,21 +1685,21 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 value={saldoCuentaInput} onChange={e => setSaldoCuentaInput(e.target.value)} autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleSaldoCuenta()} />
               <button onClick={handleSaldoCuenta} className="shrink-0 min-w-11 min-h-11 sm:min-h-0 bg-blue-600 text-white px-3 rounded-lg text-sm font-medium hover:bg-blue-700">OK</button>
-              <button onClick={() => setEditandoSaldoCuenta(false)} aria-label="Cancelar" className="shrink-0 min-w-11 min-h-11 sm:min-h-0 text-slate-400 hover:text-slate-600 px-2">✕</button>
+              <button onClick={() => setEditandoSaldoCuenta(false)} aria-label="Cancelar" className="shrink-0 min-w-11 min-h-11 sm:min-h-0 text-slate-500 dark:text-slate-400 hover:text-slate-600 px-2">✕</button>
             </div>
           ) : (
             <div className="mt-1">
-              <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+              <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`}>
                 {ocultarSaldos ? '••••••' : (saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—')}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>
                 {ingresoTransDia !== null ? (
-                  <span className={`text-xs font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-                    {ingresoTransDia >= 0 ? '↑' : '↓'} {ocultarSaldos ? '••••' : (pctTransDia !== null ? `${Math.abs(pctTransDia).toFixed(1)}%` : fmt(Math.abs(ingresoTransDia)))} vs. día anterior
+                  <span className={`text-xs font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {ingresoTransDia >= 0 ? '↑' : '↓'} {ocultarSaldos ? '••••' : (pctTransDia !== null ? `${fmtPct(pctTransDia, { signo: false })}` : fmt(Math.abs(ingresoTransDia)))} vs. día anterior
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy.' : 'Sin datos de cuenta'}
                   </span>
                 )}
@@ -1619,47 +1709,45 @@ export default function CajaView({ rubros = [], onNavigate }) {
         </div>
       </div>
 
-      {/* Atajo al resumen. El detalle vive al final, que es donde corresponde:
-          es el total de los gastos que están más abajo, y un total arriba de lo
-          que suma se lee al revés. Lo que sí estaba mal era el alcance —"¿cuánto
-          me queda?" es la pregunta con la que se entra a la Caja y quedaba a
-          nueve gastos de scroll—, así que se adelanta solo la línea de fondo.
-          Tocarla baja al detalle. Mobile únicamente: en desktop las dos columnas
-          dejan el resumen a la vista sin esto. */}
+      {/* Atajo al resumen: "¿cuánto me queda?" es la pregunta con la que se entra a
+          la Caja. El detalle vive al final (es el total de lo que está más abajo);
+          arriba va solo la línea de fondo. Tocarlo baja al detalle. Desde xl no
+          hace falta: el cierre del día está fijo en la columna derecha. */}
       <button
         onClick={() => resumenRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-        className="sm:hidden w-full flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-left active:bg-slate-50 dark:active:bg-slate-700/40 transition-colors"
+        className="xl:hidden w-full flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/40 active:bg-slate-50 dark:active:bg-slate-700/40 transition-colors"
       >
-        <span className="flex-1 min-w-0 space-y-1">
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <Banknote size={12} className="text-green-600 shrink-0" /> Resta efectivo
-            </span>
-            <span className={`text-sm font-bold tabular-nums ${restaEfvo >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>
-              {fmt(restaEfvo)}
-            </span>
+        <span className="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-1">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <Banknote size={13} className="text-green-700 dark:text-green-400 shrink-0" /> Queda en efectivo
           </span>
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <ArrowLeftRight size={12} className="text-blue-600 shrink-0" /> Resta transferencia
-            </span>
-            <span className={`text-sm font-bold tabular-nums ${restaTrans >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>
-              {fmt(restaTrans)}
-            </span>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <ArrowLeftRight size={13} className="text-blue-700 dark:text-blue-400 shrink-0" /> Queda en cuenta
           </span>
+          <span className={`text-base sm:text-lg font-bold tabular-nums whitespace-nowrap ${restaEfvo >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600 dark:text-red-400'}`}>
+            {ocultarSaldos ? '••••••' : fmt(restaEfvo)}
+          </span>
+          <span className={`text-base sm:text-lg font-bold tabular-nums whitespace-nowrap ${restaTrans >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600 dark:text-red-400'}`}>
+            {ocultarSaldos ? '••••••' : fmt(restaTrans)}
+          </span>
+          {(sinConfirmarEfvo + sinConfirmarTrans) > 0 && (
+            <span className="col-span-2 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              <Clock size={12} /> {gastosPend.length} por confirmar · {fmt(sinConfirmarEfvo + sinConfirmarTrans)}
+            </span>
+          )}
         </span>
-        <ChevronDown size={16} className="text-slate-400 shrink-0" />
+        <ChevronDown size={16} className="text-slate-500 dark:text-slate-400 shrink-0" />
       </button>
 
       {/* Ingresos extra */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Plus size={14} className="text-amber-500" />
+            <Plus size={14} className="text-amber-600 dark:text-amber-400" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ingresos extra</h3>
-            {ingresosExtra.length > 0 && <span className="text-xs text-slate-400">{fmt(ingresosExtra.reduce((s,m) => s+m.monto,0))}</span>}
+            {ingresosExtra.length > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{fmt(ingresosExtra.reduce((s,m) => s+m.monto,0))}</span>}
           </div>
-          <button onClick={() => openForm('ingreso_extra')} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0"><Plus size={13} /> Agregar</button>
+          <button onClick={() => openForm('ingreso_extra')} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0"><Plus size={13} /> Agregar</button>
         </div>
         {/* La edición de un cobro de deuda (ingreso con movimiento_id) se renderiza
             en la sección "Deudas por cobrar", no acá. */}
@@ -1675,7 +1763,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 m={m}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                colorMonto={m.origen === 'subrubro' ? 'text-green-600' : 'text-amber-600'}
+                colorMonto={m.origen === 'subrubro' ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}
                 subrubro={m.origen === 'subrubro' ? subrubroDe(m) : null}
                 onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
               />
@@ -1689,15 +1777,15 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <div className="flex items-center justify-between mb-2">
           <button type="button" onClick={() => setEmpleadosOpen(v => !v)}
             className="flex items-center gap-2 min-h-11 sm:min-h-0 text-left flex-1 min-w-0 hover:opacity-80 transition-opacity">
-            <Users size={14} className="text-green-600 shrink-0" />
+            <Users size={14} className="text-green-700 dark:text-green-400 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cajas empleados</h3>
-            {empleados.length > 0 && <span className="text-xs text-slate-400">{fmt(empleados.reduce((s,m) => s+m.monto,0))}</span>}
+            {empleados.length > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{fmt(empleados.reduce((s,m) => s+m.monto,0))}</span>}
             {!empleadosOpen && empleados.length > 0 && (
-              <span className="text-xs text-slate-400 dark:text-slate-500">· {empleados.length}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">· {empleados.length}</span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${empleadosOpen ? 'rotate-180' : ''}`} />
           </button>
-          <button onClick={() => { setEmpleadosOpen(true); openForm('empleado'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={13} /> Agregar</button>
+          <button onClick={() => { setEmpleadosOpen(true); openForm('empleado'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0 ml-2"><Plus size={13} /> Agregar</button>
         </div>
         {empleadosOpen && (
           <>
@@ -1705,11 +1793,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
               <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'} /></div>
             )}
             {empleados.length === 0 && !(showForm && tipoForm === 'empleado') && (
-              <p className="text-xs text-slate-400 py-2 text-center">Sin empleados cargados</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-2 text-center">Sin empleados cargados</p>
             )}
             {empleados.map(m => (
               <div key={m.id} className="mb-1.5 sm:mb-2">
-                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-600" />}
+                {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} colorMonto="text-green-700 dark:text-green-400" />}
               </div>
             ))}
           </>
@@ -1725,20 +1813,20 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <div className="mb-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-y-1">
           <button type="button" onClick={() => setGastosOpen(v => !v)}
             className="w-full sm:w-auto flex items-center gap-2 min-h-11 sm:min-h-0 text-left sm:flex-1 sm:min-w-0 hover:opacity-80 transition-opacity">
-            <ShoppingCart size={14} className="text-slate-400 shrink-0" />
+            <ShoppingCart size={14} className="text-slate-500 dark:text-slate-400 shrink-0" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 sm:truncate">Gastos y proveedores</h3>
             <span className="hidden sm:contents">
-              {gastos.length > 0 && <span className="text-xs text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
+              {gastos.length > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{fmt(gastos.reduce((s,m) => s+m.monto,0))}</span>}
               {!gastosOpen && gastos.length > 0 && (
-                <span className="text-xs text-slate-400 dark:text-slate-500">· {gastos.length}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">· {gastos.length}</span>
               )}
             </span>
-            <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ml-auto sm:ml-0 ${gastosOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ml-auto sm:ml-0 ${gastosOpen ? 'rotate-180' : ''}`} />
           </button>
           <div className="flex items-center gap-2 sm:contents">
             {/* El total solo en mobile: en `sm:` ya va pegado al título. */}
             {gastos.length > 0 && (
-              <span className="sm:hidden text-xs text-slate-400 tabular-nums">
+              <span className="sm:hidden text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                 {fmt(gastos.reduce((s,m) => s+m.monto,0))} · {gastos.length}
               </span>
             )}
@@ -1753,13 +1841,13 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 <Percent size={10} /> {fmt(totalDescuentos)}
               </button>
             )}
-            {gastos.length > 0 && (
+            {gastosPend.length > 0 && (
               <button onClick={allGastosSelected ? clearSelection : selectAllGastos}
                 className="min-h-11 sm:min-h-0 px-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-auto sm:ml-2">
-                {allGastosSelected ? 'Quitar selección' : 'Seleccionar todos'}
+                {allGastosSelected ? 'Quitar selección' : 'Seleccionar pendientes'}
               </button>
             )}
-            <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-500 hover:underline flex items-center gap-1 shrink-0 sm:ml-2"><Plus size={13} /> Agregar</button>
+            <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0 sm:ml-2"><Plus size={13} /> Agregar</button>
           </div>
         </div>
         {gastosOpen && (
@@ -1768,7 +1856,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
               <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'gasto'} /></div>
             )}
             {gastos.length === 0 && !(showForm && tipoForm === 'gasto') && (
-              <p className="text-xs text-slate-400 py-2 text-center">Sin gastos cargados</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-2 text-center">Sin gastos cargados</p>
             )}
             {/* Agrupados por método (transferencias → efectivo → sin método) y dentro
                 de cada grupo alfabéticamente por proveedor/concepto. */}
@@ -1777,7 +1865,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 <GrupoHeader grupo={grupo} />
                 {grupo.items.map(m => (
                   <div key={m.id} className="mb-1.5 sm:mb-2">
-                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-500" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoDe(m)} onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })} onEditarBoleta={setBoletaDe} />}
+                    {editingMov?.id === m.id && showForm ? null : <MovRow m={m} onEdit={handleEdit} onDelete={handleDelete} onConfirmar={handleConfirmarGasto} colorMonto="text-red-600 dark:text-red-400" confirming={confirmingId === m.id} subrubro={subrubroDe(m)} onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined} selectable={m.confirmado === false} selected={selectedIds.has(m.id)} onToggleSelect={toggleSelection} hideMetodo aplicaDescuento={!!subrubroDe(m)?.aplica_descuento} bloqueoConfirmar={bloqueoDe(m)} onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: fecha })} onEditarBoleta={setBoletaDe} />}
                   </div>
                 ))}
               </div>
@@ -1796,27 +1884,27 @@ export default function CajaView({ rubros = [], onNavigate }) {
           <div className="mb-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-y-1">
             <button type="button" onClick={() => setDeudasOpen(v => !v)}
               className="w-full sm:w-auto flex items-center gap-2 min-h-11 sm:min-h-0 text-left sm:flex-1 sm:min-w-0 hover:opacity-80 transition-opacity">
-              <HandCoins size={14} className="text-slate-400 shrink-0" />
+              <HandCoins size={14} className="text-slate-500 dark:text-slate-400 shrink-0" />
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 sm:truncate">Deudas por cobrar</h3>
               <span className="hidden sm:contents">
-                {deudasCobro.length > 0 && <span className="text-xs text-slate-400">{fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))}</span>}
+                {deudasCobro.length > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))}</span>}
                 {!deudasOpen && deudasCobro.length > 0 && (
-                  <span className="text-xs text-slate-400 dark:text-slate-500">· {deudasCobro.length}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">· {deudasCobro.length}</span>
                 )}
               </span>
               <InfoTooltip text="Plata que te deben, vencida o por vencer. Al confirmar el cobro con ✓ se registra el abono en el subrubro y el monto se suma a los ingresos del día bajo su método." />
-              <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ml-auto sm:ml-0 ${deudasOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ml-auto sm:ml-0 ${deudasOpen ? 'rotate-180' : ''}`} />
             </button>
             <div className="flex items-center gap-2 sm:contents">
               {deudasCobro.length > 0 && (
-                <span className="sm:hidden text-xs text-slate-400 tabular-nums">
+                <span className="sm:hidden text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                   {fmt(deudasCobro.reduce((s, m) => s + m.monto, 0))} · {deudasCobro.length}
                 </span>
               )}
-              {deudasCobro.length > 0 && (
+              {deudasPend.length > 0 && (
                 <button onClick={allDeudasSelected ? clearSelection : selectAllDeudas}
                   className="min-h-11 sm:min-h-0 px-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-500 hover:underline shrink-0 ml-auto sm:ml-2">
-                  {allDeudasSelected ? 'Quitar selección' : 'Seleccionar todas'}
+                  {allDeudasSelected ? 'Quitar selección' : 'Seleccionar pendientes'}
                 </button>
               )}
             </div>
@@ -1837,11 +1925,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
                           onEdit={handleEdit}
                           onDelete={handleDelete}
                           onConfirmar={handleConfirmarGasto}
-                          colorMonto="text-orange-500"
+                          colorMonto="text-orange-700 dark:text-orange-400"
                           confirming={confirmingId === m.id}
                           subrubro={subrubroDe(m)}
                           onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
-                          selectable
+                          selectable={m.confirmado === false}
                           selected={selectedIds.has(m.id)}
                           onToggleSelect={toggleSelection}
                           hideMetodo
@@ -1864,23 +1952,44 @@ export default function CajaView({ rubros = [], onNavigate }) {
       {proximos.length > 0 && (
         <button type="button" onClick={() => setShowProximos(true)}
           className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
-          <Clock size={15} className="text-slate-400 shrink-0" />
+          <Clock size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Próximos vencimientos</span>
-          <span className="text-xs text-slate-400 tabular-nums">· {proximos.length}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">· {proximos.length}</span>
           <span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300 tabular-nums">{fmt(proximos.reduce((s, m) => s + m.monto, 0))}</span>
-          <ChevronRight size={15} className="text-slate-400 shrink-0" />
+          <ChevronRight size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
         </button>
       )}
 
       {/* Resumen — al final, después de los gastos que suma. El acceso rápido
           está arriba (botón "Resta efectivo / Resta transferencia"). */}
-      <div ref={resumenRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 scroll-mt-20">
-        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-600"
+      <div ref={resumenRef} className="xl:hidden grid grid-cols-1 sm:grid-cols-2 gap-3 scroll-mt-4">
+        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-700 dark:text-green-400"
           disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
-        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-600"
+        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-700 dark:text-blue-400"
           disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
       </div>
+    </div>
+
+      {/* Cierre del día (xl): fijo arriba de la columna derecha mientras se
+          recorre la lista. */}
+      <aside aria-label="Cierre del día" className="hidden xl:block sticky top-0 space-y-3">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 px-1">Cierre del día</h2>
+        <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-700 dark:text-green-400"
+          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
+        <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-700 dark:text-blue-400"
+          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
+          labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
+        {proximos.length > 0 && (
+          <button type="button" onClick={() => setShowProximos(true)}
+            className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
+            <Clock size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Próximos</span>
+            <span className="text-xs text-slate-500 tabular-nums">· {proximos.length}</span>
+            <span className="ml-auto text-sm font-semibold text-slate-700 dark:text-slate-300 tabular-nums">{fmt(proximos.reduce((a, m) => a + m.monto, 0))}</span>
+          </button>
+        )}
+      </aside>
 
       {showProximos && proximos.length > 0 && (
         <Modal title={`Próximos vencimientos · ${fmt(proximosFiltrados.reduce((s, m) => s + m.monto, 0))}`} size="xl" onClose={() => setShowProximos(false)}>
@@ -1909,7 +2018,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             <div className="mb-2"><EntryForm {...formProps} initial={editingMov} /></div>
           )}
           {proximosFiltrados.length === 0 && (
-            <p className="text-xs text-slate-400 py-4 text-center">No hay vencimientos próximos en {filtroProximos === 'efectivo' ? 'efectivo' : 'transferencia'}.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 py-4 text-center">No hay vencimientos próximos en {filtroProximos === 'efectivo' ? 'efectivo' : 'transferencia'}.</p>
           )}
           {/* Agrupados por fecha de vencimiento: un encabezado por día con su total, y
               las filas de ese día juntas, sin repetir la fecha en cada una. */}
@@ -1917,7 +2026,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
             <div key={dia} className="mb-3 last:mb-0">
               <div className="flex items-baseline justify-between px-1 mb-1">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Vence {formatFechaMobile(dia)}</span>
-                <span className="text-xs text-slate-400 tabular-nums">{fmt(items.reduce((s, m) => s + m.monto, 0))} · {items.length}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">{fmt(items.reduce((s, m) => s + m.monto, 0))} · {items.length}</span>
               </div>
               <div className="space-y-1">
                 {items.map(m => (editingMov?.id === m.id && showForm ? null : (
@@ -1927,7 +2036,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onConfirmar={(mov, opts) => handleConfirmarGasto(mov, opts, { fechaPago: todayStr() })}
-                    colorMonto="text-red-500"
+                    colorMonto="text-red-600 dark:text-red-400"
                     confirming={confirmingId === m.id}
                     subrubro={subrubroDe(m)}
                     onGoToSubrubro={onNavigate ? handleGoToSubrubro : undefined}
@@ -1951,7 +2060,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       {deleteId !== null && (
         <ConfirmModal
-          message="¿Estás seguro de que querés eliminar este pago? Esta acción no se puede deshacer."
+          message={(() => {
+            const m = movs.find(x => x.id === deleteId) || proximos.find(x => x.id === deleteId);
+            return m ? `¿Eliminar "${conceptoLimpio(m)}" por ${fmt(m.monto)}?` : '¿Eliminar este ítem de la caja?';
+          })()}
+          detail="Si es un pago confirmado, también se borra el pago registrado en el subrubro. No se puede deshacer."
           confirmLabel="Eliminar"
           onConfirm={confirmDelete}
           onCancel={() => setDeleteId(null)}
@@ -1994,8 +2107,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       {selectedGastos.length > 0 && (
         <SeleccionPanel
-          total={selTotal}
-          count={selectedGastos.length}
+          total={selTotalConf}
+          count={selAConfirmar.length}
+          sinMetodo={selSinMetodo}
           subNames={selSubNames}
           onClear={clearSelection}
           onConfirmar={bulkConfirmSeleccionados}
@@ -2037,7 +2151,7 @@ function PagoParcialModal({ item, onConfirm, onClose }) {
             value={monto} onChange={e => setMonto(e.target.value)} placeholder="0,00" />
         </label>
         {n > 0 && (
-          <p className={`text-xs ${valido ? 'text-slate-500 dark:text-slate-400' : 'text-red-500'}`}>
+          <p className={`text-xs ${valido ? 'text-slate-500 dark:text-slate-400' : 'text-red-600 dark:text-red-400'}`}>
             {valido
               ? <>Queda pendiente <span className="tabular-nums font-semibold">{fmt(saldo - n)}</span>, que va a seguir apareciendo en la Caja hasta pagarse.</>
               : n >= saldo ? 'Para pagar el total usá el botón ✓ de la fila.' : 'Ingresá un monto mayor a 0.'}
@@ -2103,7 +2217,7 @@ function EditarBoletaModal({ item, onSaved, onClose }) {
   return (
     <Modal title={esCobro ? 'Editar deuda' : esRemito ? 'Editar remito' : 'Editar boleta'} size="sm" onClose={onClose}>
       {!boleta ? (
-        <p className="text-sm text-slate-400 py-6 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando…</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando…</p>
       ) : (
         <form onSubmit={guardar} className="space-y-3">
           <p className="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">{conceptoLimpio(item)}</p>
@@ -2125,7 +2239,7 @@ function EditarBoletaModal({ item, onSaved, onClose }) {
           )}
           <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
             {boleta.pagado > 0.005 && <p>Ya pagado: <span className="tabular-nums">{fmt(boleta.pagado)}</span></p>}
-            <p>Queda pendiente en la Caja: <span className={`tabular-nums font-semibold ${saldoNuevo <= 0.005 ? 'text-green-600' : ''}`}>{fmt(Math.max(0, saldoNuevo))}</span></p>
+            <p>Queda pendiente en la Caja: <span className={`tabular-nums font-semibold ${saldoNuevo <= 0.005 ? 'text-green-700 dark:text-green-400' : ''}`}>{fmt(Math.max(0, saldoNuevo))}</span></p>
             <p>El cambio se guarda en la {esCobro ? 'deuda' : 'boleta'} del subrubro.</p>
           </div>
           <div className="flex gap-2 pt-1">
@@ -2144,7 +2258,7 @@ function EditarBoletaModal({ item, onSaved, onClose }) {
 
 // Panel flotante de resumen de la selección múltiple de gastos: total acumulado,
 // cantidad y subrubro(s) involucrado(s). Acciones: marcar como pagados / limpiar.
-function SeleccionPanel({ total, count, subNames, onClear, onConfirmar }) {
+function SeleccionPanel({ total, count, sinMetodo = 0, subNames, onClear, onConfirmar }) {
   const subLabel = subNames.length === 0
     ? 'Sin subrubro'
     : subNames.length === 1
@@ -2154,23 +2268,24 @@ function SeleccionPanel({ total, count, subNames, onClear, onConfirmar }) {
     // En mobile sube por encima de la bottom nav; en desktop conserva su posición
     // de siempre. El offset sale de `.bottom-above-nav` (index.css), que se apoya
     // en el mismo --bottomnav-h que usa la barra: si cambia el alto, se mueven las dos.
-    <div className="fixed bottom-above-nav left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] max-w-lg">
+    <div role="region" aria-label="Selección" className="fixed bottom-above-nav left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] max-w-lg">
       <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl ring-1 ring-white/10 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs text-slate-400 hidden sm:inline">Total seleccionado</span>
+            <span className="text-xs text-slate-300 hidden sm:inline">A confirmar</span>
             <span className="text-lg font-bold text-green-400 tabular-nums">{fmt(total)}</span>
           </div>
-          <div className="text-xs text-slate-400 mt-0.5 truncate">
-            {count} {count === 1 ? 'mov.' : 'movs.'} · <span className="text-slate-200">{subLabel}</span>
+          <div className="text-xs text-slate-300 mt-0.5 truncate">
+            {count} {count === 1 ? 'pago' : 'pagos'} · <span className="text-slate-100">{subLabel}</span>
+            {sinMetodo > 0 && <> · <span className="text-amber-300">{sinMetodo} sin método</span></>}
           </div>
         </div>
-        <button onClick={onConfirmar}
-          className="text-xs font-medium px-3 min-h-11 sm:min-h-0 sm:py-1.5 rounded-lg bg-green-600 hover:bg-green-500 transition-colors shrink-0 flex items-center gap-1">
-          <Check size={14} /> <span className="hidden sm:inline">Marcar </span>pagados
+        <button onClick={onConfirmar} disabled={count === 0}
+          className="text-sm font-semibold px-3 min-h-11 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-40 transition-colors shrink-0 flex items-center gap-1.5">
+          <Check size={15} /> Confirmar
         </button>
         <button onClick={onClear} title="Limpiar selección" aria-label="Limpiar selección"
-          className="w-11 h-11 sm:w-auto sm:h-auto flex items-center justify-center text-slate-400 hover:text-white transition-colors shrink-0">
+          className="w-11 h-11 flex items-center justify-center text-slate-300 hover:text-white transition-colors shrink-0">
           <X size={18} />
         </button>
       </div>

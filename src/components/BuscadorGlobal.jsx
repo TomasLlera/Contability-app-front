@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { movimientosApi } from '../api';
 import { Search, X } from 'lucide-react';
 import { EntityIcon } from '../icons';
+import { fmtMoneda } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 
 export default function BuscadorGlobal({ onNavigate, onClose }) {
   const [query, setQuery] = useState('');
@@ -58,7 +59,7 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
       >
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-          <Search size={16} className="text-slate-400 shrink-0" />
+          <Search size={16} className="text-slate-500 dark:text-slate-400 shrink-0" />
           <input
             ref={inputRef}
             value={query}
@@ -68,25 +69,25 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
             className="flex-1 bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none"
           />
           {query && (
-            <button onClick={() => cambiarQuery('')} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+            <button onClick={() => cambiarQuery('')} className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
               <X size={14} />
             </button>
           )}
-          <kbd className="hidden sm:block text-xs text-slate-400 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">Esc</kbd>
+          <kbd className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">Esc</kbd>
         </div>
 
         {/* Results */}
         <div className="max-h-[420px] overflow-y-auto">
           {loading && (
-            <div className="py-10 text-center text-slate-400 text-sm">Buscando...</div>
+            <div className="py-10 text-center text-slate-500 dark:text-slate-400 text-sm">Buscando...</div>
           )}
           {!loading && query.trim().length >= 2 && results.length === 0 && (
-            <div className="py-10 text-center text-slate-400 text-sm">
+            <div className="py-10 text-center text-slate-500 dark:text-slate-400 text-sm">
               Sin resultados para <strong className="text-slate-600 dark:text-slate-300">"{query}"</strong>
             </div>
           )}
           {!loading && query.trim().length < 2 && (
-            <div className="py-10 text-center text-slate-400 text-sm">
+            <div className="py-10 text-center text-slate-500 dark:text-slate-400 text-sm">
               Escribí al menos 2 caracteres
             </div>
           )}
@@ -104,7 +105,7 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
                   <span className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">
                     {mov.subrubro?.nombre}
                   </span>
-                  <span className="text-xs text-slate-400 shrink-0">{mov.rubro?.nombre}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{mov.rubro?.nombre}</span>
                   {mov.campos_extra?.nro_factura && (
                     <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded shrink-0">
                       {mov.campos_extra.nro_factura}
@@ -116,17 +117,17 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
                 </p>
               </div>
               <div className="text-right shrink-0 ml-2">
-                <p className={`text-sm font-bold ${mov.tipo === 'factura' ? 'text-slate-800 dark:text-slate-100' : 'text-emerald-600'}`}>
+                <p className={`text-sm font-bold ${mov.tipo === 'factura' ? 'text-slate-800 dark:text-slate-100' : 'text-emerald-700 dark:text-emerald-400'}`}>
                   {mov.tipo === 'factura' ? fmt(mov.monto) : `+${fmt(mov.pago)}`}
                 </p>
-                <p className="text-xs text-slate-400">{mov.fecha || 'Sin fecha'}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{mov.fecha || 'Sin fecha'}</p>
               </div>
             </button>
           ))}
         </div>
 
         {results.length > 0 && (
-          <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 flex items-center gap-3 text-xs text-slate-400">
+          <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
             <span>{results.length} resultado{results.length !== 1 ? 's' : ''}</span>
             <span className="hidden sm:block">· ↑↓ navegar · Enter seleccionar</span>
           </div>

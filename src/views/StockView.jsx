@@ -1,11 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { stockApi, subrubrosApi, rubrosApi, getErrorMsg } from '../api';
 import toast from 'react-hot-toast';
+import RowActions from '../components/RowActions';
+import { confirmar } from '../utils/confirmar';
 import { Plus, Pencil, Trash2, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal, AlertTriangle, Package, ChevronRight, ChevronDown, X, Check, Link2, Percent, Download, Upload } from 'lucide-react';
 import { EntityIcon } from '../icons';
+import { fmtMoneda, fmtNum } from '../utils/formato';
+import { fmtFecha } from '../utils/fecha';
+import DialogShell from '../components/DialogShell';
+import Skeleton from '../components/Skeleton';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
-const fmtNum = (n) => new Intl.NumberFormat('es-AR').format(n ?? 0);
+const fmt = fmtMoneda;
+
+// "12 unidades" / "1 unidad": antes decía "0 unidad" para cualquier cantidad.
+const PLURALES = { unidad: 'unidades', litro: 'litros', caja: 'cajas', bolsa: 'bolsas', rollo: 'rollos', par: 'pares', paquete: 'paquetes', docena: 'docenas' };
+const unidadDe = (p) => (Math.abs(Number(p.stock_actual)) === 1 ? p.unidad : (PLURALES[p.unidad] || p.unidad));
 
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400';
 const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1';
@@ -57,8 +66,8 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
         onClick={() => { setOpen(o => !o); setRubroActivo(null); }}
         className="w-full flex items-center gap-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
       >
-        <Link2 size={13} className="text-slate-400 shrink-0" />
-        <span className={`flex-1 text-left truncate ${value ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+        <Link2 size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
+        <span className={`flex-1 text-left truncate ${value ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`}>
           {valueName || 'Sin vínculo'}
         </span>
         {value && (
@@ -68,7 +77,7 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
             className="text-slate-300 hover:text-red-400 transition-colors shrink-0"
           ><X size={13} /></span>
         )}
-        <ChevronDown size={13} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={13} className={`text-slate-500 dark:text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -90,7 +99,7 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
                   >
                     <span className="shrink-0 text-slate-600 dark:text-slate-300"><EntityIcon value={r.icon} size={16} /></span>
                     <span className="flex-1 font-medium truncate">{r.nombre}</span>
-                    <ChevronRight size={13} className="text-slate-400 shrink-0" />
+                    <ChevronRight size={13} className="text-slate-500 dark:text-slate-400 shrink-0" />
                   </div>
                 ))}
               </div>
@@ -107,7 +116,7 @@ function SubrubroSelector({ value, valueName, onChange, rubros }) {
               </button>
               <div className="overflow-y-auto flex-1">
                 {subrubros.length === 0 && (
-                  <p className="px-4 py-3 text-xs text-slate-400">Sin subrubros</p>
+                  <p className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">Sin subrubros</p>
                 )}
                 {subrubros.map(s => (
                   <div
@@ -222,7 +231,7 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
 
       {/* Subrubro */}
       <div>
-        <label className={labelCls}>Subrubro <span className="font-normal text-slate-400">(opcional)</span></label>
+        <label className={labelCls}>Subrubro <span className="font-normal text-slate-500 dark:text-slate-400">(opcional)</span></label>
         <SubrubroSelector
           value={form.subrubro_id}
           valueName={subrubroName}
@@ -273,7 +282,7 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
                   </label>
                   <div className="relative">
                     <input className={inputCls + ' pr-6'} type="number" inputMode="decimal" min="0" value={form.iva} onChange={e => handleIvaChange(e.target.value)} placeholder="0" />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">%</span>
                   </div>
                 </div>
                 <div>
@@ -288,7 +297,7 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
                   </label>
                   <div className="relative">
                     <input className={inputCls + ' pr-6'} type="number" inputMode="decimal" min="0" value={margen} onChange={e => handleMargenChange(e.target.value)} placeholder="0" />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">%</span>
                   </div>
                 </div>
                 <div>
@@ -297,8 +306,8 @@ function ProductoForm({ rubros, inicial, onSave, onCancel }) {
                 </div>
               </div>
               {precioConIva > 0 && precioFinal > 0 && (
-                <p className="text-xs text-slate-400">
-                  Ganancia: <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmt(precioFinal - precioConIva)}</span> por unidad
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Ganancia: <span className="font-medium text-emerald-700 dark:text-emerald-400">{fmt(precioFinal - precioConIva)}</span> por unidad
                 </p>
               )}
             </>
@@ -396,11 +405,11 @@ function PreciosTab({ productos, onActualizar }) {
         </select>
         {(filtroSub || filtroCat) && (
           <button onClick={() => { setFiltroSub(''); setFiltroCat(''); setSeleccionados(new Set()); }}
-            className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+            className="text-xs text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors">
             Limpiar filtros
           </button>
         )}
-        <span className="ml-auto text-xs text-slate-400">{filtrados.length} productos</span>
+        <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{filtrados.length} productos</span>
       </div>
 
       {/* Panel de ajuste */}
@@ -429,7 +438,7 @@ function PreciosTab({ productos, onActualizar }) {
               <input type="number" inputMode="decimal" min="0" value={ajusteValor} onChange={e => setAjusteValor(e.target.value)}
                 placeholder="0"
                 className="w-28 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 pr-7 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">
                 {ajusteTipo === 'porcentaje' ? '%' : '$'}
               </span>
             </div>
@@ -455,7 +464,7 @@ function PreciosTab({ productos, onActualizar }) {
 
       {/* Tabla */}
       {filtrados.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 text-sm">Sin productos para mostrar</div>
+        <div className="text-center py-12 text-slate-500 dark:text-slate-400 text-sm">Sin productos para mostrar</div>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
@@ -484,22 +493,22 @@ function PreciosTab({ productos, onActualizar }) {
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <div className="flex flex-col gap-0.5">
                         {p.subrubro_nombre && <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full w-fit">{p.subrubro_nombre}</span>}
-                        {p.categoria && <span className="text-xs text-slate-400">{p.categoria}</span>}
+                        {p.categoria && <span className="text-xs text-slate-500 dark:text-slate-400">{p.categoria}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       {preview?.costo != null && preview.costo !== p.precio_costo ? (
                         <div className="flex flex-col items-end leading-tight">
-                          <span className="text-xs text-slate-400 line-through">{fmt(p.precio_costo)}</span>
-                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{fmt(preview.costo)}</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 line-through">{fmt(p.precio_costo)}</span>
+                          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{fmt(preview.costo)}</span>
                         </div>
                       ) : <span className="text-slate-600 dark:text-slate-300">{p.precio_costo ? fmt(p.precio_costo) : '—'}</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {preview?.venta != null && preview.venta !== p.precio_venta ? (
                         <div className="flex flex-col items-end leading-tight">
-                          <span className="text-xs text-slate-400 line-through">{fmt(p.precio_venta)}</span>
-                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{fmt(preview.venta)}</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 line-through">{fmt(p.precio_venta)}</span>
+                          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{fmt(preview.venta)}</span>
                         </div>
                       ) : <span className="text-slate-600 dark:text-slate-300">{p.precio_venta ? fmt(p.precio_venta) : '—'}</span>}
                     </td>
@@ -536,11 +545,11 @@ function MovimientoModal({ producto, onClose, onDone }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <DialogShell onClose={onClose} label="Registrar movimiento de stock">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-800 dark:text-slate-100">Registrar movimiento</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+          <button onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{producto.nombre} — stock actual: <strong className="text-slate-700 dark:text-slate-200">{fmtNum(producto.stock_actual)} {producto.unidad}</strong></p>
         <div className="space-y-3">
@@ -563,7 +572,7 @@ function MovimientoModal({ producto, onClose, onDone }) {
           </button>
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 }
 
@@ -622,7 +631,15 @@ export default function StockView({ role }) {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (p) => {
+    // Antes borraba al primer toque, con un ícono de 14px pegado al de editar.
+    const ok = await confirmar({
+      message: `¿Eliminar el producto "${p.nombre}"?`,
+      detail: `Stock actual: ${fmtNum(p.stock_actual)} ${unidadDe(p)}. Se pierde también su historial de movimientos. No se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+    });
+    if (!ok) return;
+    const id = p.id;
     try {
       await stockApi.deleteProducto(id);
       toast.success('Eliminado');
@@ -649,7 +666,7 @@ export default function StockView({ role }) {
 
   const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()) || (p.categoria || '').toLowerCase().includes(search.toLowerCase()));
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>;
+  if (loading) return <Skeleton />;
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -658,7 +675,7 @@ export default function StockView({ role }) {
       {alertas.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">{alertas.length} producto{alertas.length !== 1 ? 's' : ''} con stock bajo</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -680,7 +697,7 @@ export default function StockView({ role }) {
           ['historial', 'Historial'],
         ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+            className={`flex-1 py-2 min-h-11 sm:min-h-0 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>
             {label}
           </button>
         ))}
@@ -703,15 +720,15 @@ export default function StockView({ role }) {
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            <button onClick={handleExport} title="Exportar Excel"
-              className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-sm">
+            <button onClick={handleExport} title="Exportar Excel" aria-label="Exportar Excel"
+              className="min-w-11 pointer-coarse:min-h-11 justify-center border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-sm">
               <Download size={14} /> <span className="hidden sm:inline">Exportar</span>
             </button>
             {isAdmin && (
               <>
                 <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
-                <button onClick={() => importRef.current?.click()} disabled={importing} title="Importar Excel"
-                  className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-sm disabled:opacity-50">
+                <button onClick={() => importRef.current?.click()} disabled={importing} title="Importar Excel" aria-label="Importar Excel"
+                  className="min-w-11 pointer-coarse:min-h-11 justify-center border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 text-sm disabled:opacity-50">
                   <Upload size={14} /> <span className="hidden sm:inline">{importing ? 'Importando...' : 'Importar'}</span>
                 </button>
               </>
@@ -722,7 +739,7 @@ export default function StockView({ role }) {
             <div className="bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-12 text-center">
               <Package size={40} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
               <p className="font-semibold text-slate-600 dark:text-slate-300">{search ? 'Sin resultados' : 'Sin productos'}</p>
-              {!search && isAdmin && <p className="text-sm text-slate-400 mt-1">Hacé clic en "Nuevo" para agregar el primero</p>}
+              {!search && isAdmin && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Hacé clic en "Nuevo" para agregar el primero</p>}
             </div>
           ) : (
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
@@ -755,11 +772,11 @@ export default function StockView({ role }) {
                         <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{p.nombre}</td>
                         <td className="px-4 py-3 text-slate-500 dark:text-slate-400 hidden sm:table-cell">{p.categoria || '—'}</td>
                         <td className="px-4 py-3 text-right">
-                          <span className={`font-semibold ${stockBajo ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                          <span className={`font-semibold ${stockBajo ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'}`}>
                             {fmtNum(p.stock_actual)}
                           </span>
-                          <span className="text-xs text-slate-400 ml-1">{p.unidad}</span>
-                          {stockBajo && <AlertTriangle size={12} className="inline ml-1 text-amber-500" />}
+                          <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">{unidadDe(p)}</span>
+                          {stockBajo && <AlertTriangle size={12} className="inline ml-1 text-amber-700 dark:text-amber-400" aria-label="Stock bajo" />}
                         </td>
                         <td className="px-4 py-3 text-right text-slate-500 dark:text-slate-400 hidden md:table-cell">{p.precio_costo ? fmt(p.precio_costo) : '—'}</td>
                         <td className="px-4 py-3 text-right text-slate-500 dark:text-slate-400 hidden md:table-cell">{p.precio_venta ? fmt(p.precio_venta) : '—'}</td>
@@ -770,24 +787,19 @@ export default function StockView({ role }) {
                           }
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => openHistorial(p)} className="text-slate-400 hover:text-blue-500 transition-colors" title="Ver historial">
-                              <SlidersHorizontal size={14} />
-                            </button>
-                            {isAdmin && (
-                              <>
-                                <button onClick={() => setMovModal(p)} className="text-slate-400 hover:text-emerald-600 transition-colors" title="Registrar movimiento">
-                                  <ArrowDownCircle size={14} />
-                                </button>
-                                <button onClick={() => setEditingId(p.id)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Editar">
-                                  <Pencil size={14} />
-                                </button>
-                                <button onClick={() => handleDelete(p.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
-                                  <Trash2 size={14} />
-                                </button>
-                              </>
-                            )}
-                          </div>
+                          {/* Mobile: menú ⋮ con etiquetas (ActionSheet). Desktop: íconos en línea. */}
+                          <RowActions
+                            title={p.nombre}
+                            className="justify-end"
+                            iconGap="gap-1"
+                            acciones={[
+                              { key: 'historial', label: 'Ver historial', icon: <SlidersHorizontal size={16} />, onClick: () => openHistorial(p) },
+                              isAdmin && { key: 'mov', label: 'Registrar movimiento', hint: 'Entrada, salida o ajuste de stock', icon: <ArrowDownCircle size={16} />, onClick: () => setMovModal(p) },
+                              isAdmin && { key: 'editar', label: 'Editar', icon: <Pencil size={16} />, onClick: () => setEditingId(p.id) },
+                              isAdmin && { key: 'eliminar', label: 'Eliminar', icon: <Trash2 size={16} />, tone: 'danger', onClick: () => handleDelete(p),
+                                className: 'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shrink-0 ml-2' },
+                            ]}
+                          />
                         </td>
                       </tr>
                     );
@@ -824,7 +836,7 @@ export default function StockView({ role }) {
               </div>
               <div className="overflow-y-auto" style={{ maxHeight: '220px' }}>
                 {filtrados.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-sm text-slate-400">Sin resultados</p>
+                  <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">Sin resultados</p>
                 ) : filtrados.map(p => (
                   <div
                     key={p.id}
@@ -832,7 +844,7 @@ export default function StockView({ role }) {
                     className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors text-sm border-b border-slate-50 dark:border-slate-700/50 last:border-0 ${historialId === p.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}`}
                   >
                     <span className="truncate">{p.nombre}</span>
-                    <span className="text-xs text-slate-400 shrink-0 ml-3">Stock: {fmtNum(p.stock_actual)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0 ml-3">Stock: {fmtNum(p.stock_actual)}</span>
                   </div>
                 ))}
               </div>
@@ -858,13 +870,13 @@ export default function StockView({ role }) {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                         {historial.map(m => (
                           <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{m.fecha}</td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{fmtFecha(m.fecha)}</td>
                             <td className="px-4 py-3">
                               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${m.tipo === 'entrada' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : m.tipo === 'salida' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'}`}>
                                 {m.tipo}
                               </span>
                             </td>
-                            <td className={`px-4 py-3 text-right font-semibold ${m.tipo === 'entrada' ? 'text-emerald-600' : m.tipo === 'salida' ? 'text-red-600' : 'text-blue-600'}`}>
+                            <td className={`px-4 py-3 text-right font-semibold ${m.tipo === 'entrada' ? 'text-emerald-700 dark:text-emerald-400' : m.tipo === 'salida' ? 'text-red-600' : 'text-blue-600'}`}>
                               {m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : '='}{fmtNum(m.cantidad)}
                             </td>
                             <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{m.observacion || '—'}</td>
@@ -874,7 +886,7 @@ export default function StockView({ role }) {
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-10 text-slate-400 text-sm">Sin movimientos registrados</div>
+                  <div className="text-center py-10 text-slate-500 dark:text-slate-400 text-sm">Sin movimientos registrados</div>
                 )}
               </>
             )}

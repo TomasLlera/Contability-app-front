@@ -33,10 +33,10 @@ export default function ComparativaVentasModal({ mes: mesInicial, reloadKey = 0,
       <div className="space-y-4">
         <div className="flex items-center justify-center">
           <div className="inline-flex items-center h-8 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden text-xs">
-            <button onClick={() => setMes(m => shiftMes(m, -1))} title="Mes anterior"
+            <button onClick={() => setMes(m => shiftMes(m, -1))} title="Mes anterior" aria-label="Mes anterior"
               className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><ChevronLeft size={14} /></button>
             <span className="h-full flex items-center px-3 border-x border-slate-300 dark:border-slate-600 font-medium text-slate-700 dark:text-slate-200">{labelMes(mes)}</span>
-            <button onClick={() => setMes(m => shiftMes(m, 1))} title="Mes siguiente"
+            <button onClick={() => setMes(m => shiftMes(m, 1))} title="Mes siguiente" aria-label="Mes siguiente"
               className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><ChevronRight size={14} /></button>
           </div>
         </div>

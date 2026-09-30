@@ -11,8 +11,11 @@ import DescuentosPanel from '../components/DescuentosPanel';
 import RowActions from '../components/RowActions';
 import TableScroll from '../components/TableScroll';
 import InfoTooltip from '../components/InfoTooltip';
+import { fmtMoneda } from '../utils/formato';
+import { fmtFecha } from '../utils/fecha';
+import Skeleton from '../components/Skeleton';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 
 // --- Rango de fechas mostrado ---------------------------------------------
 // Al entrar se muestran los últimos 30 días, no el histórico completo: un
@@ -45,7 +48,7 @@ function vencimientoLabel(fechaVenc) {
   if (dias < 0) return { label: `Vencida ${Math.abs(dias)}d`, cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' };
   if (dias === 0) return { label: 'Vence hoy', cls: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' };
   if (dias <= 7) return { label: `Vence en ${dias}d`, cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' };
-  return { label: fechaVenc, cls: 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600' };
+  return { label: fmtFecha(fechaVenc), cls: 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600' };
 }
 
 function parseMes(key) {
@@ -105,7 +108,7 @@ function SinAplicarBadge({ mov }) {
   return (
     <span
       title={total ? 'Parte de este importe no cubre ninguna factura' : 'Este movimiento no está imputado a ninguna factura'}
-      className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded"
+      className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded"
     >
       <Link2 size={10} className="opacity-60" /> {total ? 'Sobra' : 'Sin aplicar'} {fmt(mov.sin_aplicar)}
     </span>
@@ -126,6 +129,10 @@ function FocoBtn({ mov, activo, onToggle }) {
       onClick={(e) => { e.stopPropagation(); onToggle(activo ? null : mov.id); }}
       aria-pressed={activo}
       title={activo
+        ? 'Cerrar el desglose'
+        : mov.tipo === 'factura'
+          ? (vinculos ? `Ver los ${vinculos} pagos/NC de esta factura` : 'Ver el desglose (no tiene pagos aplicados)')
+          : (vinculos ? `Ver las ${vinculos} facturas que cubre` : 'Ver el desglose (no está imputado)')} aria-label={activo
         ? 'Cerrar el desglose'
         : mov.tipo === 'factura'
           ? (vinculos ? `Ver los ${vinculos} pagos/NC de esta factura` : 'Ver el desglose (no tiene pagos aplicados)')
@@ -165,7 +172,7 @@ function DesgloseVinculos({ mov, esDeudaSub, visibles }) {
       {fila(esFactura ? (esDeudaSub ? 'Deuda original' : 'Monto original') : 'Importe del movimiento', fmt(bruto))}
 
       {items.length === 0 ? (
-        <p className="italic text-slate-400 dark:text-slate-500 py-1">
+        <p className="italic text-slate-500 dark:text-slate-400 py-1">
           {esFactura
             ? `Sin ${esDeudaSub ? 'abonos' : 'pagos'} ni notas de crédito aplicados`
             : 'No está imputado a ninguna factura'}
@@ -176,14 +183,14 @@ function DesgloseVinculos({ mov, esDeudaSub, visibles }) {
             {esFactura
               ? (a.tipo === 'nota_credito'
                   ? <><FileText size={11} className="text-purple-500 shrink-0" /> NC</>
-                  : <><ArrowDownCircle size={11} className="text-blue-500 shrink-0" /> {esDeudaSub ? 'Abono' : 'Pago'}</>)
-              : <><FileText size={11} className="text-amber-500 shrink-0" /> {esDeudaSub ? 'Deuda' : 'Factura'}</>}
-            <span className="tabular-nums text-slate-400 dark:text-slate-500">{a.fecha || 'sin fecha'}</span>
+                  : <><ArrowDownCircle size={11} className="text-blue-600 dark:text-blue-400 shrink-0" /> {esDeudaSub ? 'Abono' : 'Pago'}</>)
+              : <><FileText size={11} className="text-amber-600 dark:text-amber-400 shrink-0" /> {esDeudaSub ? 'Deuda' : 'Factura'}</>}
+            <span className="tabular-nums text-slate-500 dark:text-slate-400">{a.fecha || 'sin fecha'}</span>
             {!a.explicito && (
-              <span title="Imputado automáticamente por antigüedad (FIFO): no hubo vinculación manual" className="text-[10px] px-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">auto</span>
+              <span title="Imputado automáticamente por antigüedad (FIFO): no hubo vinculación manual" className="text-xs px-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">auto</span>
             )}
             {!visibles.has(a.mov_id) && (
-              <span title="Está fuera del período mostrado" className="text-[10px] px-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">fuera del período</span>
+              <span title="Está fuera del período mostrado" className="text-xs px-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">fuera del período</span>
             )}
           </span>
           <span className="tabular-nums font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">−{fmt(a.monto)}</span>
@@ -195,7 +202,7 @@ function DesgloseVinculos({ mov, esDeudaSub, visibles }) {
           ? fila(
               'Saldo',
               resto <= 0.005
-                ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 size={12} /> Saldada</span>
+                ? <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400"><CheckCircle2 size={12} /> Saldada</span>
                 : <span className={items.length ? 'text-amber-600 dark:text-amber-400' : ''}>{fmt(resto)}</span>
             )
           : fila('Sin aplicar', resto <= 0.005 ? fmt(0) : <span className="text-amber-600 dark:text-amber-400">{fmt(resto)}</span>)}
@@ -208,7 +215,7 @@ function DesgloseVinculos({ mov, esDeudaSub, visibles }) {
 // imputó y si fue una vinculación manual o el reparto FIFO automático.
 function AplicadoChip({ monto, explicito }) {
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
       explicito
         ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
@@ -239,14 +246,14 @@ function MovimientoCard({ m, esDeudaSub, camposNumericos, camposTexto, venc, isA
   const signo = suma ? '+' : '−';
   const colorValor = suma
     ? (esDeudaSub ? 'text-orange-600 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100')
-    : esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : esDeudaSub ? 'text-green-600' : 'text-blue-600';
+    : esNC ? 'text-purple-700 dark:text-purple-400' : esAjuste ? 'text-orange-700 dark:text-orange-400' : esDeudaSub ? 'text-green-700 dark:text-green-400' : 'text-blue-700 dark:text-blue-400';
 
   const extras = [
     ...camposNumericos.map(c => {
       const val = m.campos_extra?.[c.nombre];
       const n = Number(val);
       if (val === undefined || val === '' || isNaN(n)) return null;
-      return { label: c.nombre, valor: `${c.tipo === 'suma' ? '+' : '−'}${fmt(n)}`, tono: c.tipo === 'suma' ? 'text-green-600' : 'text-red-500' };
+      return { label: c.nombre, valor: `${c.tipo === 'suma' ? '+' : '−'}${fmt(n)}`, tono: c.tipo === 'suma' ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400' };
     }),
     ...camposTexto.map(c => {
       const val = m.campos_extra?.[c.nombre];
@@ -288,16 +295,15 @@ function MovimientoCard({ m, esDeudaSub, camposNumericos, camposTexto, venc, isA
             {foco.aplicado && <AplicadoChip monto={foco.aplicado.monto} explicito={foco.aplicado.explicito} />}
             <SinAplicarBadge mov={m} />
             {esFactura && (esDeudaSub || m.documento) && (
-              <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${
+              <span className={`inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded ${
                 esDeudaSub ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400'
-                  : m.documento === 'remito' ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
               }`}>
                 {esDeudaSub ? 'Deuda' : m.documento === 'remito' ? 'Remito' : 'Factura'}
               </span>
             )}
             {esPago && m.metodo_pago && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+              <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${
                 m.metodo_pago === 'efectivo'
                   ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
                   : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
@@ -306,22 +312,22 @@ function MovimientoCard({ m, esDeudaSub, camposNumericos, camposTexto, venc, isA
               </span>
             )}
           </div>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
             {m.fecha
-              ? <span className="tabular-nums">{m.fecha}</span>
+              ? <span className="tabular-nums whitespace-nowrap">{fmtFecha(m.fecha)}</span>
               : <span className="text-amber-500 italic">Sin fecha</span>}
-            {venc && <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${venc.cls}`}>{venc.label}</span>}
+            {venc && <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium whitespace-nowrap ${venc.cls}`}>{venc.label}</span>}
             {hayDetalle && <ChevronDown size={12} className={`shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />}
           </p>
         </button>
 
         <div className="shrink-0 text-right">
           <p className={`text-base font-bold tabular-nums whitespace-nowrap ${colorValor}`}>
-            {(valor || 0) > 0 ? `${signo}${fmt(valor)}` : <span className="text-slate-300 dark:text-slate-600">—</span>}
+            {(valor || 0) > 0 ? `${signo === '+' ? '' : signo}${fmt(valor)}` : <span className="text-slate-300 dark:text-slate-600">—</span>}
           </p>
           {esFactura && (
             (m.saldo ?? m.monto) <= 0.005
-              ? <p className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle2 size={11} /> Saldada</p>
+              ? <p className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400"><CheckCircle2 size={11} /> Saldada</p>
               : <p className={`text-xs tabular-nums ${m.saldo != null && m.saldo < m.monto - 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
                   Saldo {fmt(m.saldo ?? m.monto)}
                 </p>
@@ -349,12 +355,12 @@ function MovimientoCard({ m, esDeudaSub, camposNumericos, camposTexto, venc, isA
       {abierto && hayDetalle && (
         <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Total</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Total</span>
             <span className={`text-sm font-bold tabular-nums ${m._total >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600'}`}>{fmt(m._total)}</span>
           </div>
           {extras.map(e => (
             <div key={e.label} className="flex items-baseline justify-between gap-3">
-              <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">{e.label}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{e.label}</span>
               <span className={`text-sm text-right wrap-break-word ${e.tono || 'text-slate-700 dark:text-slate-200'}`}>{e.valor}</span>
             </div>
           ))}
@@ -470,13 +476,19 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   };
 
   const handleDelete = (mov) => {
-    const message = mov._ajuste_pago_id
-      ? '¿Borrar este ajuste automático?'
-      : mov.tipo === 'pago' || mov.tipo === 'nota_credito'
-        ? '¿Borrar este pago? También se borrará su ajuste automático si tiene uno.'
-        : '¿Borrar este movimiento?';
+    const nombreTipo = mov._ajuste_pago_id ? 'el ajuste automático'
+      : mov.tipo === 'pago' ? (esDeudaSub ? 'el abono' : 'el pago')
+      : mov.tipo === 'nota_credito' ? 'la nota de crédito'
+      : mov.tipo === 'factura' ? (esDeudaSub ? 'la deuda' : mov.documento === 'remito' ? 'el remito' : 'la factura')
+      : 'el movimiento';
+    const importe = (mov.monto || 0) > 0 ? mov.monto : mov.pago;
+    const message = `¿Borrar ${nombreTipo} del ${fmtFecha(mov.fecha) || 'sin fecha'} por ${fmt(importe)}?`;
+    const detail = (mov.tipo === 'pago' || mov.tipo === 'nota_credito') && !mov._ajuste_pago_id
+      ? 'También se borra su ajuste automático, si tiene uno. No se puede deshacer.'
+      : 'No se puede deshacer.';
     setConfirmModal({
       message,
+      detail,
       onConfirm: async () => {
         await movimientosApi.delete(mov.id);
         setConfirmModal(null);
@@ -532,7 +544,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   const hayVencimientos = data.movimientos.some(m => m.fecha_vencimiento);
   // Fecha, Doc, Monto, Pago, Saldo, Método + numéricos + Total, Estado + textos
   // + Vencimiento? + acciones. Lo usa el colSpan de la fila de desglose.
-  const totalCols = 9 + camposNumericos.length + camposTexto.length + (hayVencimientos ? 1 : 0);
+  const totalCols = 7 + camposNumericos.length + camposTexto.length + (hayVencimientos ? 1 : 0);
 
   // --- Vinculación visual factura ↔ pagos/NC -------------------------------
   // Resuelve el foco en los dos sentidos: enfocar una factura resalta los pagos
@@ -571,7 +583,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
       }
     : SIN_FOCO;
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando...</div>;
+  if (loading) return <Skeleton />;
 
   const esFacturaPendiente = (m) =>
     (m.tipo === 'factura' || (!m.tipo && (m.monto || 0) > 0)) && (m.saldo ?? m.monto ?? 0) > 0.005;
@@ -588,22 +600,21 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   const etiquetaRango = rango === '30d' ? `últimos ${DIAS_RANGO_DEFAULT} días`
     : rango === 'mes' ? parseMes(mesActual)
     : rango === 'custom'
-      ? [custom.desde && `desde ${custom.desde}`, custom.hasta && `hasta ${custom.hasta}`].filter(Boolean).join(' ') || 'todo el historial'
+      ? [custom.desde && `desde ${fmtFecha(custom.desde)}`, custom.hasta && `hasta ${fmtFecha(custom.hasta)}`].filter(Boolean).join(' ') || 'todo el historial'
       : 'todo el historial';
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={onBack} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm flex items-center gap-1 shrink-0">
-          <ArrowLeft size={15} /> Volver
-        </button>
+      <div className="flex items-center gap-3 mb-5">
         <div className="min-w-0">
-          <p className="text-xs text-slate-400 uppercase tracking-wide font-medium truncate">{rubro.nombre}</p>
+          <button onClick={onBack} className="-ml-1 px-1 min-h-11 sm:min-h-8 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-sm flex items-center gap-1 max-w-full">
+            <ArrowLeft size={15} className="shrink-0" /> <span className="truncate">{rubro.nombre}</span>
+          </button>
           <div className="flex items-center gap-2 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 truncate">{subrubro.nombre}</h1>
             {esDeudaSub && (
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
                 Deuda a cobrar
               </span>
             )}
@@ -613,32 +624,32 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
 
       {/* Resumen. En mobile los importes bajan a text-base: un monto largo en ARS
           no entra en media pantalla con text-xl y desborda la tarjeta. */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3 mb-6">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Total adeudado' : 'Total facturado'}</p>
-          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums truncate ${esDeudaSub ? 'text-orange-600' : 'text-slate-800 dark:text-slate-100'}`}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Total adeudado' : 'Total facturado'}</p>
+          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums whitespace-nowrap ${esDeudaSub ? 'text-orange-700 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100'}`}>
             {fmt(data.movimientos.reduce((s, m) => s + (m.monto || 0), 0))}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{etiquetaRango}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{etiquetaRango}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Total abonado' : 'Total pagado'}</p>
-          <p className="text-base sm:text-xl font-bold text-green-700 mt-1 tabular-nums truncate">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Total abonado' : 'Total pagado'}</p>
+          <p className="text-base sm:text-xl font-bold text-green-700 dark:text-green-400 mt-1 tabular-nums whitespace-nowrap">
             {fmt(data.movimientos.reduce((s, m) => s + (m.pago || 0), 0))}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{etiquetaRango}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{etiquetaRango}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 sm:p-4 min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Deuda a vencer' : 'Saldo a vencer'}</p>
-          <p className="text-base sm:text-xl font-bold text-amber-600 mt-1 tabular-nums truncate">
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Deuda a vencer' : 'Saldo a vencer'}</p>
+          <p className="text-base sm:text-xl font-bold text-amber-700 dark:text-amber-400 mt-1 tabular-nums whitespace-nowrap">
             {fmt(saldoAVencer)}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{vencProxima ? vencProxima.label : 'Sin vencimientos'}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{vencProxima ? vencProxima.label : 'Sin vencimientos'}</p>
         </div>
         <div className={`rounded-xl p-3 sm:p-4 border min-w-0 ${saldoPositivo ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'}`}>
-          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{esDeudaSub ? 'Saldo a cobrar' : 'Saldo pendiente'}</p>
-          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums truncate ${!saldoPositivo ? 'text-red-600' : esDeudaSub && saldoFinal > 0.005 ? 'text-orange-600' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(saldoFinal)}</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{todasFacturasPendientes.length} {esDeudaSub ? 'deuda' : 'factura'}{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Saldo a cobrar' : 'Saldo pendiente'}</p>
+          <p className={`text-base sm:text-xl font-bold mt-1 tabular-nums whitespace-nowrap ${!saldoPositivo ? 'text-red-600 dark:text-red-400' : esDeudaSub && saldoFinal > 0.005 ? 'text-orange-700 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100'}`}>{fmt(saldoFinal)}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{todasFacturasPendientes.length} {esDeudaSub ? 'deuda' : 'factura'}{todasFacturasPendientes.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
@@ -648,7 +659,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           <button
             key={v}
             onClick={() => { setViewMode(v); if (v === 'calendario') cargarTodos(); }}
-            className={`px-4 py-1.5 rounded-md transition-colors ${viewMode === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+            className={`px-4 py-1.5 pointer-coarse:min-h-11 rounded-md transition-colors ${viewMode === v ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
           >{l}</button>
         ))}
       </div>
@@ -670,7 +681,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                   setRango(f.val);
                   if (f.val === 'mes') setMesActual(mesActualKey());
                 }}
-                className={`px-2.5 py-1 min-h-10 sm:min-h-0 rounded-md text-xs font-medium transition-colors ${rango === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                className={`px-2.5 py-1 min-h-10 sm:min-h-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-xs font-medium transition-colors ${rango === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
               >{f.label}</button>
             ))}
           </div>
@@ -706,19 +717,20 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
               <button
                 key={f.val}
                 onClick={() => setEstadoFiltro(f.val)}
-                className={`px-2.5 py-1 min-h-10 sm:min-h-0 rounded-md text-xs font-medium transition-colors ${estadoFiltro === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                className={`px-2.5 py-1 min-h-10 sm:min-h-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-xs font-medium transition-colors ${estadoFiltro === f.val ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
               >{f.label}</button>
             ))}
           </div>
           {/* Navegación por mes (solo en el rango "Este mes") */}
           {rango === 'mes' && (
             <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
-              <button onClick={() => setMesActual(mesAnterior(mesActual))} className="px-3 py-1 min-h-10 sm:min-h-0 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-base sm:text-sm font-medium">‹</button>
+              <button onClick={() => setMesActual(mesAnterior(mesActual))} aria-label="Mes anterior" className="px-3 py-1 min-h-10 sm:min-h-0 pointer-coarse:min-h-11 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-base sm:text-sm font-medium">‹</button>
               <span className="px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200 min-w-20 text-center">{parseMes(mesActual)}</span>
               <button
                 onClick={() => setMesActual(mesSiguiente(mesActual))}
                 disabled={mesActual >= mesActualKey()}
-                className="px-2 py-1 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium disabled:opacity-30"
+                aria-label="Mes siguiente"
+                className="px-3 py-1 min-h-10 sm:min-h-0 pointer-coarse:min-h-11 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium disabled:opacity-30"
               >›</button>
             </div>
           )}
@@ -726,12 +738,15 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowExportModal(true)}
-            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"
+            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 min-h-11 sm:min-h-0 pointer-coarse:min-h-11 rounded-lg text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center gap-1.5"
           ><Download size={14} /> Excel</button>
           {isAdmin && (
             <button
               onClick={() => setConfirmModal({
-                message: `¿Borrar TODOS los movimientos de "${subrubro.nombre}"? Esta acción no se puede deshacer.`,
+                message: `¿Borrar TODOS los movimientos de "${subrubro.nombre}"?`,
+                detail: `Se eliminan ${todosMovs.length} movimientos (facturas, pagos y notas de crédito). No se puede deshacer.`,
+                requireText: 'BORRAR',
+                confirmLabel: 'Borrar todo',
                 onConfirm: async () => {
                   await subrubrosApi.clearMovimientos(subrubro.id);
                   setConfirmModal(null);
@@ -740,13 +755,13 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                   toast.success('Movimientos eliminados');
                 },
               })}
-              className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1.5"
-            ><Trash2 size={14} /> Limpiar</button>
+              className="order-last sm:order-first text-red-600 dark:text-red-400 px-3 py-1.5 min-h-11 sm:min-h-0 pointer-coarse:min-h-11 rounded-lg text-sm hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-1.5 sm:mr-2"
+            ><Trash2 size={14} /> Vaciar</button>
           )}
           {isAdmin && (
             <button
               onClick={() => { setEditingMov(null); setShowForm(true); }}
-              className="bg-blue-600 text-white px-4 py-1.5 min-h-11 sm:min-h-0 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm"
+              className="bg-blue-600 text-white px-4 py-1.5 min-h-11 sm:min-h-0 pointer-coarse:min-h-11 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm"
             >+ Movimiento</button>
           )}
         </div>
@@ -793,7 +808,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
       {viewMode === 'tabla' && (
       <div className={recargando ? 'opacity-50 pointer-events-none transition-opacity' : 'transition-opacity'}>
       {movsDetallados.length === 0 ? (
-        <div className="text-center py-16 text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+        <div className="text-center py-16 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
           <Wallet size={40} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
           <p className="font-medium">
             {estadoFiltro !== 'todos'
@@ -814,7 +829,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
       ) : (
         <div>
         {/* Mobile: una card por movimiento (ver MovimientoCard). */}
-        <div className="sm:hidden rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
+        <div className="lg:hidden rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
           {movsDetallados.map(m => {
             const esFact = m.tipo === 'factura';
             const saldada = esFact && ((m.saldo ?? m.monto) <= 0.005 || m.pagado === true);
@@ -837,20 +852,18 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
         </div>
 
         {/* Desktop: la tabla completa. */}
-        <TableScroll className="hidden sm:block rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 overflow-hidden">
+        <TableScroll className="hidden lg:block rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-700/60 border-b border-slate-200 dark:border-slate-700">
                 <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide sticky left-0 z-10 bg-slate-50 dark:bg-slate-700/60">Fecha</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Doc.</th>
                 <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Deuda' : 'Monto'}</th>
                 <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{esDeudaSub ? 'Abono' : 'Pago'}</th>
                 <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Saldo</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Método</th>
                 {camposNumericos.map(c => (
                   <th key={c.id} className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{c.nombre}</th>
                 ))}
-                <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total</th>
+                <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide" title="Saldo corrido del período: facturas menos pagos y notas de crédito">Saldo acum.</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Estado</th>
                 {camposTexto.map(c => (
                   <th key={c.id} className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{c.nombre}</th>
@@ -858,7 +871,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                 {hayVencimientos && (
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vencimiento</th>
                 )}
-                <th className="px-3 sm:px-4 py-3" />
+                <th className="px-3 sm:px-4 py-3 sticky right-0 z-10 bg-slate-50 dark:bg-slate-700"><span className="sr-only">Acciones</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -908,69 +921,41 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                       <span className="flex items-center gap-1.5">
                         <FocoBtn mov={m} activo={f.esFoco} onToggle={setFoco} />
                         {m.fecha
-                          ? <span className="text-slate-600 dark:text-slate-300">{m.fecha}</span>
-                          : <span className="text-amber-500 text-xs italic">Sin fecha</span>
+                          ? <span className="text-slate-600 dark:text-slate-300">{fmtFecha(m.fecha)}</span>
+                          : <span className="text-amber-600 dark:text-amber-400 text-xs italic">Sin fecha</span>
                         }
                       </span>
                     </td>
 
-                    <td className="px-3 sm:px-4 py-3">
-                      {esFactura && (esDeudaSub || m.documento) && (
-                        <span
-                          className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            esDeudaSub
-                              ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400'
-                              : m.documento === 'remito'
-                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                                : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                          }`}
-                        >
-                          {esDeudaSub ? 'Deuda' : m.documento === 'remito' ? 'Remito' : 'Factura'}
-                        </span>
-                      )}
-                    </td>
-
                     <td className="px-3 sm:px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {(m.monto || 0) > 0
-                        ? <span className={esDeudaSub ? 'text-orange-600 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100'}>+{fmt(m.monto)}</span>
+                        ? <span className={esDeudaSub ? 'text-orange-700 dark:text-orange-400' : 'text-slate-800 dark:text-slate-100'}>{fmt(m.monto)}</span>
                         : <span className="text-slate-300 dark:text-slate-600">—</span>
                       }
                     </td>
 
                     <td className="px-3 sm:px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {(m.pago || 0) > 0 ? (
-                        <span className={esNC ? 'text-purple-600' : esAjuste ? 'text-orange-600' : esDeudaSub ? 'text-green-600' : 'text-blue-600'}>
+                        <span className={esNC ? 'text-purple-700 dark:text-purple-400' : esAjuste ? 'text-orange-700 dark:text-orange-400' : esDeudaSub ? 'text-green-700 dark:text-green-400' : 'text-blue-700 dark:text-blue-400'}>
                           −{fmt(m.pago)}
                         </span>
                       ) : <span className="text-slate-300">—</span>
                       }
+                      {esPago && m.metodo_pago && (
+                        <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">
+                          {m.metodo_pago === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                        </span>
+                      )}
                     </td>
 
                     {/* Saldo pendiente por factura (monto − NC/pagos vinculados) */}
                     <td className="px-3 sm:px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {esFactura ? (
                         (m.saldo ?? m.monto) <= 0.005
-                          ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs"><CheckCircle2 size={12} /> Saldada</span>
+                          ? <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400 text-xs"><CheckCircle2 size={12} /> Saldada</span>
                           : <span className={m.saldo != null && m.saldo < m.monto - 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'}>
                               {fmt(m.saldo ?? m.monto)}
                             </span>
-                      ) : <span className="text-slate-300">—</span>}
-                    </td>
-
-                    <td className="px-3 sm:px-4 py-3">
-                      {esPago && m.metodo_pago ? (
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            m.metodo_pago === 'efectivo'
-                              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                              : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                          }`}
-                          title={m.metodo_pago === 'efectivo' ? 'Pago en efectivo' : 'Pago por transferencia'}
-                        >
-                          {m.metodo_pago === 'efectivo'
-                            ? <><Banknote size={10} /> Efvo</>
-                            : <><ArrowLeftRight size={10} /> Transf</>}
-                        </span>
                       ) : <span className="text-slate-300">—</span>}
                     </td>
 
@@ -980,7 +965,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                       return (
                         <td key={c.id} className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
                           {val !== undefined && val !== '' && !isNaN(n)
-                            ? <span className={c.tipo === 'suma' ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                            ? <span className={c.tipo === 'suma' ? 'text-green-700 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
                                 {c.tipo === 'suma' ? '+' : '−'}{fmt(n)}
                               </span>
                             : <span className="text-slate-300">—</span>
@@ -996,6 +981,17 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                     <td className="px-3 sm:px-4 py-3">
                       <span className="flex flex-wrap items-center gap-1">
                         <TipoBadge mov={m} deuda={esDeudaSub} />
+                          {esFactura && (esDeudaSub || m.documento) && (
+                            <span
+                              className={`inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded ${
+                                esDeudaSub
+                                  ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400'
+                                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {esDeudaSub ? 'Deuda' : m.documento === 'remito' ? 'Remito' : 'Factura'}
+                            </span>
+                          )}
                         {f.aplicado && <AplicadoChip monto={f.aplicado.monto} explicito={f.aplicado.explicito} />}
                         <SinAplicarBadge mov={m} />
                       </span>
@@ -1021,13 +1017,13 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
                       </td>
                     )}
 
-                    <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
+                    <td className={`px-3 sm:px-4 py-3 text-right whitespace-nowrap sticky right-0 z-10 ${stickyBg}`}>
                       {isAdmin && (
                         <>
                           {!esAutoAjuste && (
-                            <button onClick={() => handleEdit(m)} className="text-blue-500 hover:text-blue-700 text-xs mr-3">Editar</button>
+                            <button onClick={() => handleEdit(m)} className="text-blue-600 dark:text-blue-400 hover:underline text-xs px-1.5 py-1 mr-2">Editar</button>
                           )}
-                          <button onClick={() => handleDelete(m)} className="text-red-400 hover:text-red-600 text-xs">Borrar</button>
+                          <button onClick={() => handleDelete(m)} className="text-red-600 dark:text-red-400 hover:underline text-xs px-1.5 py-1">Borrar</button>
                         </>
                       )}
                     </td>
@@ -1054,6 +1050,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
 
       {confirmModal && (
         <ConfirmModal
+          {...confirmModal}
           message={confirmModal.message}
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(null)}

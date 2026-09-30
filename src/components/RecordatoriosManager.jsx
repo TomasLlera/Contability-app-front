@@ -8,6 +8,7 @@ import { recordatoriosApi, rubrosApi, subrubrosApi, usersApi, authApi, getErrorM
 import Modal from './Modal';
 import ConfirmModal from './ConfirmModal';
 import InfoTooltip from './InfoTooltip';
+import Skeleton from './Skeleton';
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -229,7 +230,7 @@ function RecordatorioForm({ inicial, rubros, usuarios, onClose, onSaved }) {
             </div>
           )}
           {form.tipo_programacion === 'hoy' && (
-            <p className="text-xs text-slate-400">Aparece solo hoy ({fmtFechaCorta(hoyStr())}) y después se archiva.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Aparece solo hoy ({fmtFechaCorta(hoyStr())}) y después se archiva.</p>
           )}
         </div>
 
@@ -263,7 +264,7 @@ function RecordatorioForm({ inicial, rubros, usuarios, onClose, onSaved }) {
                 onChange={e => set('frecuencia_valor', e.target.value)}
                 className={`${inputCls} w-24`}
               />
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {form.frecuencia_tipo === 'cada_x_horas'
                   ? 'horas entre apariciones'
                   : 'veces, repartidas entre las 08:00 y las 15:00'}
@@ -295,7 +296,7 @@ function RecordatorioForm({ inicial, rubros, usuarios, onClose, onSaved }) {
         {/* Vínculo con rubro/subrubros */}
         <div>
           <label className={labelCls}>
-            Rubro vinculado <span className="text-slate-400 font-normal">(opcional)</span>
+            Rubro vinculado <span className="text-slate-500 dark:text-slate-400 font-normal">(opcional)</span>
           </label>
           <select
             value={form.rubro_id}
@@ -308,7 +309,7 @@ function RecordatorioForm({ inicial, rubros, usuarios, onClose, onSaved }) {
 
           {form.rubro_id !== '' && (
             <div className="mt-2.5">
-              <p className="text-xs text-slate-400 mb-1.5 flex items-center gap-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1">
                 Elegí los subrubros que el aviso tiene que listar. Cada uno se puede tildar como hecho.
                 <InfoTooltip
                   text="La estrella marca los prioritarios: van primero y resaltados en el aviso. Sirve para no tener que nombrarlos otra vez dentro del mensaje."
@@ -316,7 +317,7 @@ function RecordatorioForm({ inicial, rubros, usuarios, onClose, onSaved }) {
                 />
               </p>
               {subrubros.length === 0 ? (
-                <p className="text-xs text-slate-400">Este rubro no tiene subrubros.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Este rubro no tiene subrubros.</p>
               ) : (
                 <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                   {subrubros.map(s => {
@@ -332,9 +333,9 @@ function RecordatorioForm({ inicial, rubros, usuarios, onClose, onSaved }) {
                           type="button"
                           onClick={() => togglePrioritario(s.id)}
                           aria-pressed={prioritario}
-                          title={prioritario ? 'Quitar prioridad' : 'Marcar como prioritario'}
+                          title={prioritario ? 'Quitar prioridad' : 'Marcar como prioritario'} aria-label={prioritario ? 'Quitar prioridad' : 'Marcar como prioritario'}
                           className={`tap shrink-0 transition-colors ${
-                            prioritario ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600 hover:text-amber-400'
+                            prioritario ? 'text-amber-600 dark:text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-400'
                           }`}
                         >
                           <Star size={15} className={prioritario ? 'fill-current' : ''} />
@@ -399,12 +400,12 @@ function Historial() {
     recordatoriosApi.getHistorial(30).then(setItems).catch(() => setItems([]));
   }, []);
 
-  if (items === null) return <p className="text-xs text-slate-400">Cargando historial…</p>;
-  if (!items.length) return <p className="text-xs text-slate-400">Todavía no se mostró ningún recordatorio.</p>;
+  if (items === null) return <p className="text-xs text-slate-500 dark:text-slate-400">Cargando historial…</p>;
+  if (!items.length) return <p className="text-xs text-slate-500 dark:text-slate-400">Todavía no se mostró ningún recordatorio.</p>;
 
   const META = {
     completado: { icon: CheckCircle2, cls: 'text-emerald-600 dark:text-emerald-400', label: 'Completado' },
-    ignorado:   { icon: XCircle,      cls: 'text-slate-400',                          label: 'Ignorado' },
+    ignorado:   { icon: XCircle,      cls: 'text-slate-500 dark:text-slate-400',                          label: 'Ignorado' },
     postergado: { icon: Clock,        cls: 'text-amber-600 dark:text-amber-400',      label: 'Postergado' },
     pendiente:  { icon: Clock,        cls: 'text-blue-500 dark:text-blue-400',        label: 'Pendiente' },
   };
@@ -419,7 +420,7 @@ function Historial() {
             <Icon size={14} className={`shrink-0 ${meta.cls}`} />
             <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-200">{e.titulo}</span>
             <span className={`shrink-0 ${meta.cls}`}>{meta.label}</span>
-            <span className="shrink-0 text-slate-400 tabular-nums">{fmtFechaCorta(e.fecha)}</span>
+            <span className="shrink-0 text-slate-500 dark:text-slate-400 tabular-nums">{fmtFechaCorta(e.fecha)}</span>
           </li>
         );
       })}
@@ -470,7 +471,7 @@ export default function RecordatoriosManager() {
     } catch (err) { toast.error(getErrorMsg(err)); }
   };
 
-  if (items === null) return <div className="flex items-center justify-center h-48 text-slate-400 text-sm">Cargando…</div>;
+  if (items === null) return <Skeleton variante="lista" filas={3} />;
 
   const Fila = ({ rec }) => (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 ${!rec.activo || rec.archivado ? 'opacity-60' : ''}`}>
@@ -482,15 +483,15 @@ export default function RecordatoriosManager() {
         <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
           {rec.titulo}
           {rec.alcance === 'personal' && (
-            <span className="text-[10px] uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">
+            <span className="text-xs uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">
               Solo {rec.usuario_nombre || `#${rec.usuario_id}`}
             </span>
           )}
           {rec.archivado && (
-            <span className="text-[10px] uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">Archivado</span>
+            <span className="text-xs uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 py-0.5 rounded">Archivado</span>
           )}
         </p>
-        <p className="text-xs text-slate-400 truncate">
+        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
           {textoProgramacion(rec)} · {textoFrecuencia(rec)}
           {rec.subrubros?.length > 0 && ` · ${rec.subrubros.length} subrubro${rec.subrubros.length !== 1 ? 's' : ''}`}
           {rec.subrubros_prioritarios_ids?.length > 0 && ` (${rec.subrubros_prioritarios_ids.length} prioritario${rec.subrubros_prioritarios_ids.length !== 1 ? 's' : ''})`}
@@ -501,14 +502,14 @@ export default function RecordatoriosManager() {
       {isAdmin && (
         <div className="flex items-center gap-1 shrink-0 w-full sm:w-auto justify-end">
           {!rec.archivado && (
-            <button onClick={() => togglePausa(rec)} className="tap text-slate-400 hover:text-amber-600 transition-colors" title={rec.activo ? 'Pausar' : 'Activar'}>
+            <button onClick={() => togglePausa(rec)} className="tap text-slate-500 dark:text-slate-400 hover:text-amber-600 transition-colors" title={rec.activo ? 'Pausar' : 'Activar'} aria-label={rec.activo ? 'Pausar' : 'Activar'}>
               {rec.activo ? <Pause size={15} /> : <Play size={15} />}
             </button>
           )}
-          <button onClick={() => setEditando(rec)} className="tap text-slate-400 hover:text-blue-600 transition-colors" title="Editar">
+          <button onClick={() => setEditando(rec)} className="tap text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors" title="Editar" aria-label="Editar">
             <Pencil size={15} />
           </button>
-          <button onClick={() => setABorrar(rec)} className="tap text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
+          <button onClick={() => setABorrar(rec)} className="tap text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors" title="Eliminar" aria-label="Eliminar">
             <Trash2 size={15} />
           </button>
         </div>
@@ -527,7 +528,7 @@ export default function RecordatoriosManager() {
               width="w-72"
             />
           </h2>
-          <p className="text-xs text-slate-400">Aparecen en el Dashboard según su programación.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Aparecen en el Dashboard según su programación.</p>
         </div>
         {isAdmin && (
           <button
@@ -546,7 +547,7 @@ export default function RecordatoriosManager() {
       )}
 
       {vigentes.length === 0 ? (
-        <p className="text-sm text-slate-400">No hay recordatorios cargados.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">No hay recordatorios cargados.</p>
       ) : (
         <div className="space-y-2">
           {vigentes.map(rec => <Fila key={rec.id} rec={rec} />)}

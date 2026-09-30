@@ -66,7 +66,7 @@ export default function BottomNav({ activeView, onNavigate, onOpenDrawer }) {
     <>
       {abierto && (
         <div
-          className="md:hidden fixed inset-0 z-50 flex items-end bg-slate-950/50 backdrop-blur-[2px] animate-[fadeIn_120ms_ease-out]"
+          className="lg:hidden fixed inset-0 z-50 flex items-end bg-slate-950/50 backdrop-blur-[2px] animate-fade-in"
           onClick={() => setSubmenu(null)}
         >
           <div
@@ -75,14 +75,14 @@ export default function BottomNav({ activeView, onNavigate, onOpenDrawer }) {
             onClick={e => e.stopPropagation()}
             className="w-full bg-white dark:bg-slate-800 rounded-t-2xl shadow-2xl ring-1 ring-slate-200 dark:ring-slate-700
                        pb-[max(0.5rem,env(safe-area-inset-bottom))]
-                       animate-[sheetIn_220ms_cubic-bezier(0.16,1,0.3,1)]"
+                       animate-sheet-in"
           >
             <div className="flex items-center justify-between px-5 pt-3 pb-1">
               <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{abierto.label}</p>
               <button
                 onClick={() => setSubmenu(null)}
                 aria-label="Cerrar"
-                className="w-11 h-11 -mr-3 flex items-center justify-center rounded-full text-slate-400 active:bg-slate-100 dark:active:bg-slate-700/60"
+                className="w-11 h-11 -mr-3 flex items-center justify-center rounded-full text-slate-500 dark:text-slate-400 active:bg-slate-100 dark:active:bg-slate-700/60"
               ><X size={18} /></button>
             </div>
             <div className="px-2 pb-2">
@@ -97,7 +97,7 @@ export default function BottomNav({ activeView, onNavigate, onOpenDrawer }) {
                   <span className={`text-sm font-medium ${activeView === s.view ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}>
                     {s.label}
                   </span>
-                  <span className="text-xs text-slate-400 truncate">{s.hint}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{s.hint}</span>
                 </button>
               ))}
             </div>
@@ -107,7 +107,7 @@ export default function BottomNav({ activeView, onNavigate, onOpenDrawer }) {
 
       <nav
         aria-label="Navegación principal"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40
                    bg-white/95 dark:bg-slate-800/95 backdrop-blur
                    border-t border-slate-200 dark:border-slate-700
                    pb-[env(safe-area-inset-bottom)]"
@@ -127,20 +127,16 @@ export default function BottomNav({ activeView, onNavigate, onOpenDrawer }) {
                 aria-current={on ? 'page' : undefined}
                 className={`flex-1 min-h-14 flex flex-col items-center justify-center gap-0.5 transition-colors
                             active:bg-slate-100 dark:active:bg-slate-700/50
-                            ${on ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}
+                            ${on ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-400'}`}
               >
                 <Icon size={20} strokeWidth={on ? 2.4 : 2} />
-                <span className={`text-[11px] leading-none ${on ? 'font-semibold' : 'font-medium'}`}>{it.label}</span>
+                <span className={`text-xs leading-none ${on ? 'font-semibold' : 'font-medium'}`}>{it.label}</span>
               </button>
             );
           })}
         </div>
       </nav>
 
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes sheetIn { from { transform: translateY(100%) } to { transform: translateY(0) } }
-      `}</style>
     </>,
     document.body
   );

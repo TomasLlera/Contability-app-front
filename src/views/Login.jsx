@@ -34,7 +34,7 @@ export default function Login({ onLogin }) {
       <div aria-hidden className="absolute -bottom-40 -right-32 w-[520px] h-[520px] rounded-full
                                   bg-indigo-400/20 dark:bg-indigo-500/10 blur-3xl pointer-events-none" />
 
-      <div className="relative w-full max-w-sm animate-[fadeIn_400ms_ease-out]">
+      <div className="relative w-full max-w-sm animate-[modal-in_400ms_ease-out]">
         <div className="flex flex-col items-center mb-6">
           <img src="/favicon.png" alt="Kontia"
             className="w-14 h-14 rounded-2xl shadow-lg shadow-blue-500/30 mb-4" />
@@ -90,7 +90,7 @@ export default function Login({ onLogin }) {
                   tabIndex={-1}
                   aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md
-                             text-slate-400 hover:text-slate-600 dark:hover:text-slate-200
+                             text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200
                              hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition"
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -103,7 +103,7 @@ export default function Login({ onLogin }) {
                               bg-red-50 dark:bg-red-950/40
                               border border-red-200 dark:border-red-900/60
                               text-red-700 dark:text-red-400 text-sm
-                              animate-[fadeIn_200ms_ease-out]">
+                              animate-[fade-in_200ms_ease-out]">
                 <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -126,17 +126,11 @@ export default function Login({ onLogin }) {
           </form>
         </div>
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-6">
+        <p className="text-center text-xs text-slate-500 dark:text-slate-600 mt-6">
           © {new Date().getFullYear()} Kontia
         </p>
       </div>
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { hoyAR } from '../utils/fecha';
 import { Download, X } from 'lucide-react';
 import { movimientosApi, getErrorMsg } from '../api';
+import DialogShell from './DialogShell';
 
 const hoy = () => hoyAR();
 const addMonths = (n) => {
@@ -55,11 +56,11 @@ export default function ExportModal({ subrubro, onClose }) {
   const isPersonalizado = PRESETS[preset].desde === null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <DialogShell onClose={onClose} label="Exportar a Excel">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-semibold text-slate-800 dark:text-slate-100">Exportar Excel</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 -mr-2 w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"><X size={18} /></button>
         </div>
 
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Período a exportar para <strong className="text-slate-700 dark:text-slate-200">{subrubro.nombre}</strong></p>
@@ -104,11 +105,11 @@ export default function ExportModal({ subrubro, onClose }) {
         )}
 
         {PRESETS[preset].label === 'Todo' && (
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-5 text-center">Se exportarán todos los movimientos sin filtro de fecha.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 text-center">Se exportarán todos los movimientos sin filtro de fecha.</p>
         )}
 
         {error && (
-          <p className="text-xs text-red-500 dark:text-red-400 mb-3 text-center">{error}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mb-3 text-center">{error}</p>
         )}
 
         <button
@@ -120,6 +121,6 @@ export default function ExportModal({ subrubro, onClose }) {
           {loading ? 'Generando...' : 'Descargar Excel'}
         </button>
       </div>
-    </div>
+    </DialogShell>
   );
 }

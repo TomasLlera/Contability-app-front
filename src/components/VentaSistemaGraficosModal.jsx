@@ -4,14 +4,10 @@ import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, Cell,
 } from 'recharts';
+import { fmtMoneda, fmtMonedaCompacta } from '../utils/formato';
 
-const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
-const fmtCorto = (n) => {
-  const v = Math.abs(n || 0);
-  if (v >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${Math.round(n / 1_000)}k`;
-  return `$${n || 0}`;
-};
+const fmt = (n) => fmtMoneda(n, { decimales: 0 });
+const fmtCorto = fmtMonedaCompacta;
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const labelMes = (mes) => {
@@ -79,7 +75,7 @@ export default function VentaSistemaGraficosModal({ data, tipos, onClose }) {
           ))}
         </div>
 
-        <div className="h-72 text-slate-400">
+        <div className="h-72 text-slate-500 dark:text-slate-400">
           {/* Evolución diaria apilada por tipo: la altura total sigue siendo la venta
               del día, pero se ve qué parte se facturó. */}
           {tab === 'evolucion' && (
@@ -141,9 +137,9 @@ function Stat({ label, value, hint, tone = 'slate' }) {
   };
   return (
     <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
-      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
       <p className={`text-sm font-semibold ${tones[tone]}`}>{value}</p>
-      {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
+      {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
     </div>
   );
 }

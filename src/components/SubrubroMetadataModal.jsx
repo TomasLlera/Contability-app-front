@@ -30,14 +30,14 @@ function Seccion({ icon, titulo, resumen, abierta, onToggle, children }) {
         aria-expanded={abierta}
         className="w-full flex items-center gap-2 px-3 py-2.5 text-left bg-slate-50 dark:bg-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
       >
-        <Icon size={14} className="shrink-0 text-slate-400" />
+        <Icon size={14} className="shrink-0 text-slate-500 dark:text-slate-400" />
         <span className="text-sm font-medium text-slate-700 dark:text-slate-200 shrink-0">{titulo}</span>
         {!abierta && resumen && (
-          <span className="text-xs text-slate-400 truncate min-w-0">· {resumen}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 truncate min-w-0">· {resumen}</span>
         )}
         <ChevronDown
           size={16}
-          className={`ml-auto shrink-0 text-slate-400 transition-transform ${abierta ? 'rotate-180' : ''}`}
+          className={`ml-auto shrink-0 text-slate-500 dark:text-slate-400 transition-transform ${abierta ? 'rotate-180' : ''}`}
         />
       </button>
       {abierta && <div className="p-3 space-y-3">{children}</div>}
@@ -209,14 +209,14 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
           {/* Nombre + ícono */}
           <div>
             <label className={labelCls}>
-              Nombre <span className="text-red-500" title="Campo obligatorio">*</span>
+              Nombre <span className="text-red-600 dark:text-red-400" title="Campo obligatorio">*</span>
             </label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowIconPicker(o => !o)}
                 className="text-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg px-2 py-1.5 shrink-0"
-                title="Cambiar ícono"
+                title="Cambiar ícono" aria-label="Cambiar ícono"
               ><EntityIcon value={icon} size={18} /></button>
               <input
                 type="text"
@@ -232,13 +232,14 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                 <button
                   type="button"
                   onClick={() => { setIcon(''); setShowIconPicker(false); }}
-                  title="Sin ícono"
-                  className={`flex items-center justify-center text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 ${icon === '' ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}
+                  title="Sin ícono" aria-label="Sin ícono"
+                  className={`flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 ${icon === '' ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}
                 ><Ban size={16} /></button>
                 {ICON_LIST.map(ic => (
                   <button
                     key={ic}
                     type="button"
+                    aria-label={ic}
                     onClick={() => { setIcon(ic); setShowIconPicker(false); }}
                     className={`flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 ${ic === icon ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300' : ''}`}
                   ><EntityIcon value={ic} size={18} /></button>
@@ -270,7 +271,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-[11px] text-slate-400">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {esDeuda
                 ? 'Registra plata que te DEBEN (préstamos a otros locales/personas). Cargás deudas y abonos; los abonos entran como ingresos en la Caja del Día.'
                 : 'Registra facturas de proveedores a pagar y sus pagos (comportamiento clásico).'}
@@ -346,7 +347,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                 onChange={e => setCbu(e.target.value)}
                 maxLength={32}
               />
-              <p className="mt-1 text-[11px] text-slate-400">22 dígitos, sin espacios ni guiones.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">22 dígitos, sin espacios ni guiones.</p>
             </div>
             <div>
               <label className={labelCls}>
@@ -437,7 +438,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
             </div>
 
             {/* Una sola nota al pie de la fila, no una por control. */}
-            <p className="mt-1.5 text-[11px] text-slate-400">
+            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
               {modoVencimiento === 'dias' &&
                 `Cada ${esDeuda ? 'deuda' : 'factura'} vence N días después de su fecha (ej: 30 = vence 30 días después de ${esDeuda ? 'registrada' : 'emitida'}).`}
               {modoVencimiento === 'dia_semana' &&
@@ -460,7 +461,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
               <option value="transferencia">Transferencia (automático)</option>
               <option value="efectivo">Efectivo (automático)</option>
             </select>
-            <p className="mt-1 text-[11px] text-slate-400">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {esDeuda
                 ? 'Si elegís un método fijo, los abonos de este subrubro lo toman automáticamente y entran como ingresos con ese método en la Caja del día. Con "Ambas" se elige al momento de cargar.'
                 : 'Si elegís un método fijo, los pagos de este subrubro lo toman automáticamente y aparecen en esa sección de Caja del día. Con "Ambas" se elige al momento de cargar.'}

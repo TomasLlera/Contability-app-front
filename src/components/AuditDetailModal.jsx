@@ -1,4 +1,5 @@
 import { X, ArrowRight, User, Calendar, Globe, FileText } from 'lucide-react';
+import DialogShell from './DialogShell';
 
 /* ─────────────────────────────────────────────────────────────
    Formateadores: traducen valores crudos a algo legible para un cliente.
@@ -185,7 +186,7 @@ function InfoPanel({ recurso, rec, lookups, tone = 'neutral', proveedor }) {
     .filter(r => !isEmpty(r.raw) && r.value !== '—');
 
   if (proveedor) rows.splice(1, 0, { label: 'Proveedor', value: proveedor });
-  if (rows.length === 0) return <p className="text-sm text-slate-400">Sin datos registrados.</p>;
+  if (rows.length === 0) return <p className="text-sm text-slate-500 dark:text-slate-400">Sin datos registrados.</p>;
 
   const cell = tone === 'green' ? 'bg-green-50 dark:bg-green-950/30'
     : tone === 'red' ? 'bg-red-50 dark:bg-red-950/30'
@@ -219,19 +220,19 @@ function DiffPanel({ recurso, before, after, lookups }) {
     };
   }).filter(r => !r.both);
 
-  if (rows.length === 0) return <p className="text-sm text-slate-400">Sin datos comparables.</p>;
+  if (rows.length === 0) return <p className="text-sm text-slate-500 dark:text-slate-400">Sin datos comparables.</p>;
 
   return (
     <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-      <div className="grid grid-cols-[11rem_1fr_1.25rem_1fr] items-center gap-x-2 px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+      <div className="grid grid-cols-[11rem_1fr_1.25rem_1fr] items-center gap-x-2 px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
         <span>Campo</span><span>Antes</span><span /><span>Después</span>
       </div>
       {rows.map(r => (
         <div key={r.label} className={`grid grid-cols-[11rem_1fr_1.25rem_1fr] items-center gap-x-2 px-3.5 py-2 text-sm border-b border-slate-100 dark:border-slate-700/60 last:border-0 ${r.changed ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''}`}>
           <span className={`font-medium ${r.changed ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>{r.label}</span>
-          <span className={`break-words ${r.changed ? 'text-red-600 dark:text-red-400 line-through decoration-red-300/60' : 'text-slate-400 dark:text-slate-500'}`}>{r.antes}</span>
+          <span className={`break-words ${r.changed ? 'text-red-600 dark:text-red-400 line-through decoration-red-300/60' : 'text-slate-400 dark:text-slate-400'}`}>{r.antes}</span>
           <span className="flex justify-center text-slate-300 dark:text-slate-600">{r.changed ? <ArrowRight size={13} /> : ''}</span>
-          <span className={`break-words ${r.changed ? 'text-green-600 dark:text-green-400 font-medium' : 'text-slate-500 dark:text-slate-300'}`}>{r.despues}</span>
+          <span className={`break-words ${r.changed ? 'text-green-700 dark:text-green-400 font-medium' : 'text-slate-500 dark:text-slate-300'}`}>{r.despues}</span>
         </div>
       ))}
     </div>
@@ -257,7 +258,7 @@ export default function AuditDetailModal({ item, onClose, lookups }) {
   const esGenerico = !SCHEMAS[recurso];
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <DialogShell onClose={onClose} label="Detalle de auditoría">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
@@ -265,15 +266,15 @@ export default function AuditDetailModal({ item, onClose, lookups }) {
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full tracking-wide ${meta.cls}`}>{meta.label}</span>
             <h2 className="font-semibold text-slate-800 dark:text-slate-100">{titulo(recurso, refRec, item.recurso_id)}</h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 -mr-2 w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"><X size={18} /></button>
         </div>
 
         {/* Metadata */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 py-3 text-xs border-b border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/40">
-          <div className="flex items-start gap-1.5"><User size={13} className="mt-0.5 text-slate-400 shrink-0" /><div><p className="text-slate-400 mb-0.5">Usuario</p><p className="font-medium text-slate-700 dark:text-slate-200">{item.usuario}</p></div></div>
-          <div className="flex items-start gap-1.5"><Calendar size={13} className="mt-0.5 text-slate-400 shrink-0" /><div><p className="text-slate-400 mb-0.5">Fecha y hora</p><p className="font-medium text-slate-700 dark:text-slate-200">{new Date(item.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</p></div></div>
-          <div className="flex items-start gap-1.5"><FileText size={13} className="mt-0.5 text-slate-400 shrink-0" /><div><p className="text-slate-400 mb-0.5">Recurso</p><p className="font-medium text-slate-700 dark:text-slate-200 capitalize">{recurso}</p></div></div>
-          <div className="flex items-start gap-1.5"><Globe size={13} className="mt-0.5 text-slate-400 shrink-0" /><div><p className="text-slate-400 mb-0.5">IP</p><p className="font-medium text-slate-700 dark:text-slate-200 font-mono">{item.ip || '—'}</p></div></div>
+          <div className="flex items-start gap-1.5"><User size={13} className="mt-0.5 text-slate-500 dark:text-slate-400 shrink-0" /><div><p className="text-slate-500 dark:text-slate-400 mb-0.5">Usuario</p><p className="font-medium text-slate-700 dark:text-slate-200">{item.usuario}</p></div></div>
+          <div className="flex items-start gap-1.5"><Calendar size={13} className="mt-0.5 text-slate-500 dark:text-slate-400 shrink-0" /><div><p className="text-slate-500 dark:text-slate-400 mb-0.5">Fecha y hora</p><p className="font-medium text-slate-700 dark:text-slate-200">{new Date(item.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</p></div></div>
+          <div className="flex items-start gap-1.5"><FileText size={13} className="mt-0.5 text-slate-500 dark:text-slate-400 shrink-0" /><div><p className="text-slate-500 dark:text-slate-400 mb-0.5">Recurso</p><p className="font-medium text-slate-700 dark:text-slate-200 capitalize">{recurso}</p></div></div>
+          <div className="flex items-start gap-1.5"><Globe size={13} className="mt-0.5 text-slate-500 dark:text-slate-400 shrink-0" /><div><p className="text-slate-500 dark:text-slate-400 mb-0.5">IP</p><p className="font-medium text-slate-700 dark:text-slate-200 font-mono">{item.ip || '—'}</p></div></div>
         </div>
 
         {/* Body */}
@@ -297,7 +298,7 @@ export default function AuditDetailModal({ item, onClose, lookups }) {
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Cambios realizados</p>
               <DiffPanel recurso={recurso} before={before} after={afterUpdate} lookups={lookups} />
               {!before && (
-                <p className="text-xs text-slate-400 mt-2">No se registró el estado previo (registro anterior a esta versión). Se muestran los valores resultantes.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">No se registró el estado previo (registro anterior a esta versión). Se muestran los valores resultantes.</p>
               )}
             </div>
           )}
@@ -305,7 +306,7 @@ export default function AuditDetailModal({ item, onClose, lookups }) {
           {/* Creación / Eliminación: para recursos genéricos mostramos el panel crudo */}
           {item.accion === 'create' && esGenerico && (
             <div>
-              <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide mb-2">Datos creados</p>
+              <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide mb-2">Datos creados</p>
               <InfoPanel recurso={recurso} rec={after || diff.payload || {}} lookups={lookups} tone="green" />
             </div>
           )}
@@ -316,10 +317,10 @@ export default function AuditDetailModal({ item, onClose, lookups }) {
             </div>
           )}
           {item.accion === 'create' && !esGenerico && (
-            <p className="text-xs text-slate-400">Registro nuevo — no hay estado anterior.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Registro nuevo — no hay estado anterior.</p>
           )}
           {item.accion === 'delete' && !esGenerico && (
-            <p className="text-xs text-slate-400">Los valores mostrados corresponden al estado del registro antes de eliminarlo.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Los valores mostrados corresponden al estado del registro antes de eliminarlo.</p>
           )}
 
           {/* Login / logout */}
@@ -330,12 +331,12 @@ export default function AuditDetailModal({ item, onClose, lookups }) {
           {/* Respaldo técnico */}
           {diff.payload && (
             <details className="text-xs">
-              <summary className="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">Ver datos técnicos (JSON enviado)</summary>
+              <summary className="cursor-pointer text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">Ver datos técnicos (JSON enviado)</summary>
               <pre className="mt-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 overflow-x-auto text-slate-600 dark:text-slate-300">{JSON.stringify(diff.payload, null, 2)}</pre>
             </details>
           )}
         </div>
       </div>
-    </div>
+    </DialogShell>
   );
 }

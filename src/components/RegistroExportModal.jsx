@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Download, X, FileSpreadsheet } from 'lucide-react';
 import { getErrorMsg } from '../api';
 import InfoTooltip from './InfoTooltip';
+import DialogShell from './DialogShell';
 
 const mesActual = () => {
   const d = new Date();
@@ -35,7 +36,7 @@ export default function RegistroExportModal({ titulo, ayuda, mesInicial, onExpor
   const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <DialogShell onClose={onClose} label="Exportar registro">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
@@ -43,7 +44,7 @@ export default function RegistroExportModal({ titulo, ayuda, mesInicial, onExpor
             <h2 className="font-semibold text-slate-800 dark:text-slate-100">{titulo}</h2>
             {ayuda && <InfoTooltip text={ayuda} />}
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 -mr-2 w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"><X size={18} /></button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -56,11 +57,11 @@ export default function RegistroExportModal({ titulo, ayuda, mesInicial, onExpor
             <input type="month" value={hasta} onChange={e => setHasta(e.target.value)} className={inputCls} />
           </div>
         </div>
-        <p className="text-[11px] text-slate-400 mt-2">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
           Elegí el mismo mes en ambos para exportar uno solo, o un rango para comparar varios meses.
         </p>
 
-        {error && <p className="text-xs text-red-500 dark:text-red-400 mt-4 text-center">{error}</p>}
+        {error && <p className="text-xs text-red-600 dark:text-red-400 mt-4 text-center">{error}</p>}
 
         <button
           onClick={handleExport}
@@ -71,6 +72,6 @@ export default function RegistroExportModal({ titulo, ayuda, mesInicial, onExpor
           {loading ? 'Generando...' : 'Descargar Excel'}
         </button>
       </div>
-    </div>
+    </DialogShell>
   );
 }

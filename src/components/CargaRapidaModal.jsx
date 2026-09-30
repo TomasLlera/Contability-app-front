@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
-import { hoyAR } from '../utils/fecha';
-import { X, Zap } from 'lucide-react';
+import { useState, useEffect, useRef, useId } from 'react';
+import { hoyAR, fmtFecha } from '../utils/fecha';
+import { Zap, Loader2, ChevronDown } from 'lucide-react';
+import Modal from './Modal';
 import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg, newIdemKey } from '../api';
 import toast from 'react-hot-toast';
 import InfoTooltip from './InfoTooltip';
+import { fmtMoneda } from '../utils/formato';
 
 const today = () => hoyAR();
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
+const fmt = fmtMoneda;
 
 // ── Vencimiento automático del subrubro (espejo de calcularVencimientoSub del backend) ──
 // 'dias' → emisión + N días; 'dia_semana' → próximo día fijo de la semana (nunca el
@@ -44,13 +46,21 @@ const calcVencimientoSub = (fechaStr, sub) => {
 const TIPOS = [
   { value: 'factura',      label: 'Factura',       color: 'bg-amber-500' },
   { value: 'pago',         label: 'Pago',          color: 'bg-blue-500' },
-  { value: 'nota_credito', label: 'Nota Créd.',    color: 'bg-purple-500' },
+  { value: 'nota_credito', label: 'Nota de crédito', color: 'bg-purple-500' },
 ];
 
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const selectCls = inputCls;
 
 export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
+  const uid = useId();
+  // Errores visibles junto a cada campo (antes: botón deshabilitado o un toast).
+  const [errores, setErrores] = useState({});
+  const limpiarError = (c) => setErrores(e => (e[c] ? { ...e, [c]: null } : e));
+  const montoRef = useRef(null);
+  const subRef = useRef(null);
+  const vencRef = useRef(null);
+  const [masDatos, setMasDatos] = useState(false);
   const [rubroId, setRubroId] = useState('');
   const [subrubros, setSubrubros] = useState([]);
   const [subrubroId, setSubrubroId] = useState('');
@@ -137,12 +147,20 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (saving) return;
     const n = Number(monto);
-    if (!n || !subrubroId) return;
     // Vencimiento: obligatorio en facturas y nunca anterior a la emisión.
-    if (tipo === 'factura') {
-      if (!fechaVenc) { toast.error('Ingresá la fecha de vencimiento'); return; }
-      if (fechaVenc < fecha) { toast.error('El vencimiento no puede ser anterior a la fecha de emisión'); return; }
+    const nuevos = {
+      subrubro: !subrubroId ? 'Elegí el rubro y el subrubro' : null,
+      monto: !n ? 'Ingresá un monto mayor a 0' : null,
+      venc: tipo !== 'factura' ? null
+        : !fechaVenc ? 'Ingresá la fecha de vencimiento'
+        : fechaVenc < fecha ? 'No puede ser anterior a la emisión' : null,
+    };
+    if (nuevos.subrubro || nuevos.monto || nuevos.venc) {
+      setErrores(nuevos);
+      (nuevos.subrubro ? subRef : nuevos.monto ? montoRef : vencRef).current?.focus();
+      return;
     }
     // Una NC aplicada a una boleta puntual nunca puede superar su saldo pendiente
     // (el backend también la rechaza con 400).
@@ -214,178 +232,202 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
 
   const rubrosSorted = [...rubros].sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Zap size={16} className="text-blue-500" />
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Carga rápida</h2>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
-        </div>
+  const labelCls = 'block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1';
+  const hintCls = 'font-normal text-slate-500 dark:text-slate-400';
+  const errCls = 'mt-1 text-xs text-red-600 dark:text-red-400';
+  const conError = (c) => errores[c] ? 'border-red-400 dark:border-red-500 focus:ring-red-500' : '';
+  const segWrap = 'flex rounded-lg bg-slate-100 dark:bg-slate-700/60 p-0.5 text-sm font-medium';
+  const segCls = (activo) => `flex-1 min-h-11 sm:min-h-9 px-1 rounded-md transition-colors ${
+    activo ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100'
+  }`;
+  const hayPercepciones = (tipo === 'factura' && !esRemito) || tipo === 'nota_credito';
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+  return (
+    // <Modal> como el resto de la app: full-screen en mobile con Guardar fijo al pie
+    // (antes era una tarjeta flotante propia, sin role="dialog" ni Escape).
+    <Modal
+      title={<span className="inline-flex items-center gap-2"><Zap size={16} className="text-blue-600 dark:text-blue-400" /> Carga rápida</span>}
+      ariaLabel="Carga rápida"
+      size="md"
+      onClose={onClose}
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose}
+            className="flex-1 min-h-11 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600">
+            Cerrar
+          </button>
+          <button type="submit" form={`${uid}-form`} disabled={saving}
+            className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-1.5">
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      }
+    >
+        <form id={`${uid}-form`} onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Tipo */}
-          <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
+          <div role="radiogroup" aria-label="Tipo" className={segWrap}>
             {TIPOS.map(t => (
-              <button key={t.value} type="button" onClick={() => setTipo(t.value)}
-                className={`flex-1 py-2 transition-colors ${tipo === t.value ? `${t.color} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+              <button key={t.value} type="button" role="radio" aria-checked={tipo === t.value}
+                onClick={() => setTipo(t.value)} className={segCls(tipo === t.value)}>
                 {t.label}
               </button>
             ))}
           </div>
 
-          {/* Rubro */}
-          <select className={selectCls} value={rubroId} onChange={e => elegirRubro(e.target.value)} required>
-            <option value="">— Seleccionar rubro —</option>
-            {rubrosSorted.map(r => (
-              <option key={r.id} value={r.id}>{r.nombre}</option>
-            ))}
-          </select>
-
-          {/* Subrubro */}
-          <select className={selectCls} value={subrubroId} onChange={e => setSubrubroId(e.target.value)} required disabled={!rubroId || loadingSubs}>
-            <option value="">— {loadingSubs ? 'Cargando...' : 'Seleccionar subrubro'} —</option>
-            {subrubros.map(s => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
+          {/* Proveedor: rubro + subrubro */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor={`${uid}-rubro`} className={labelCls}>Rubro</label>
+              <select id={`${uid}-rubro`} className={`${selectCls} ${conError('subrubro')}`} value={rubroId} onChange={e => { elegirRubro(e.target.value); limpiarError('subrubro'); }}>
+                <option value="">— Elegir —</option>
+                {rubrosSorted.map(r => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={`${uid}-sub`} className={labelCls}>Subrubro</label>
+              <select id={`${uid}-sub`} ref={subRef} className={`${selectCls} ${conError('subrubro')}`} value={subrubroId}
+                onChange={e => { setSubrubroId(e.target.value); limpiarError('subrubro'); }}
+                disabled={!rubroId || loadingSubs}
+                aria-invalid={!!errores.subrubro} aria-describedby={errores.subrubro ? `${uid}-sub-err` : undefined}>
+                <option value="">— {loadingSubs ? 'Cargando...' : 'Elegir'} —</option>
+                {subrubros.map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+            {errores.subrubro && <p id={`${uid}-sub-err`} className={`${errCls} sm:col-span-2 -mt-2`}>{errores.subrubro}</p>}
+          </div>
 
           {/* Boleta a la que aplicar — solo Pago / Nota de crédito */}
           {esPago && subrubroId && (
             loadingFacturas
-              ? <p className="text-xs text-slate-400">Cargando boletas...</p>
+              ? <p className="text-xs text-slate-500 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Cargando boletas...</p>
               : facturas.length === 0
-                ? <p className="text-xs text-slate-400">Sin boletas pendientes en este subrubro.</p>
+                ? <p className="text-xs text-slate-500 dark:text-slate-400">Sin boletas pendientes en este subrubro.</p>
                 : (
-                  <select className={selectCls} value={facturaSel} onChange={e => handleFacturaSel(e.target.value)}>
-                    <option value="">— Aplicar a boleta (opcional) —</option>
-                    {facturas.map(f => {
-                      const saldo = f.saldo != null ? f.saldo : f.monto;
-                      const parcial = f.saldo != null && f.saldo < f.monto - 0.005;
-                      return (
-                        <option key={f.id} value={f.id}>
-                          {(f.concepto || 'Factura')} — {fmt(saldo)}{parcial ? ' (saldo, ya tiene NC/pago)' : ''}{f.fecha ? ` — ${f.fecha}` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <div>
+                    <label htmlFor={`${uid}-boleta`} className={labelCls}>Aplicar a boleta <span className={hintCls}>(opcional)</span></label>
+                    <select id={`${uid}-boleta`} className={selectCls} value={facturaSel} onChange={e => handleFacturaSel(e.target.value)}>
+                      <option value="">— Automático (más antiguas primero) —</option>
+                      {facturas.map(f => {
+                        const saldo = f.saldo != null ? f.saldo : f.monto;
+                        const parcial = f.saldo != null && f.saldo < f.monto - 0.005;
+                        return (
+                          <option key={f.id} value={f.id}>
+                            {(f.concepto || 'Factura')} — {fmt(saldo)}{parcial ? ' (saldo, ya tiene NC/pago)' : ''}{f.fecha ? ` — ${fmtFecha(f.fecha)}` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 )
           )}
 
+          {/* Monto */}
+          <div>
+            <label htmlFor={`${uid}-monto`} className={labelCls}>
+              {tipo === 'factura' ? 'Monto' : tipo === 'pago' ? 'Monto del pago' : 'Monto de la nota de crédito'}
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500 dark:text-slate-400">$</span>
+              <input id={`${uid}-monto`} ref={montoRef} type="number" inputMode="decimal" min="0" step="any" placeholder="0,00"
+                className={`w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-base font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500 ${conError('monto')}`}
+                value={monto} onChange={e => { setMonto(e.target.value); limpiarError('monto'); }}
+                aria-invalid={!!errores.monto} aria-describedby={errores.monto ? `${uid}-monto-err` : undefined} />
+            </div>
+            {errores.monto && <p id={`${uid}-monto-err`} className={errCls}>{errores.monto}</p>}
+          </div>
+
           {/* Fecha de emisión + vencimiento (el vencimiento solo aplica a facturas) */}
-          {tipo === 'factura' ? (
-            <div className="grid grid-cols-2 gap-3">
+          <div className={tipo === 'factura' ? 'grid grid-cols-2 gap-3' : ''}>
+            <div>
+              <label htmlFor={`${uid}-fecha`} className={labelCls}>{tipo === 'factura' ? 'Emisión' : 'Fecha'}</label>
+              <input id={`${uid}-fecha`} type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
+            </div>
+            {tipo === 'factura' && (
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Emisión</label>
-                <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
-              </div>
-              <div>
-                <label className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                <label htmlFor={`${uid}-venc`} className={`${labelCls} flex items-center gap-1`}>
                   Vencimiento
                   <InfoTooltip text="Si el subrubro tiene un criterio de vencimiento configurado, se calcula solo — podés cambiarlo. Al vencer, la factura aparece en la Caja del Día." />
                 </label>
-                <input type="date" className={inputCls} value={fechaVenc} min={fecha}
-                  onChange={e => { vencManualRef.current = true; setFechaVenc(e.target.value); }} required />
+                <input id={`${uid}-venc`} ref={vencRef} type="date" className={`${inputCls} ${conError('venc')}`} value={fechaVenc} min={fecha}
+                  onChange={e => { vencManualRef.current = true; setFechaVenc(e.target.value); limpiarError('venc'); }}
+                  aria-invalid={!!errores.venc} aria-describedby={errores.venc ? `${uid}-venc-err` : undefined} />
+                {errores.venc && <p id={`${uid}-venc-err`} className={errCls}>{errores.venc}</p>}
               </div>
-            </div>
-          ) : (
-            <input type="date" className={inputCls} value={fecha} max={today()} onChange={e => setFecha(e.target.value)} required />
-          )}
+            )}
+          </div>
 
           {/* Documento — solo en Factura */}
           {tipo === 'factura' && (
-            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
-              <button type="button" onClick={() => setDocumento('factura')}
-                className={`flex-1 py-2 transition-colors ${documento === 'factura' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
-                Factura
-              </button>
-              <button type="button" onClick={() => setDocumento('remito')}
-                className={`flex-1 py-2 transition-colors ${documento === 'remito' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
-                Remito
-              </button>
-            </div>
-          )}
-
-          {/* Método de pago — solo en Pago */}
-          {tipo === 'pago' && (
-            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
-              <button type="button" onClick={() => setMetodoPago('efectivo')}
-                className={`flex-1 py-2 transition-colors ${metodoPago === 'efectivo' ? 'bg-green-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
-                Efectivo
-              </button>
-              <button type="button" onClick={() => setMetodoPago('transferencia')}
-                className={`flex-1 py-2 transition-colors ${metodoPago === 'transferencia' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
-                Transferencia
-              </button>
-            </div>
-          )}
-
-          {/* Método de pago de la factura — viaja a la Caja del Día al vencer. Remito = efectivo. */}
-          {tipo === 'factura' && (
             <div>
-              <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-xs font-medium">
-                {[['efectivo', 'Efectivo', 'bg-green-600'], ['transferencia', 'Transferencia', 'bg-blue-600']].map(([v, l, bg]) => {
-                  const active = (esRemito ? 'efectivo' : metodoFactura) === v;
+              <span id={`${uid}-doc`} className={labelCls}>Documento</span>
+              <div role="radiogroup" aria-labelledby={`${uid}-doc`} className={segWrap}>
+                {[['factura', 'Factura'], ['remito', 'Remito']].map(([v, l]) => (
+                  <button key={v} type="button" role="radio" aria-checked={documento === v} onClick={() => setDocumento(v)} className={segCls(documento === v)}>{l}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Método: del pago, o el que la factura lleva a la Caja del Día al vencer. */}
+          {(tipo === 'pago' || tipo === 'factura') && (
+            <div>
+              <span id={`${uid}-metodo`} className={labelCls}>
+                Método {tipo === 'factura' && <span className={hintCls}>(así aparece en la Caja al vencer)</span>}
+              </span>
+              <div role="radiogroup" aria-labelledby={`${uid}-metodo`} className={segWrap}>
+                {[['efectivo', 'Efectivo'], ['transferencia', 'Transferencia']].map(([v, l]) => {
+                  const active = tipo === 'pago' ? metodoPago === v : (esRemito ? 'efectivo' : metodoFactura) === v;
                   return (
-                    <button key={v} type="button" disabled={esRemito}
-                      onClick={() => { if (!esRemito) setMetodoFactura(active ? null : v); }}
-                      className={`flex-1 py-2 transition-colors ${active ? `${bg} text-white` : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'} ${esRemito ? 'cursor-not-allowed opacity-90' : ''}`}>
+                    <button key={v} type="button" role="radio" aria-checked={active} disabled={tipo === 'factura' && esRemito}
+                      onClick={() => {
+                        if (tipo === 'pago') setMetodoPago(v);
+                        else if (!esRemito) setMetodoFactura(active ? null : v);
+                      }}
+                      className={`${segCls(active)} ${tipo === 'factura' && esRemito ? 'cursor-not-allowed' : ''}`}>
                       {l}
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">
-                {esRemito
-                  ? 'Remito — siempre efectivo. Aparece en la Caja del Día.'
-                  : 'Opcional. Al vencer, aparece con este método en la Caja del Día.'}
-              </p>
+              {tipo === 'factura' && (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {esRemito ? 'Remito: siempre efectivo.' : 'Opcional.'}
+                </p>
+              )}
             </div>
           )}
 
-          {/* Percepciones — solo Factura (no remito) / Nota de Crédito. No suman al
-              monto. Se ubican arriba del monto (el monto es lo último que se carga). */}
-          {((tipo === 'factura' && !esRemito) || tipo === 'nota_credito') && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Percepción IVA <span className="font-normal text-violet-400/70">(no suma)</span></label>
-                <input type="number" inputMode="decimal" min="0" step="any" placeholder="0"
-                  className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">Ingresos Brutos <span className="font-normal text-violet-400/70">(no suma)</span></label>
-                <input type="number" inputMode="decimal" min="0" step="any" placeholder="0"
-                  className="w-full border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
-              </div>
+          {/* Percepciones — no suman al monto; plegadas porque son opcionales. */}
+          {hayPercepciones && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={() => setMasDatos(v => !v)} aria-expanded={masDatos}
+                className="w-full min-h-11 flex items-center gap-2 px-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">
+                <span className="flex-1">Percepciones <span className={hintCls}>(IVA / IIBB, no suman)</span></span>
+                <ChevronDown size={15} className={`shrink-0 transition-transform ${masDatos ? 'rotate-180' : ''}`} />
+              </button>
+              {masDatos && (
+                <div className="px-3 pb-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor={`${uid}-perc`} className={labelCls}>Percepción IVA</label>
+                    <input id={`${uid}-perc`} type="number" inputMode="decimal" min="0" step="any" placeholder="0,00" className={inputCls}
+                      value={percepcionIva} onChange={e => setPercepcionIva(e.target.value)} />
+                  </div>
+                  <div>
+                    <label htmlFor={`${uid}-iibb`} className={labelCls}>Ingresos Brutos</label>
+                    <input id={`${uid}-iibb`} type="number" inputMode="decimal" min="0" step="any" placeholder="0,00" className={inputCls}
+                      value={ingresosBrutos} onChange={e => setIngresosBrutos(e.target.value)} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          {/* Monto */}
-          <div className="relative">
-            <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold ${esPago ? 'text-blue-500' : 'text-green-600'}`}>
-              {esPago ? '−' : '+'}
-            </span>
-            <input type="number" inputMode="decimal" min="0" step="any" placeholder="0"
-              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={monto} onChange={e => setMonto(e.target.value)} required />
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600">
-              Cerrar
-            </button>
-            <button type="submit" disabled={saving || !Number(monto) || !subrubroId}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40">
-              {saving ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

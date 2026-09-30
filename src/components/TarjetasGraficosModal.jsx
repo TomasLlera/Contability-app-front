@@ -3,14 +3,10 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import { Users, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { fmtMoneda, fmtPct, fmtMonedaCompacta } from '../utils/formato';
 
-const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtCorto = (n) => {
-  const v = Math.abs(n || 0);
-  if (v >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${Math.round(n / 1_000)}k`;
-  return `$${n || 0}`;
-};
+const fmt = fmtMoneda;
+const fmtCorto = fmtMonedaCompacta;
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const labelMes = (mes) => {
   if (!mes) return '';
@@ -36,10 +32,10 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
         {/* Navegador de mes */}
         <div className="flex items-center justify-center">
           <div className="inline-flex items-center h-8 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden text-xs">
-            <button onClick={() => onMesChange(-1)} title="Mes anterior"
+            <button onClick={() => onMesChange(-1)} title="Mes anterior" aria-label="Mes anterior"
               className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><ChevronLeft size={14} /></button>
             <span className="h-full flex items-center px-3 border-x border-slate-300 dark:border-slate-600 font-medium text-slate-700 dark:text-slate-200">{labelMes(mes)}</span>
-            <button onClick={() => onMesChange(1)} title="Mes siguiente"
+            <button onClick={() => onMesChange(1)} title="Mes siguiente" aria-label="Mes siguiente"
               className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><ChevronRight size={14} /></button>
           </div>
         </div>
@@ -51,24 +47,24 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
             const c = comparativa_tipos[key] || {};
             return (
               <div key={key} className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
-                <p className="text-[11px] text-slate-400">{label}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
                 <p className={`text-sm font-semibold ${text}`}>{fmt(g.total)}</p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {c.porcentaje === null || c.porcentaje === undefined
                     ? `Anterior: ${fmt(c.anterior)}`
-                    : `${c.porcentaje > 0 ? '+' : ''}${c.porcentaje.toFixed(1)}% vs mes ant.`}
+                    : `${fmtPct(c.porcentaje)} vs mes ant.`}
                 </p>
               </div>
             );
           })}
           <div className="bg-slate-900 dark:bg-slate-800 border border-slate-700 rounded-xl px-3 py-2">
-            <p className="text-[11px] text-slate-400">Total del mes</p>
+            <p className="text-xs text-slate-300">Total del mes</p>
             <p className="text-sm font-bold text-white">{fmt(total)}</p>
-            <p className="text-[11px] flex items-center gap-1 text-slate-400">
-              {igual ? <Minus size={10} /> : sube ? <TrendingUp size={10} className="text-green-500" /> : <TrendingDown size={10} className="text-red-500" />}
+            <p className="text-xs flex items-center gap-1 text-slate-300">
+              {igual ? <Minus size={10} /> : sube ? <TrendingUp size={10} className="text-green-500" /> : <TrendingDown size={10} className="text-red-600 dark:text-red-400" />}
               {comparativa.porcentaje === null || comparativa.porcentaje === undefined
                 ? `Anterior: ${fmt(mes_anterior.total)}`
-                : `${comparativa.porcentaje > 0 ? '+' : ''}${comparativa.porcentaje.toFixed(1)}%`}
+                : `${fmtPct(comparativa.porcentaje)}`}
             </p>
           </div>
         </div>
@@ -76,7 +72,7 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
         {/* Composición diaria apilada */}
         <div>
           <p className="text-xs font-semibold text-slate-500 mb-2">Composición por tipo — {labelMes(mes)}</p>
-          <div className="h-72 text-slate-400">
+          <div className="h-72 text-slate-500 dark:text-slate-400">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={serie} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} vertical={false} />
@@ -99,12 +95,12 @@ export default function TarjetasGraficosModal({ data, tipos, mes, onMesChange, o
           <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
             <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/40">
               <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <Users size={13} className="text-green-600" /> Por empleado — {labelMes(mes)}
+                <Users size={13} className="text-green-700 dark:text-green-400" /> Por empleado — {labelMes(mes)}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs whitespace-nowrap">
-                <thead className="text-slate-400">
+                <thead className="text-slate-500 dark:text-slate-400">
                   <tr className="border-b border-slate-100 dark:border-slate-700/60">
                     <th className="text-left px-3 py-1.5 font-medium">Empleado</th>
                     {tipos.map(t => <th key={t.key} className={`text-right px-3 py-1.5 font-medium ${t.text}`}>{t.label}</th>)}

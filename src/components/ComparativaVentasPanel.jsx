@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { registroApi } from '../api';
 import { Scale, TriangleAlert, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react';
 import InfoTooltip from './InfoTooltip';
+import { fmtMoneda, fmtPct } from '../utils/formato';
+import { fmtFecha } from '../utils/fecha';
 
-const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = fmtMoneda;
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const labelMes = (mes) => {
   if (!mes) return '';
@@ -71,7 +73,7 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-slate-400 py-3 px-4">
+      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 py-3 px-4">
         <Loader2 size={12} className="animate-spin" /> Calculando comparativa…
       </div>
     );
@@ -87,7 +89,7 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
       {!bare && (
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
           <span className="font-semibold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-            <Scale size={14} className="text-slate-400" /> {titulo} — {labelMes(data.mes)}
+            <Scale size={14} className="text-slate-500 dark:text-slate-400" /> {titulo} — {labelMes(data.mes)}
             <InfoTooltip text="Compara el total FACTURADO del mes en Venta Sistema contra el total cobrado con tarjeta. El ticket no entra: no es facturación. Sirve para detectar cobros con tarjeta que quedaron sin facturar. Diferencias de hasta $1 se toman como redondeo." />
           </span>
         </div>
@@ -112,7 +114,7 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
           <Celda
             label="Diferencia"
             valor={Math.abs(data.diferencia)}
-            sub={data.porcentaje !== null ? `${Math.abs(data.porcentaje).toFixed(1)}% sobre el mayor` : 'Sin base de comparación'}
+            sub={data.porcentaje !== null ? `${fmtPct(data.porcentaje, { signo: false })} sobre el mayor` : 'Sin base de comparación'}
             color={est.texto}
           />
         </div>
@@ -121,7 +123,7 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
             las tarjetas superan lo facturado: puede haber cobros con tarjeta cargados
             como ticket. */}
         {data.venta_sistema.total_ticket > 0 && (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Fuera del cruce — Ticket del mes: <span className="font-medium text-violet-600 dark:text-violet-400 tabular-nums">{fmt(data.venta_sistema.total_ticket)}</span>
             {' · '}Total Venta Sistema: <span className="font-medium text-slate-500 dark:text-slate-300 tabular-nums">{fmt(data.venta_sistema.total)}</span>
           </p>
@@ -147,7 +149,7 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
             {abierto && (
               <div className="mt-2 max-h-56 overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="text-slate-400">
+                  <thead className="text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="text-left py-1 font-medium">Día</th>
                       <th className="text-right py-1 font-medium">Facturado</th>
@@ -159,11 +161,11 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                     {diasConDif.map(d => (
                       <tr key={d.fecha}>
-                        <td className="py-1 text-slate-500 tabular-nums">{d.fecha}</td>
+                        <td className="py-1 text-slate-500 tabular-nums">{fmtFecha(d.fecha)}</td>
                         <td className="py-1 text-right text-slate-600 dark:text-slate-300 tabular-nums">{fmt(d.total_facturado)}</td>
                         <td className="py-1 text-right text-slate-600 dark:text-slate-300 tabular-nums">{fmt(d.total_tarjetas)}</td>
-                        <td className="py-1 text-right text-slate-400 tabular-nums">{d.total_ticket ? fmt(d.total_ticket) : '—'}</td>
-                        <td className={`py-1 text-right font-medium tabular-nums ${d.diferencia > 0 ? 'text-red-500' : 'text-amber-600 dark:text-amber-400'}`}>
+                        <td className="py-1 text-right text-slate-500 dark:text-slate-400 tabular-nums">{d.total_ticket ? fmt(d.total_ticket) : '—'}</td>
+                        <td className={`py-1 text-right font-medium tabular-nums ${d.diferencia > 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
                           {d.diferencia > 0 ? '+' : ''}{fmt(d.diferencia)}
                         </td>
                       </tr>
@@ -182,9 +184,9 @@ export default function ComparativaVentasPanel({ mes, reloadKey = 0, titulo = 'C
 function Celda({ label, valor, sub, color }) {
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5">
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
       <p className={`text-lg font-bold ${color} tabular-nums`}>{fmt(valor)}</p>
-      <p className="text-xs text-slate-400 mt-0.5 truncate">{sub}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">{sub}</p>
     </div>
   );
 }

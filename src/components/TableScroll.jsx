@@ -41,7 +41,7 @@ export default function TableScroll({ children, className = '', hint = 'Deslizá
   return (
     <div className={`relative ${className}`}>
       {hint && hayScroll && !tocada && (
-        <p className="sm:hidden flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 mb-1.5">
+        <p className="sm:hidden flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-1.5">
           <ChevronsRight size={12} className="shrink-0 animate-pulse" /> {hint}
         </p>
       )}

@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { ivaApi, getErrorMsg } from '../api';
+import { confirmar } from '../utils/confirmar';
 import { parseWorkbook, fmtSample } from '../utils/excel';
 import { Upload, FileSpreadsheet, Check, X, AlertCircle } from 'lucide-react';
+import DialogShell from './DialogShell';
 
 // Campos destino del Excel de compras (espejo de COLUMNS en backend/routes/iva.js).
 const IVA_FIELDS = [
@@ -135,10 +137,13 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
       // 2) Si hay duplicados, preguntamos si guardarlos (notas de crédito repetidas) u omitirlos.
       let incluirDuplicados = false;
       if (dupsDetectados > 0) {
-        incluirDuplicados = window.confirm(
-          `Se detectaron ${dupsDetectados} comprobante(s) con la misma fecha, proveedor e importe (posibles notas de crédito repetidas).\n\n` +
-          `Aceptar = guardarlos igual (duplicados)\nCancelar = omitirlos`
-        );
+        incluirDuplicados = await confirmar({
+          message: `Se detectaron ${dupsDetectados} comprobante(s) repetidos`,
+          detail: 'Tienen la misma fecha, proveedor e importe (pueden ser notas de crédito repetidas). ¿Los guardás igual o los omitís?',
+          confirmLabel: 'Guardarlos igual',
+          cancelLabel: 'Omitirlos',
+          dangerous: false,
+        });
       }
 
       // 3) Importación real con la decisión tomada.
@@ -159,7 +164,7 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <DialogShell onClose={onClose} label="Importar compras">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
@@ -169,10 +174,10 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
             </div>
             <div>
               <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Importar compras (IVA)</p>
-              <p className="text-xs text-slate-400">Mapeá cada campo a la columna de tu Excel</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Mapeá cada campo a la columna de tu Excel</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 -mr-2 w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"><X size={18} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
@@ -185,12 +190,12 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); loadFirst(e.dataTransfer.files); }}
               >
-                <Upload size={32} className="mx-auto mb-3 text-slate-400" />
+                <Upload size={32} className="mx-auto mb-3 text-slate-500 dark:text-slate-400" />
                 <p className="font-medium text-slate-600 dark:text-slate-300 text-sm">Arrastrá uno o más Excel, o hacé click</p>
-                <p className="text-xs text-slate-400 mt-1">.xlsx / .xls · se mapean con las columnas del primero</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">.xlsx / .xls · se mapean con las columnas del primero</p>
               </div>
               <input ref={inputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={e => loadFirst(e.target.files)} />
-              {error && <p className="mt-3 text-sm text-red-500 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
+              {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
             </div>
           )}
 
@@ -236,10 +241,10 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
                         <div className="w-36 shrink-0">
                           <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                             {f.label}
-                            {f.required && <span className="text-red-500 ml-0.5">*</span>}
-                            {f.sum && <span className="text-[10px] text-amber-500 ml-1" title="Se suma por mes">∑</span>}
+                            {f.required && <span className="text-red-600 dark:text-red-400 ml-0.5">*</span>}
+                            {f.sum && <span className="text-xs text-amber-600 dark:text-amber-400 ml-1" title="Se suma por mes">∑</span>}
                           </p>
-                          <p className="text-xs text-slate-400 mt-0.5 truncate">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                             {selected ? (samples.filter(v => v !== null).slice(0, 2).map(fmtSample).join(' · ') || '—') : 'sin asignar'}
                           </p>
                         </div>
@@ -269,7 +274,7 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
                 </p>
               )}
 
-              {error && <p className="text-sm text-red-500 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
+              {error && <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
             </div>
           )}
 
@@ -290,7 +295,7 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800 dark:text-slate-100">{result.importadas} fila{result.importadas !== 1 ? 's' : ''} importada{result.importadas !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-slate-400">{result.duplicadas > 0 ? `${result.duplicadas} duplicada(s) ${result.incluirDuplicados ? 'guardada(s)' : 'omitida(s)'}` : 'Sin duplicados'}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{result.duplicadas > 0 ? `${result.duplicadas} duplicada(s) ${result.incluirDuplicados ? 'guardada(s)' : 'omitida(s)'}` : 'Sin duplicados'}</p>
                 </div>
               </div>
               <div className="space-y-1.5 mb-5 max-h-52 overflow-y-auto">
@@ -298,8 +303,8 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
                   <div key={i} className="flex items-center justify-between py-1.5 px-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                     <span className="text-sm text-slate-700 dark:text-slate-200 truncate mr-3">{a.archivo}</span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">{a.importadas} nuevas</span>
-                      {a.duplicadas > 0 && <span className="text-xs text-amber-500">{a.duplicadas} dup.</span>}
+                      <span className="text-xs text-green-700 dark:text-green-400 font-medium">{a.importadas} nuevas</span>
+                      {a.duplicadas > 0 && <span className="text-xs text-amber-600 dark:text-amber-400">{a.duplicadas} dup.</span>}
                     </div>
                   </div>
                 ))}
@@ -320,6 +325,6 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
           </div>
         )}
       </div>
-    </div>
+    </DialogShell>
   );
 }

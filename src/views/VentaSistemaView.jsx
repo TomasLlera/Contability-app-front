@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { hoyAR, mesAR } from '../utils/fecha';
+import { hoyAR, mesAR, fmtFecha } from '../utils/fecha';
 import { registroApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
 import VentaSistemaGraficosModal from '../components/VentaSistemaGraficosModal';
@@ -9,8 +9,10 @@ import RowActions from '../components/RowActions';
 import ComparativaVentasModal from '../components/ComparativaVentasModal';
 import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, BarChart3, FileSpreadsheet, Scale, Receipt, FileText, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { fmtMoneda } from '../utils/formato';
+import Skeleton from '../components/Skeleton';
 
-const fmt = (n) => (n || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = fmtMoneda;
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const labelMes = (mes) => {
   if (!mes) return '';
@@ -116,7 +118,7 @@ export default function VentaSistemaView({ role }) {
   };
 
   const handleDelete = (v) => setConfirm({
-    message: `¿Eliminar la venta de ${tipoDef(v.tipo).label} del ${v.fecha} por ${fmt(v.monto)}?`,
+    message: `¿Eliminar la venta de ${tipoDef(v.tipo).label} del ${fmtFecha(v.fecha)} por ${fmt(v.monto)}?`,
     onConfirm: async () => {
       try {
         await registroApi.ventas.delete(v.id);
@@ -127,7 +129,7 @@ export default function VentaSistemaView({ role }) {
     },
   });
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando…</div>;
+  if (loading) return <Skeleton />;
 
   const { ventas = [] } = data || {};
   const ventasDelDia = ventas.filter(v => v.fecha === fecha);
@@ -161,7 +163,7 @@ export default function VentaSistemaView({ role }) {
       {/* Navegador de mes + gráficos */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex items-center h-9 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
-          <button onClick={() => setMes(shiftMes(mes, -1))} title="Mes anterior"
+          <button onClick={() => setMes(shiftMes(mes, -1))} title="Mes anterior" aria-label="Mes anterior"
             className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <ChevronLeft size={15} />
           </button>
@@ -170,7 +172,7 @@ export default function VentaSistemaView({ role }) {
             <input type="month" value={mes} onChange={e => e.target.value && setMes(e.target.value)} title="Elegir mes"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           </div>
-          <button onClick={() => setMes(shiftMes(mes, 1))} title="Mes siguiente"
+          <button onClick={() => setMes(shiftMes(mes, 1))} title="Mes siguiente" aria-label="Mes siguiente"
             className="h-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <ChevronRight size={15} />
           </button>
@@ -209,24 +211,24 @@ export default function VentaSistemaView({ role }) {
                   <ChevronDown size={13} className={`text-slate-400 transition-transform ${abierto ? 'rotate-180' : ''}`} />
                 </div>
                 <p className={`mt-1 text-lg font-bold ${text}`}>{fmt(g.total)}</p>
-                <p className="text-xs text-slate-400">{g.cantidad} {g.cantidad === 1 ? 'venta' : 'ventas'}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{g.cantidad} {g.cantidad === 1 ? 'venta' : 'ventas'}</p>
               </button>
               {abierto && (
                 <div className="border-t border-slate-200/70 dark:border-slate-700/70 bg-white/60 dark:bg-slate-800/40 px-3 py-2 space-y-1">
                   {g.lista.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-1">Sin cargas para este día.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 py-1">Sin cargas para este día.</p>
                   ) : g.lista.map(v => (
                     <div key={v.id} className="flex items-center justify-between gap-2 text-xs group">
                       {/* El concepto ya no se carga desde el alta: solo se muestra
                           cuando la venta lo tiene (cargas viejas o editadas a mano). */}
                       <span className="truncate text-slate-600 dark:text-slate-300">
                         {fmt(v.monto)}
-                        {v.concepto && <span className="text-slate-400"> · {v.concepto}</span>}
+                        {v.concepto && <span className="text-slate-500 dark:text-slate-400"> · {v.concepto}</span>}
                       </span>
                       {!isViewer && (
                         <span className="flex items-center gap-1 shrink-0 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
-                          <button onClick={() => startEdit(v)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
-                          <button onClick={() => handleDelete(v)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
+                          <button onClick={() => startEdit(v)} title="Editar" aria-label="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={12} /></button>
+                          <button onClick={() => handleDelete(v)} title="Eliminar" aria-label="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={12} /></button>
                         </span>
                       )}
                     </div>
@@ -243,7 +245,7 @@ export default function VentaSistemaView({ role }) {
           se desbordaban de los 351px de un teléfono. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-slate-900 dark:bg-slate-800 border border-slate-700 rounded-xl px-4 sm:px-5 py-3.5 sm:py-4">
         <div className="text-sm font-medium text-slate-300 flex items-center gap-1.5 min-w-0">
-          <span className="truncate">Total consolidado del {fecha}</span>
+          <span className="truncate">Total consolidado del {fmtFecha(fecha)}</span>
           <InfoTooltip text="Ticket + facturado. Solo la parte facturada genera IVA débito fiscal (21%) y es la que se cruza contra el total de tarjetas en la Comparativa." />
         </div>
         <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">{fmt(totalDia)}</span>
@@ -254,15 +256,15 @@ export default function VentaSistemaView({ role }) {
         <form onSubmit={handleAdd} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-end">
             <div className="sm:w-44">
-              <label className="block text-xs text-slate-400 mb-1">Fecha</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Fecha</label>
               <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} onClick={e => e.currentTarget.showPicker?.()} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Monto</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Monto</label>
               <input type="number" inputMode="decimal" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={inputCls} />
             </div>
             <div>
-              <label className="flex items-center gap-1 text-xs text-slate-400 mb-1">
+              <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-1">
                 Tipo
                 <InfoTooltip text="Ticket = venta sin comprobante fiscal. Facturado = factura emitida. Solo lo facturado genera IVA 21% y entra en la comparativa contra tarjetas." />
               </label>
@@ -281,13 +283,13 @@ export default function VentaSistemaView({ role }) {
       {/* Ventas del día seleccionado */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40">
-          <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">Ventas del {fecha}</span>
+          <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">Ventas del {fmtFecha(fecha)}</span>
           <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-            {fmt(totalDia)} <span className="text-xs font-normal text-slate-400">({ventasDelDia.length})</span>
+            {fmt(totalDia)} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">({ventasDelDia.length})</span>
           </span>
         </div>
         {ventasDelDia.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-6">Sin ventas cargadas para este día.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">Sin ventas cargadas para este día.</p>
         ) : (
           <Tabla ventas={ventasDelDia} isViewer={isViewer} editId={editId} edit={edit} setEdit={setEdit}
             onStartEdit={startEdit} onSaveEdit={saveEdit} onCancelEdit={() => setEditId(null)} onDelete={handleDelete} />
@@ -328,8 +330,8 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
               const def = tipoDef(v.tipo);
               return <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>;
             })()}
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
-              <span className="tabular-nums">{v.fecha}</span>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+              <span className="tabular-nums">{fmtFecha(v.fecha)}</span>
               {v.concepto && <> · {v.concepto}</>}
             </p>
           </div>
@@ -349,7 +351,7 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
 
     <div className="hidden sm:block overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="text-slate-400 text-xs">
+        <thead className="text-slate-500 dark:text-slate-400 text-xs">
           <tr>
             <th className="text-left px-4 py-1.5 font-medium w-32">Tipo</th>
             <th className="text-left px-4 py-1.5 font-medium w-36">Fecha</th>
@@ -379,8 +381,8 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
               </td>
               <td className="px-2 py-1.5">
                 <div className="flex items-center justify-end gap-1">
-                  <button onClick={onSaveEdit} title="Guardar" className="text-green-500 hover:text-green-600"><Check size={15} /></button>
-                  <button onClick={onCancelEdit} title="Cancelar" className="text-slate-400 hover:text-slate-600"><X size={15} /></button>
+                  <button onClick={onSaveEdit} title="Guardar" aria-label="Guardar" className="text-green-500 hover:text-green-600"><Check size={15} /></button>
+                  <button onClick={onCancelEdit} title="Cancelar" aria-label="Cancelar" className="text-slate-500 dark:text-slate-400 hover:text-slate-600"><X size={15} /></button>
                 </div>
               </td>
             </tr>
@@ -392,14 +394,14 @@ function Tabla({ ventas, isViewer, editId, edit, setEdit, onStartEdit, onSaveEdi
                   return <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${def.text}`}><def.Icon size={13} /> {def.label}</span>;
                 })()}
               </td>
-              <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{v.fecha}</td>
-              <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{v.concepto || <span className="text-slate-400">—</span>}</td>
+              <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{fmtFecha(v.fecha)}</td>
+              <td className="px-4 py-2 text-slate-700 dark:text-slate-200">{v.concepto || <span className="text-slate-500 dark:text-slate-400">—</span>}</td>
               <td className="px-4 py-2 text-right font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">{fmt(v.monto)}</td>
               <td className="px-2 py-2">
                 {!isViewer && (
                   <div className="flex items-center justify-end gap-1 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={() => onStartEdit(v)} title="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={13} /></button>
-                    <button onClick={() => onDelete(v)} title="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
+                    <button onClick={() => onStartEdit(v)} title="Editar" aria-label="Editar" className="text-slate-300 hover:text-blue-500"><Pencil size={13} /></button>
+                    <button onClick={() => onDelete(v)} title="Eliminar" aria-label="Eliminar" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
                   </div>
                 )}
               </td>

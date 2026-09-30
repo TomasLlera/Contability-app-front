@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight } from 'lucide-react';
+import { fmtMoneda, fmtPct } from '../utils/formato';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n ?? 0);
+const fmt = (n) => fmtMoneda(n, { decimales: 0 });
 
 // Métricas por defecto (rubros). Se pueden sobreescribir con la prop `metricas`
 // (p. ej. caja usa ingresos/egresos/neto).
@@ -20,7 +21,7 @@ function pctChange(cur, prev) {
 function DeltaBadge({ cur, prev, good }) {
   const pct = pctChange(cur, prev);
   if (pct === null || Math.abs(pct) < 0.5) {
-    return <span className="inline-flex items-center gap-0.5 text-xs text-slate-400 font-medium"><Minus size={12} /> = sin cambio</span>;
+    return <span className="inline-flex items-center gap-0.5 text-xs text-slate-500 dark:text-slate-400 font-medium"><Minus size={12} /> = sin cambio</span>;
   }
   const up = pct > 0;
   const positivo = good ? up : !up; // ¿es un buen resultado?
@@ -28,7 +29,7 @@ function DeltaBadge({ cur, prev, good }) {
   const Icon = up ? TrendingUp : TrendingDown;
   return (
     <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${cls}`}>
-      <Icon size={12} /> {up ? '+' : ''}{pct.toFixed(1)}%
+      <Icon size={12} /> {fmtPct(pct)}
     </span>
   );
 }
@@ -44,11 +45,11 @@ function BarPair({ actual, anterior, bar }) {
     <div className="space-y-1">
       {rows.map(r => (
         <div key={r.l} className="flex items-center gap-2">
-          <span className="w-14 shrink-0 text-[11px] text-slate-400">{r.l}</span>
+          <span className="w-14 shrink-0 text-xs text-slate-500 dark:text-slate-400">{r.l}</span>
           <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${r.cls} transition-all duration-500`} style={{ width: `${Math.max((r.v / max) * 100, r.v > 0 ? 3 : 0)}%` }} />
           </div>
-          <span className="w-24 shrink-0 text-right text-[11px] font-medium text-slate-600 dark:text-slate-300 tabular-nums">{fmt(r.v)}</span>
+          <span className="w-24 shrink-0 text-right text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">{fmt(r.v)}</span>
         </div>
       ))}
     </div>
@@ -77,29 +78,32 @@ export default function ComparativaCard({ titulo, subtitulo, icon, actual, anter
           {icon}
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{titulo}</h3>
-            {subtitulo && <p className="text-xs text-slate-400 truncate">{subtitulo}</p>}
+            {subtitulo && <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{subtitulo}</p>}
           </div>
         </div>
         <div className="text-right shrink-0">
           <DeltaBadge cur={actual[principal.key]} prev={anterior[principal.key]} good={principal.good} />
-          <p className="text-[11px] text-slate-400 mt-0.5">{principal.label.toLowerCase()}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{principal.label.toLowerCase()}</p>
         </div>
       </div>
 
-      {/* Resumen compacto: 3 métricas con su delta */}
-      <div className="grid grid-cols-3 gap-2 mt-3">
+      {/* Resumen compacto: 3 métricas con su delta. En mobile una fila por métrica:
+          en tres columnas de 100px los montos en millones se cortaban ("$ 6.174...."). */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
         {metricas.map(m => (
-          <div key={m.key} className="rounded-lg bg-slate-50 dark:bg-slate-700/40 px-2.5 py-2">
-            <p className="text-[11px] text-slate-400 mb-0.5">{m.label}</p>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100 tabular-nums truncate">{fmt(actual[m.key])}</p>
-            <DeltaBadge cur={actual[m.key]} prev={anterior[m.key]} good={m.good} />
+          <div key={m.key} className="rounded-lg bg-slate-50 dark:bg-slate-700/40 px-3 py-2 flex items-center justify-between gap-3 sm:block">
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:mb-0.5">{m.label}</p>
+            <div className="text-right sm:text-left">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 tabular-nums whitespace-nowrap" title={fmtMoneda(actual[m.key])}>{fmt(actual[m.key])}</p>
+              <DeltaBadge cur={actual[m.key]} prev={anterior[m.key]} good={m.good} />
+            </div>
           </div>
         ))}
       </div>
 
       <button
         onClick={() => setOpen(o => !o)}
-        className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        className="mt-3 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
       >
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         {open ? 'Ocultar detalle' : 'Ver detalle (barras comparativas)'}
@@ -109,7 +113,7 @@ export default function ComparativaCard({ titulo, subtitulo, icon, actual, anter
         <div className="mt-3 space-y-3 pt-3 border-t border-slate-100 dark:border-slate-700">
           {metricas.map(m => (
             <div key={m.key}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{m.label}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">{m.label}</p>
               <BarPair actual={actual[m.key]} anterior={anterior[m.key]} bar={m.bar} />
             </div>
           ))}

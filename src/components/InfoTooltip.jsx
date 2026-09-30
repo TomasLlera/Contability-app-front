@@ -64,7 +64,7 @@ export default function InfoTooltip({ text, side, size = 13, width = 'w-56' }) {
         type="button"
         aria-label="Ayuda"
         onClick={toggle}
-        className="tap text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        className="tap text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
       >
         <HelpCircle size={size} />
       </button>
