@@ -584,22 +584,16 @@ export default function StockView({ role }) {
   const [importing, setImporting] = useState(false);
   const importRef = useRef(null);
 
-  const cargar = async () => {
-    try {
-      const [prods, alertss, rubross] = await Promise.all([
-        stockApi.getProductos(),
-        stockApi.getAlertas(),
-        rubrosApi.getAll(),
-      ]);
-      setProductos(prods);
-      setAlertas(alertss);
-      setRubros(rubross);
-    } catch (err) {
-      toast.error(getErrorMsg(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Cadena de promesas (no async/await): el estado solo se toca en los callbacks,
+  // así el efecto que la llama no hace setState síncrono. Devuelve la promesa.
+  const cargar = () => Promise.all([
+    stockApi.getProductos(),
+    stockApi.getAlertas(),
+    rubrosApi.getAll(),
+  ])
+    .then(([prods, alertss, rubross]) => { setProductos(prods); setAlertas(alertss); setRubros(rubross); })
+    .catch(err => { toast.error(getErrorMsg(err)); })
+    .finally(() => setLoading(false));
 
   useEffect(() => { cargar(); }, []);
 

@@ -59,29 +59,14 @@ export default function IvaView({ initialTab = 'compras', role }) {
   const [vTotal, setVTotal] = useState('');
   const [vConcepto, setVConcepto] = useState('');
 
-  const cargar = useCallback(async () => {
-    try {
-      const [c, l, v, cf, r] = await Promise.all([
-        ivaApi.getCompras(), ivaApi.getLotes(), ivaApi.getVentas(), ivaApi.getCreditos(), ivaApi.getResumen(),
-      ]);
-      setCompras(c); setLotes(l); setVentas(v); setCreditos(cf); setResumen(r);
-      // Debug: los tres acumulados que restan del saldo, por mes (las percepciones
-      // combinan IvaCompra + facturas de subrubro; los créditos son carga manual).
-      console.debug('[IVA] deducciones acumuladas por mes:',
-        (r.meses || []).map(m => ({
-          mes: m.mes,
-          percepcion_iva: m.compras?.percepcion_iva,
-          ingresos_brutos: m.compras?.ingresos_brutos,
-          creditos_fiscales: m.creditos_fiscales,
-          calculada: m.diferencia_calculada,
-          ajustada: m.diferencia_ajustada,
-        })));
-    } catch (err) {
-      toast.error(getErrorMsg(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Cadena de promesas (no async/await): el estado solo se toca en los callbacks,
+  // así el efecto que la llama no hace setState síncrono. Devuelve la promesa.
+  const cargar = useCallback(() => Promise.all([
+    ivaApi.getCompras(), ivaApi.getLotes(), ivaApi.getVentas(), ivaApi.getCreditos(), ivaApi.getResumen(),
+  ])
+    .then(([c, l, v, cf, r]) => { setCompras(c); setLotes(l); setVentas(v); setCreditos(cf); setResumen(r); })
+    .catch(err => { toast.error(getErrorMsg(err)); })
+    .finally(() => setLoading(false)), []);
 
   // Recalcula cruce + lotes tras cada import/carga (tiempo real)
   const refrescarDerivados = useCallback(async () => {

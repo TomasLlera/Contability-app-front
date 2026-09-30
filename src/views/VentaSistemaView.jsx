@@ -57,15 +57,12 @@ export default function VentaSistemaView({ role }) {
   const [editId, setEditId] = useState(null);
   const [edit, setEdit] = useState({ tipo: 'ticket', fecha: '', monto: '', concepto: '' });
 
-  const cargar = useCallback(async () => {
-    try {
-      setData(await registroApi.ventas.getMes(mes));
-    } catch (err) {
-      toast.error(getErrorMsg(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [mes]);
+  // Cadena de promesas (no async/await): el estado solo se toca en los callbacks,
+  // así el efecto que la llama no hace setState síncrono. Devuelve la promesa.
+  const cargar = useCallback(() => registroApi.ventas.getMes(mes)
+    .then(setData)
+    .catch(err => { toast.error(getErrorMsg(err)); })
+    .finally(() => setLoading(false)), [mes]);
 
   useEffect(() => { cargar(); }, [cargar]);
 

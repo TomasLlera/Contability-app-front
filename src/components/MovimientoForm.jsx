@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { hoyAR } from '../utils/fecha';
 import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2, HandCoins } from 'lucide-react';
 import { newIdemKey } from '../api';
@@ -73,15 +73,6 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const metodoBloqueado = esRemito || metodoFijo;
   const metodoFacturaActivo = esRemito ? 'efectivo' : metodoPago;
 
-  const toggleFactura = (id) => {
-    setFacturasSeleccionadas(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   // Saldo restante de la factura (monto original − NC/pagos ya aplicados). Si el
   // backend no lo manda, cae al monto. Es lo que se debe vincular/mostrar para no
   // pisar créditos previos: una 2da NC ve el saldo, no el monto original.
@@ -120,13 +111,19 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   // editando un pago/NC que ya trae monto), se respeta su valor: cambiar la
   // selección de boletas ya no lo pisa. Así se puede aplicar un monto distinto
   // al total seleccionado y seguir moviendo las boletas vinculadas.
+  // Se hace en el mismo handler que cambia la selección (antes era un efecto que
+  // re-renderizaba de más).
   const pagoManualRef = useRef(movimiento?.pago > 0);
-  const selInicialRef = useRef(true);
-  useEffect(() => {
-    if (selInicialRef.current) { selInicialRef.current = false; return; }
-    if (pagoManualRef.current) return;
-    if (facturasSeleccionadas.size > 0) setPago(String(totalSeleccionado));
-  }, [facturasSeleccionadas]);
+  const toggleFactura = (id) => {
+    const next = new Set(facturasSeleccionadas);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setFacturasSeleccionadas(next);
+    if (!pagoManualRef.current && next.size > 0) {
+      const total = todasFacturasPendientes.filter(f => next.has(f.id)).reduce((s, f) => s + saldoFactura(f), 0);
+      setPago(String(total));
+    }
+  };
 
   const montoPago = Number(pago) || 0;
   const diferencia = Math.round((totalSeleccionado - montoPago) * 100) / 100;

@@ -299,79 +299,99 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   const [selectedRubroId, setSelectedRubroId] = useState(initialRubroId);
   const [subrubros, setSubrubros] = useState([]);
   const [selectedSubrubroId, setSelectedSubrubroId] = useState(null);
-  const [metrica, setMetrica] = useState('facturado');
-  const [tendencia, setTendencia] = useState([]);
-  const [loadingTendencia, setLoadingTendencia] = useState(false);
+  const [metrica, setMetrica] = useState(initialMetrica || 'facturado');
+  // Respuestas guardadas junto con la clave de lo que se pidió: "cargando" se deriva
+  // de si la clave coincide con la actual (sin setState síncrono en los efectos).
+  const [respTendencia, setRespTendencia] = useState({ clave: null, datos: [] });
   const [comparacion, setComparacion] = useState([]);
 
   // Caja
   const [cajaVista, setCajaVista]     = useState('dia');
   const [cajaPreset, setCajaPreset]   = useState(30);
   const [cajaMetrica, setCajaMetrica] = useState('ingresosEfvo');
-  const [cajaMovs, setCajaMovs]       = useState([]);
-  const [cajaLoading, setCajaLoading] = useState(false);
+  const [respCaja, setRespCaja]       = useState({ clave: null, datos: [] });
   const [showEspeciales, setShowEspeciales] = useState(() => sessionStorage.getItem('graficas_especiales') !== '0');
 
   // Stock
   const [stockVista, setStockVista]   = useState('mes');
   const [stockAnio, setStockAnio]     = useState(new Date().getFullYear());
-  const [stockData, setStockData]     = useState(null);
-  const [stockLoading, setStockLoading] = useState(false);
+  const [respStock, setRespStock]     = useState({ clave: null, datos: null });
 
   useEffect(() => { dashboardApi.getResumen().then(setResumen); }, []);
   useEffect(() => { dashboardApi.getComparativa().then(setComparativa).catch(() => {}); }, []);
   useEffect(() => { dashboardApi.getComparativaCaja().then(setComparativaCaja).catch(() => {}); }, []);
-  useEffect(() => { if (rubros.length > 0 && !selectedRubroId) setSelectedRubroId(rubros[0].id); }, [rubros]);
-  // Al abrir Gráficas apuntando a un rubro (ej. desde la card de Proveedores del dashboard).
-  useEffect(() => { if (initialRubroId) { setSelectedRubroId(initialRubroId); setTab('rubros'); } }, [initialRubroId]);
-  // Métrica a mostrar (Facturas / Pagos / Deuda) cuando se abre desde un tile del dashboard.
-  useEffect(() => { if (initialMetrica) setMetrica(initialMetrica); }, [initialMetrica]);
+
+  // Ajustes de estado durante el render (patrón recomendado por React en vez de
+  // efectos que solo copian props a estado):
+  //   • sin rubro elegido → el primero apenas llegan los rubros;
+  if (!selectedRubroId && rubros.length > 0) setSelectedRubroId(rubros[0].id);
+  //   • abrir Gráficas apuntando a un rubro o a una métrica (desde el dashboard);
+  const [initialRubroPrevio, setInitialRubroPrevio] = useState(initialRubroId);
+  if (initialRubroPrevio !== initialRubroId) {
+    setInitialRubroPrevio(initialRubroId);
+    if (initialRubroId) { setSelectedRubroId(initialRubroId); setTab('rubros'); }
+  }
+  const [initialMetricaPrevia, setInitialMetricaPrevia] = useState(initialMetrica);
+  if (initialMetricaPrevia !== initialMetrica) {
+    setInitialMetricaPrevia(initialMetrica);
+    if (initialMetrica) setMetrica(initialMetrica);
+  }
+  //   • otro rubro → se limpia el subrubro elegido y la comparación del anterior.
+  const [rubroPrevio, setRubroPrevio] = useState(selectedRubroId);
+  if (rubroPrevio !== selectedRubroId) {
+    setRubroPrevio(selectedRubroId);
+    setSelectedSubrubroId(null);
+    setComparacion([]);
+  }
 
   useEffect(() => {
     if (!selectedRubroId) return;
-    setSelectedSubrubroId(null); setComparacion([]);
     subrubrosApi.getByRubro(selectedRubroId).then(setSubrubros);
     dashboardApi.getComparacion(selectedRubroId).then(d => setComparacion(d.comparacion ?? [])).catch(() => {});
   }, [selectedRubroId]);
 
+  const claveTendencia = selectedRubroId ? `${selectedRubroId}|${selectedSubrubroId ?? ''}` : null;
+  const tendencia = respTendencia.datos;
+  const loadingTendencia = !!claveTendencia && respTendencia.clave !== claveTendencia;
   useEffect(() => {
-    if (!selectedRubroId) return;
-    setLoadingTendencia(true);
+    if (!claveTendencia) return;
     const req = selectedSubrubroId
       ? dashboardApi.getTendenciaSubrubro(selectedSubrubroId, 6)
       : dashboardApi.getTendencia(selectedRubroId, 6);
-    req.then(d => setTendencia(d.tendencia ?? [])).finally(() => setLoadingTendencia(false));
-  }, [selectedRubroId, selectedSubrubroId]);
+    req.then(d => setRespTendencia({ clave: claveTendencia, datos: d.tendencia ?? [] }))
+      .catch(() => setRespTendencia(r => ({ clave: claveTendencia, datos: r.datos })));
+  }, [claveTendencia]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (tab !== 'caja') return;
+  // Rango del historial de caja según la vista y el preset elegidos.
+  const rangoCaja = (() => {
     const hasta = todayStr();
-    let desde;
     if (cajaVista === 'dia') {
-      if (cajaPreset === 'mes') {
-        desde = todayStr().slice(0, 7) + '-01';
-      } else {
-        desde = addDays(hasta, -(Number(cajaPreset) - 1));
-      }
-    } else if (cajaVista === 'mes') {
-      const d = new Date(hasta + 'T00:00:00');
-      d.setMonth(d.getMonth() - cajaPreset);
-      desde = d.toISOString().split('T')[0];
-    } else {
-      const d = new Date(hasta + 'T00:00:00');
-      d.setFullYear(d.getFullYear() - cajaPreset);
-      desde = d.toISOString().split('T')[0];
+      return { desde: cajaPreset === 'mes' ? hasta.slice(0, 7) + '-01' : addDays(hasta, -(Number(cajaPreset) - 1)), hasta };
     }
-    setCajaLoading(true);
-    cajaApi.getRango(desde, hasta).then(data => setCajaMovs(data)).catch(() => {}).finally(() => setCajaLoading(false));
-  }, [tab, cajaPreset, cajaVista]);
-
+    const d = new Date(hasta + 'T00:00:00');
+    if (cajaVista === 'mes') d.setMonth(d.getMonth() - cajaPreset);
+    else d.setFullYear(d.getFullYear() - cajaPreset);
+    return { desde: d.toISOString().split('T')[0], hasta };
+  })();
+  const claveCaja = tab === 'caja' ? `${rangoCaja.desde}|${rangoCaja.hasta}` : null;
+  const cajaMovs = respCaja.datos;
+  const cajaLoading = !!claveCaja && respCaja.clave !== claveCaja;
   useEffect(() => {
-    if (tab !== 'stock') return;
-    setStockLoading(true);
+    if (!claveCaja) return;
+    cajaApi.getRango(rangoCaja.desde, rangoCaja.hasta)
+      .then(data => setRespCaja({ clave: claveCaja, datos: data }))
+      .catch(() => setRespCaja(r => ({ clave: claveCaja, datos: r.datos })));
+  }, [claveCaja]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const claveStock = tab === 'stock' ? `${stockVista}|${stockVista === 'dia' ? '' : stockAnio}` : null;
+  const stockData = respStock.datos;
+  const stockLoading = !!claveStock && respStock.clave !== claveStock;
+  useEffect(() => {
+    if (!claveStock) return;
     stockApi.getGraficas(stockVista, stockVista === 'dia' ? undefined : stockAnio)
-      .then(setStockData).catch(() => {}).finally(() => setStockLoading(false));
-  }, [tab, stockVista, stockAnio]);
+      .then(datos => setRespStock({ clave: claveStock, datos }))
+      .catch(() => setRespStock(r => ({ clave: claveStock, datos: r.datos })));
+  }, [claveStock]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cajaAggregated = useMemo(() => {
     const getKey = (fecha) => {

@@ -154,18 +154,16 @@ export default function App() {
 
   // Declarada antes del efecto que la usa (antes estaba más abajo: funcionaba, pero
   // el efecto accedía a una constante todavía no declarada en el código).
-  const cargar = async () => {
-    const [ls, rs] = await Promise.all([localesApi.getAll(), rubrosApi.getAll()]);
-    setLocales(ls);
-    setRubros(rs);
-    setLoading(false);
-    const stats = {};
-    await Promise.all(rs.map(async r => {
-      const subs = await subrubrosApi.getByRubro(r.id);
-      stats[r.id] = subs.length;
-    }));
-    setRubroStats(stats);
-  };
+  // Cadena de promesas (no async/await): el estado solo se toca en los callbacks,
+  // así el efecto que la llama no hace setState síncrono. Devuelve la promesa.
+  const cargar = () => Promise.all([localesApi.getAll(), rubrosApi.getAll()])
+    .then(([ls, rs]) => {
+      setLocales(ls);
+      setRubros(rs);
+      setLoading(false);
+      return Promise.all(rs.map(r => subrubrosApi.getByRubro(r.id).then(subs => [r.id, subs.length])));
+    })
+    .then(pares => setRubroStats(Object.fromEntries(pares)));
 
   useEffect(() => {
     if (loggedIn) {
@@ -190,9 +188,8 @@ export default function App() {
         window.removeEventListener('click', updateActivity);
         window.removeEventListener('touchstart', updateActivity);
       };
-    } else {
-      setLoading(false);
     }
+    // Sin sesión no hace falta tocar `loading`: se muestra el login antes de mirarlo.
   }, [loggedIn]);
 
   useEffect(() => {

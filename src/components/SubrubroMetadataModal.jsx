@@ -96,24 +96,6 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
     return () => obs.disconnect();
   }, []);
 
-  useEffect(() => {
-    setNombre(subrubro?.nombre || '');
-    setIcon(subrubro?.icon || '');
-    setShowIconPicker(false);
-    setRazonSocial(subrubro?.razon_social || '');
-    setCuit(subrubro?.cuit || '');
-    setCbu(subrubro?.cbu || '');
-    setAlias(subrubro?.alias || '');
-    setModoVencimiento(subrubro?.modo_vencimiento || 'dias');
-    setDiaVencimiento(subrubro?.dia_vencimiento != null ? String(subrubro.dia_vencimiento) : '');
-    setDiaSemanaVencimiento(subrubro?.dia_semana_vencimiento != null ? String(subrubro.dia_semana_vencimiento) : '');
-    setDiaMesVencimiento(subrubro?.dia_mes_vencimiento != null ? String(subrubro.dia_mes_vencimiento) : '');
-    setNotas(subrubro?.notas || '');
-    setMetodoPagoDefault(subrubro?.metodo_pago_default || 'ambas');
-    setTipoSubrubro(subrubro?.tipo_subrubro || 'factura');
-    setAplicaDescuento(!!subrubro?.aplica_descuento);
-  }, [subrubro?.id]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!nombre.trim()) {

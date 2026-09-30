@@ -23,23 +23,25 @@ const formatFechaCorta = (dateStr) => {
  * agrega ruido a la vista.
  */
 export default function DescuentosPanel({ subrubroId = null, desde, hasta, titulo = 'Descuentos aplicados', compact = false }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Respuesta con la clave del filtro al que corresponde: "cargando" = la respuesta
+  // guardada todavía no es la del filtro actual (sin setState síncrono en el efecto).
+  const clave = `${subrubroId ?? ''}|${desde ?? ''}|${hasta ?? ''}`;
+  const [respuesta, setRespuesta] = useState({ clave: null, data: null });
   const [abierto, setAbierto] = useState(false);
+  const loading = respuesta.clave !== clave;
+  const data = respuesta.data;
 
   useEffect(() => {
     let vivo = true;
-    setLoading(true);
     cajaApi.getDescuentos({
       ...(desde ? { desde } : {}),
       ...(hasta ? { hasta } : {}),
       ...(subrubroId ? { subrubro_id: subrubroId } : {}),
     })
-      .then(d => { if (vivo) setData(d); })
-      .catch(() => { if (vivo) setData(null); })
-      .finally(() => { if (vivo) setLoading(false); });
+      .then(d => { if (vivo) setRespuesta({ clave, data: d }); })
+      .catch(() => { if (vivo) setRespuesta({ clave, data: null }); });
     return () => { vivo = false; };
-  }, [subrubroId, desde, hasta]);
+  }, [clave, subrubroId, desde, hasta]);
 
   if (loading) {
     return (

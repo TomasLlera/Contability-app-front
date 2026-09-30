@@ -380,7 +380,8 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
   const [showForm, setShowForm] = useState(false);
   const [editingMov, setEditingMov] = useState(null);
   const [loading, setLoading] = useState(true);      // primera carga: pantalla completa
-  const [recargando, setRecargando] = useState(false); // cambio de filtro: solo la lista
+  // Clave (subrubro + período) de los datos cargados; ver `recargando` más abajo.
+  const [claveCargada, setClaveCargada] = useState(null);
   const [viewMode, setViewMode] = useState('tabla');
   const [estadoFiltro, setEstadoFiltro] = useState('todos'); // 'todos' | 'pagadas' | 'pendientes'
   const [todosMovs, setTodosMovs] = useState([]);
@@ -392,27 +393,30 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
 
   // Solo recarga la lista de movimientos: los campos del rubro se piden aparte y
   // una sola vez, así cambiar de rango no repinta la vista entera.
-  const cargar = async () => {
-    setRecargando(true);
-    try {
-      setData(await movimientosApi.getBySubrubro(subrubro.id, paramsDeRango(rango, mesActual, custom)));
-    } catch (err) {
-      toast.error(getErrorMsg(err));
-    } finally {
-      setRecargando(false);
-      setLoading(false);
-    }
+  // Período pedido vs período ya cargado: mientras no coinciden, la lista se muestra
+  // atenuada ("recargando"). Derivado en vez de guardado, para no hacer setState
+  // síncrono dentro del efecto que dispara la carga.
+  const params = paramsDeRango(rango, mesActual, custom);
+  const claveDatos = `${subrubro.id}|${JSON.stringify(params)}`;
+  const recargando = claveCargada !== claveDatos;
+
+  // Cadenas de promesas (no async/await): el estado solo se toca en los callbacks.
+  const cargar = () => {
+    const clave = claveDatos;
+    return movimientosApi.getBySubrubro(subrubro.id, params)
+      .then(setData)
+      .catch(err => { toast.error(getErrorMsg(err)); })
+      .finally(() => { setClaveCargada(clave); setLoading(false); });
   };
 
-  const cargarTodos = async () => {
-    const d = await movimientosApi.getBySubrubro(subrubro.id);
+  const cargarTodos = () => movimientosApi.getBySubrubro(subrubro.id).then(d => {
     setTodosMovs(d.movimientos);
     // Facturas pendientes para vinculación en el form
     const pendientes = d.movimientos.filter(m =>
       (m.tipo === 'factura' || (!m.tipo && (m.monto || 0) > 0)) && !m.pagado
     );
     setTodasFacturasPendientes(pendientes);
-  };
+  });
 
   useEffect(() => { camposApi.getByRubro(rubro.id).then(setCampos).catch(() => {}); }, [rubro.id]);
   useEffect(() => { cargar(); }, [subrubro.id, rango, mesActual, custom.desde, custom.hasta]);

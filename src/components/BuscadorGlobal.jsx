@@ -7,9 +7,16 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 
 export default function BuscadorGlobal({ onNavigate, onClose }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Resultado de la última búsqueda, con el texto al que corresponde. "Buscando" se
+  // deriva de si ese texto coincide con el actual (sin setState dentro del efecto).
+  const [respuesta, setRespuesta] = useState({ q: '', items: [] });
   const [activeIdx, setActiveIdx] = useState(-1);
+  const qActual = query.trim();
+  const buscable = qActual.length >= 2;
+  const loading = buscable && respuesta.q !== qActual;
+  const results = buscable && respuesta.q === qActual ? respuesta.items : [];
+  // Cambiar el texto reinicia la selección con el teclado.
+  const cambiarQuery = (v) => { setQuery(v); setActiveIdx(-1); };
   const inputRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -22,17 +29,14 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
 
   useEffect(() => {
     clearTimeout(timerRef.current);
-    setActiveIdx(-1);
-    if (query.trim().length < 2) { setResults([]); setLoading(false); return; }
-    setLoading(true);
+    if (!buscable) return;
     timerRef.current = setTimeout(() => {
-      movimientosApi.search(query.trim())
-        .then(setResults)
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false));
+      movimientosApi.search(qActual)
+        .then(items => setRespuesta({ q: qActual, items }))
+        .catch(() => setRespuesta({ q: qActual, items: [] }));
     }, 300);
     return () => clearTimeout(timerRef.current);
-  }, [query]);
+  }, [qActual, buscable]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); }
@@ -58,13 +62,13 @@ export default function BuscadorGlobal({ onNavigate, onClose }) {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => cambiarQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Buscar movimientos, facturas, proveedores..."
             className="flex-1 bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+            <button onClick={() => cambiarQuery('')} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
               <X size={14} />
             </button>
           )}

@@ -298,27 +298,19 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     return () => document.removeEventListener('mousedown', handler);
   }, [onCancel]);
 
-  useEffect(() => {
-    if (!subrubroSel) { setFacturasSub([]); setFacturaSel(''); return; }
+  // Elegir subrubro carga sus boletas pendientes. Se hace en el handler (antes era
+  // un efecto que dependía de subrubroSel).
+  const elegirSubrubro = (id) => {
+    setSubrubroSel(id);
+    setFacturaSel('');
+    setFacturasSub([]);
+    if (!id) return;
     setLoadingFacturas(true);
-    cajaApi.getFacturasPendientes(subrubroSel)
-      .then(data => { setFacturasSub(data); setFacturaSel(''); })
+    cajaApi.getFacturasPendientes(id)
+      .then(setFacturasSub)
       .catch(() => setFacturasSub([]))
       .finally(() => setLoadingFacturas(false));
-  }, [subrubroSel]);
-
-  // Proveedor → auto-selecciona subrubro si está vinculado
-  useEffect(() => {
-    if (!seleccion) return;
-    const prov = proveedoresList.find(p => p.nombre === seleccion);
-    if (prov?.subrubro_id) {
-      const sub = allSubrubros.find(s => s.id === prov.subrubro_id);
-      if (sub) {
-        setRubroSel(String(sub.rubro_id));
-        setSubrubroSel(String(sub.id));
-      }
-    }
-  }, [seleccion]);
+  };
 
   const handleFacturaSel = (id) => {
     setFacturaSel(id);
@@ -341,6 +333,13 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   const handleSeleccion = (val) => {
     setSeleccion(val);
     if (val && val !== '__otro__') setConcepto(val);
+    // Proveedor vinculado a un subrubro → lo auto-selecciona (y carga sus boletas).
+    const prov = val ? proveedoresList.find(p => p.nombre === val) : null;
+    const sub = prov?.subrubro_id ? allSubrubros.find(s => s.id === prov.subrubro_id) : null;
+    if (sub) {
+      setRubroSel(String(sub.rubro_id));
+      elegirSubrubro(String(sub.id));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -415,7 +414,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
             </select>
             <select className={selectCls} value={subrubroSel} onChange={e => {
               const id = e.target.value;
-              setSubrubroSel(id);
+              elegirSubrubro(id);
               if (id) {
                 const sub = subrubrosDel.find(s => String(s.id) === id);
                 if (sub) setConcepto(sub.nombre);
@@ -1024,48 +1023,46 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
   // `forzarSync: false` = refresco automático (foco): respeta el mínimo entre
   // corridas. Después de una acción del usuario se sincroniza siempre.
-  const cargar = async ({ forzarSync = true } = {}) => {
-    try {
-      // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
-      // como gastos pending sin método de pago. Idempotente — no duplica.
-      const ult = ultimoSyncRef.current;
-      if (forzarSync || ult.fecha !== fecha || Date.now() - ult.at > SYNC_MIN_MS) {
-        try { await cajaApi.autoSync(fecha); } catch { /* sin permisos o sin red: se muestra lo que haya */ }
-        ultimoSyncRef.current = { fecha, at: Date.now() };
-      }
-      // Una sola request con todo lo del día (antes eran cuatro en serie): ítems,
-      // saldo en cuenta de ayer (para el ingreso por transferencia del día), saldo
-      // de efectivo de apertura encadenado desde el último saldo_inicial manual y,
-      // si es hoy, los próximos vencimientos.
-      const dia = await cajaApi.getDia(fecha);
-      setMovs(dia.movs);
-      setProximos(dia.proximos || []);
-      setSaldoCuentaAyer(dia.saldo_cuenta_ayer ?? null);
-      // Con saldo_inicial manual cargado hoy, ese manda. saldo === null = nunca se
-      // cargó un saldo inicial → la Caja muestra "—" en vez de un cero engañoso.
-      const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
-      setSaldoAutoCalculado(tieneSaldoManual ? null : (dia.saldo_anterior?.saldo ?? null));
-    } catch { /* se conserva lo último cargado */ }
+  // Las cargas son cadenas de promesas (no async/await): el estado solo se toca en
+  // los callbacks, así los efectos que las disparan no hacen setState síncrono.
+  // Todas devuelven la promesa.
+  const cargar = ({ forzarSync = true } = {}) => {
+    // Auto-sync: trae vencimientos del día (de los rubros configurados) y los crea
+    // como gastos pending sin método de pago. Idempotente — no duplica.
+    const ult = ultimoSyncRef.current;
+    const sincronizar = forzarSync || ult.fecha !== fecha || Date.now() - ult.at > SYNC_MIN_MS;
+    const pasoSync = sincronizar
+      ? cajaApi.autoSync(fecha)
+          .catch(() => { /* sin permisos o sin red: se muestra lo que haya */ })
+          .then(() => { ultimoSyncRef.current = { fecha, at: Date.now() }; })
+      : Promise.resolve();
+    // Una sola request con todo lo del día (antes eran cuatro en serie): ítems,
+    // saldo en cuenta de ayer (para el ingreso por transferencia del día), saldo
+    // de efectivo de apertura encadenado desde el último saldo_inicial manual y,
+    // si es hoy, los próximos vencimientos.
+    return pasoSync
+      .then(() => cajaApi.getDia(fecha))
+      .then(dia => {
+        setMovs(dia.movs);
+        setProximos(dia.proximos || []);
+        setSaldoCuentaAyer(dia.saldo_cuenta_ayer ?? null);
+        // Con saldo_inicial manual cargado hoy, ese manda. saldo === null = nunca se
+        // cargó un saldo inicial → la Caja muestra "—" en vez de un cero engañoso.
+        const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
+        setSaldoAutoCalculado(tieneSaldoManual ? null : (dia.saldo_anterior?.saldo ?? null));
+      })
+      .catch(() => { /* se conserva lo último cargado */ });
   };
 
-  const cargarConfig = async () => {
-    const cfg = await cajaApi.getConfig();
-    setConfig(cfg);
-  };
+  const cargarConfig = () => cajaApi.getConfig().then(setConfig);
 
-  const cargarVencimientos = async () => {
-    try {
-      const data = await movimientosApi.getVencimientos(7);
-      setVencimientos(Array.isArray(data) ? data : (data?.vencimientos || []));
-    } catch { /* se conservan los vencimientos ya cargados */ }
-  };
+  const cargarVencimientos = () => movimientosApi.getVencimientos(7)
+    .then(data => setVencimientos(Array.isArray(data) ? data : (data?.vencimientos || [])))
+    .catch(() => { /* se conservan los vencimientos ya cargados */ });
 
-  const cargarSubrubros = async () => {
-    try {
-      const results = await Promise.all(rubros.map(r => subrubrosApi.getByRubro(r.id)));
-      setAllSubrubros(results.flat());
-    } catch { /* sin subrubros: las filas muestran solo el concepto */ }
-  };
+  const cargarSubrubros = () => Promise.all(rubros.map(r => subrubrosApi.getByRubro(r.id)))
+    .then(results => setAllSubrubros(results.flat()))
+    .catch(() => { /* sin subrubros: las filas muestran solo el concepto */ });
 
   // Refresca todo lo que depende de datos del servidor (movimientos del día +
   // reconciliación auto-sync, vencimientos, config y subrubros). Lo usa el botón
@@ -1088,7 +1085,14 @@ export default function CajaView({ rubros = [], onNavigate }) {
     }
   };
 
-  useEffect(() => { cargar(); clearSelection(); }, [fecha]);
+  useEffect(() => { cargar(); }, [fecha]);
+  // Cambiar de día vacía la selección múltiple. Ajuste durante el render (patrón de
+  // React en vez de un setState dentro del efecto).
+  const [fechaSeleccion, setFechaSeleccion] = useState(fecha);
+  if (fechaSeleccion !== fecha) {
+    setFechaSeleccion(fecha);
+    setSelectedIds(new Set());
+  }
   useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
 
   // Auto-refresh: al volver el foco a la ventana o reactivar la pestaña, recarga

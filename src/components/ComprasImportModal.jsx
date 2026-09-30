@@ -67,16 +67,20 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
     setMapping(autoDetect(sel.headers.filter(h => h.length > 0), savedRef.current));
   }, [skipRows, step]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadFirst = async (fileList) => {
+  // Mapeo de columnas guardado (o {} si no hay config).
+  const mappingGuardado = () => ivaApi.getConfig().then(c => c.mapping || {}).catch(() => ({}));
+
+  const loadFirst = (fileList) => {
     const arr = Array.from(fileList || []);
     if (!arr.length) return;
     setError(null);
     setFiles(arr);
+    mappingGuardado().then(saved => leerArchivo(arr, saved));
+  };
 
-    let saved = {};
-    try { saved = (await ivaApi.getConfig()).mapping || {}; } catch { /* sin config */ }
+  // Lee el primer archivo y arma el preview con el mapeo guardado.
+  const leerArchivo = (arr, saved) => {
     savedRef.current = saved;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -96,8 +100,11 @@ export default function ComprasImportModal({ initialFiles = [], onClose, onDone 
   };
 
   // Carga inicial si vino con archivos (drag&drop desde la vista)
+  // Todo el estado se fija dentro del .then (nada síncrono en el cuerpo del efecto).
   useEffect(() => {
-    if (initialFiles.length) loadFirst(initialFiles);
+    const arr = Array.from(initialFiles || []);
+    if (!arr.length) return;
+    mappingGuardado().then(saved => { setFiles(arr); leerArchivo(arr, saved); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const samplesFor = (col) => {

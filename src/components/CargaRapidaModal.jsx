@@ -72,20 +72,22 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [ingresosBrutos, setIngresosBrutos] = useState('');
   const [saving, setSaving] = useState(false);
   const [loadingSubs, setLoadingSubs] = useState(false);
-  const [facturas, setFacturas] = useState([]);
   const [facturaSel, setFacturaSel] = useState('');
-  const [loadingFacturas, setLoadingFacturas] = useState(false);
   // Clave de idempotencia estable por apertura del modal (una alta lógica).
   const idemKeyRef = useRef(null);
   if (idemKeyRef.current === null) idemKeyRef.current = newIdemKey();
 
-  useEffect(() => {
-    if (!rubroId) { setSubrubros([]); setSubrubroId(''); return; }
+  // Al elegir rubro se cargan sus subrubros (en el handler, no en un efecto).
+  const elegirRubro = (id) => {
+    setRubroId(id);
+    setSubrubros([]);
+    setSubrubroId('');
+    if (!id) return;
     setLoadingSubs(true);
-    subrubrosApi.getByRubro(rubroId)
+    subrubrosApi.getByRubro(id)
       .then(s => { setSubrubros(s); setSubrubroId(s[0]?.id || ''); })
       .finally(() => setLoadingSubs(false));
-  }, [rubroId]);
+  };
 
   const esPago = tipo === 'pago' || tipo === 'nota_credito';
   // Remito: no lleva percepciones y se paga siempre en efectivo (automático).
@@ -105,14 +107,26 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
 
   // Boletas pendientes del subrubro: permiten aplicar el pago/NC a una factura
   // puntual (y dejar saldo si es parcial). Solo aplica a pago / nota de crédito.
+  // La lista guardada lleva la clave (subrubro) a la que corresponde: "cargando" y
+  // "vacía" se derivan de eso, sin setState síncrono dentro del efecto.
+  const claveFacturas = subrubroId && esPago ? String(subrubroId) : null;
+  const [respFacturas, setRespFacturas] = useState({ clave: null, items: [] });
+  const facturas = claveFacturas && respFacturas.clave === claveFacturas ? respFacturas.items : [];
+  const loadingFacturas = !!claveFacturas && respFacturas.clave !== claveFacturas;
+  const recargarFacturas = (clave) => cajaApi.getFacturasPendientes(clave)
+    .then(items => setRespFacturas({ clave, items }))
+    .catch(() => setRespFacturas({ clave, items: [] }));
   useEffect(() => {
-    if (!subrubroId || !esPago) { setFacturas([]); setFacturaSel(''); return; }
-    setLoadingFacturas(true);
-    cajaApi.getFacturasPendientes(subrubroId)
-      .then(setFacturas)
-      .catch(() => setFacturas([]))
-      .finally(() => setLoadingFacturas(false));
-  }, [subrubroId, esPago]);
+    if (claveFacturas) recargarFacturas(claveFacturas);
+  }, [claveFacturas]);
+
+  // Si cambia el subrubro o el tipo, la boleta elegida deja de valer. Se ajusta
+  // durante el render (patrón recomendado por React en vez de un efecto).
+  const [clavePrevia, setClavePrevia] = useState(claveFacturas);
+  if (clavePrevia !== claveFacturas) {
+    setClavePrevia(claveFacturas);
+    setFacturaSel('');
+  }
 
   const handleFacturaSel = (id) => {
     setFacturaSel(id);
@@ -189,7 +203,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
       setIngresosBrutos('');
       // Tras un pago/NC cambió el saldo de las boletas: refrescar el listado.
       if (esPago && subrubroId) {
-        cajaApi.getFacturasPendientes(subrubroId).then(setFacturas).catch(() => {});
+        recargarFacturas(String(subrubroId));
       }
     } catch (err) {
       toast.error(getErrorMsg(err));
@@ -223,7 +237,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           </div>
 
           {/* Rubro */}
-          <select className={selectCls} value={rubroId} onChange={e => setRubroId(e.target.value)} required>
+          <select className={selectCls} value={rubroId} onChange={e => elegirRubro(e.target.value)} required>
             <option value="">— Seleccionar rubro —</option>
             {rubrosSorted.map(r => (
               <option key={r.id} value={r.id}>{r.nombre}</option>

@@ -74,9 +74,14 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
     cargar();
   }, [rubro.id]);
 
-  useEffect(() => {
+  // Otro rubro u otro subrubro inicial (navegación desde fuera) → se abre ese.
+  // Ajuste durante el render, el patrón que recomienda React en vez de un efecto.
+  const claveSeleccion = `${rubro.id}|${initialSubrubro?.id ?? ''}`;
+  const [claveSeleccionPrevia, setClaveSeleccionPrevia] = useState(claveSeleccion);
+  if (claveSeleccionPrevia !== claveSeleccion) {
+    setClaveSeleccionPrevia(claveSeleccion);
     setSelectedSubrubro(initialSubrubro ?? null);
-  }, [rubro.id, initialSubrubro?.id]);
+  }
 
   useEffect(() => {
     if (!editingId) return;
@@ -402,6 +407,9 @@ export default function RubroView({ rubro, initialSubrubro, role }) {
 
       {editingMetadataSub && (
         <SubrubroMetadataModal
+          // Otro subrubro = modal nuevo con sus datos (reemplaza el efecto que
+          // copiaba los campos al cambiar de subrubro).
+          key={editingMetadataSub.id}
           subrubro={editingMetadataSub}
           onSave={handleSaveMetadata}
           onClose={() => setEditingMetadataSub(null)}

@@ -96,22 +96,20 @@ export default function TarjetasView({ role }) {
   // comparativa para volver a pedir el cruce, que cambia con cada ingreso.
   const [recarga, setRecarga] = useState(0);
 
-  const cargar = useCallback(async () => {
-    try {
-      const [d, m] = await Promise.all([
-        registroApi.tarjetas.getDia(fecha),
-        registroApi.tarjetas.getMes(mes),
-      ]);
-      setDia(d); setMesData(m); setError(null);
-    } catch (err) {
+  // Cadena de promesas (no async/await): el estado solo se toca en los callbacks,
+  // así el efecto que la llama no hace setState síncrono. Devuelve la promesa.
+  const cargar = useCallback(() => Promise.all([
+    registroApi.tarjetas.getDia(fecha),
+    registroApi.tarjetas.getMes(mes),
+  ])
+    .then(([d, m]) => { setDia(d); setMesData(m); setError(null); })
+    .catch(err => {
       // Sin esto un endpoint caído se veía idéntico a un día sin cargas (todo en
       // cero), y no había forma de distinguir "no vendimos nada" de "no cargó".
       setError(getErrorMsg(err));
       toast.error(getErrorMsg(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [fecha, mes]);
+    })
+    .finally(() => setLoading(false)), [fecha, mes]);
 
   // Recarga los datos del día/mes y avisa a la comparativa que quedó desactualizada.
   const recargarTodo = useCallback(async () => {
