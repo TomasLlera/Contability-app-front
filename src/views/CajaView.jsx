@@ -732,7 +732,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 icon: <Percent size={16} />,
                 iconDesktop: (
                   <>
-                    <Percent size={20} />
+                    <Percent size={18} />
                     <ChevronDown size={11} className={`transition-transform ${descOpen ? 'rotate-180' : ''}`} />
                   </>
                 ),
@@ -748,7 +748,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 label: esCobro ? 'Cobro parcial' : 'Pago parcial',
                 hint: 'Pagar una parte: el resto queda pendiente',
                 icon: <Coins size={16} />,
-                iconDesktop: <Coins size={22} />,
+                iconDesktop: <Coins size={20} />,
                 onClick: () => onPagoParcial(m),
                 className: 'p-1 -m-1 text-slate-400 hover:text-green-600 transition-colors shrink-0',
               },
@@ -757,7 +757,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 label: esCobro ? 'Editar deuda' : 'Editar boleta',
                 hint: 'Corregir el importe y las percepciones de la factura',
                 icon: <Receipt size={16} />,
-                iconDesktop: <Receipt size={22} />,
+                iconDesktop: <Receipt size={20} />,
                 onClick: () => onEditarBoleta(m),
                 className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
@@ -765,7 +765,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 key: 'editar',
                 label: 'Editar',
                 icon: <Pencil size={16} />,
-                iconDesktop: <Pencil size={22} />,
+                iconDesktop: <Pencil size={20} />,
                 onClick: () => onEdit(m),
                 className: 'p-1 -m-1 text-slate-400 hover:text-blue-500 transition-colors shrink-0',
               },
@@ -773,7 +773,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
                 key: 'eliminar',
                 label: 'Eliminar',
                 icon: <Trash2 size={16} />,
-                iconDesktop: <Trash2 size={22} />,
+                iconDesktop: <Trash2 size={20} />,
                 tone: 'danger',
                 onClick: () => onDelete(m.id),
                 className: 'p-1 -m-1 text-slate-400 hover:text-red-500 transition-colors shrink-0',
