@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useId } from 'react';
-import { cajaApi, movimientosApi, subrubrosApi, newIdemKey } from '../api';
+import { cajaApi, subrubrosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
@@ -608,7 +608,7 @@ function GrupoHeader({ grupo }) {
 // vista actual (p. ej. se está mirando un día futuro). Revertir sigue permitido.
 // `onPagoParcial` / `onEditarBoleta`: acciones de un pendiente vinculado a una
 // factura (pagar una parte; corregir la boleta sin ir al subrubro).
-function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false, bloqueoConfirmar = null, onPagoParcial, onEditarBoleta }) {
+function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = false, subrubro, onGoToSubrubro, selectable = false, selected = false, onToggleSelect, hideMetodo = false, aplicaDescuento = false, bloqueoConfirmar = null, onPagoParcial, onEditarBoleta, compacto = false }) {
   // Acordeón de descuento: arranca cerrado siempre (también después de confirmar) para
   // no ocupar espacio; se abre a demanda, ya sea para cargar el descuento o para
   // consultar el detalle de uno ya aplicado.
@@ -748,19 +748,20 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
             // Confirmado: badge de solo lectura. Antes era el mismo botón ✓ al 40% de
             // opacidad y un toque lo revertía sin preguntar (borraba el pago del
             // subrubro). Revertir vive ahora en el menú, con confirmación.
-            <span className="inline-flex items-center gap-1 min-h-8 px-2 rounded-lg text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 shrink-0">
+            <span title={esCobro ? 'Cobrado' : 'Pagado'}
+              className="inline-flex items-center gap-1 min-h-8 px-2 rounded-lg text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 shrink-0">
               {confirming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-              {esCobro ? 'Cobrado' : 'Pagado'}
+              {compacto ? <span className="sr-only">{esCobro ? 'Cobrado' : 'Pagado'}</span> : (esCobro ? 'Cobrado' : 'Pagado')}
             </span>
           ) : (
             <button onClick={(e) => { e.stopPropagation(); onConfirmar(m); }} disabled={confirming || confirmarBloqueado}
               title={confirmarBloqueado ? bloqueoConfirmar : esCobro ? 'Confirmar cobro (registra el abono)' : 'Confirmar pago'}
               aria-label={confirmarBloqueado ? bloqueoConfirmar : `${esCobro ? 'Confirmar cobro' : 'Confirmar pago'}: ${conceptoLimpio(m)}`}
-              className={`min-h-11 sm:min-h-9 px-3 flex items-center justify-center gap-1.5 rounded-lg shrink-0 text-sm font-semibold transition-colors
+              className={`min-h-11 sm:min-h-9 ${compacto ? 'min-w-11 sm:min-w-9 px-2' : 'px-3'} flex items-center justify-center gap-1.5 rounded-lg shrink-0 text-sm font-semibold transition-colors
                           border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300
                           hover:bg-green-100 dark:hover:bg-green-900/60 disabled:opacity-50 ${confirmarBloqueado ? 'disabled:cursor-not-allowed' : 'disabled:cursor-wait'}`}>
               {confirming ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-              {esCobro ? 'Cobrar' : 'Pagar'}
+              {!compacto && (esCobro ? 'Cobrar' : 'Pagar')}
             </button>
           ))}
           <RowActions
@@ -924,15 +925,13 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   );
 }
 
-function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 0, vencimientos, labelDisponible }) {
+function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 0, labelDisponible }) {
   // Se renombra a mayúscula para usarlo como componente (<Icon />). Como variable
   // con mayúscula, ESLint no lo marca como "sin usar" (sin el plugin de React no
   // cuenta el uso en JSX).
   const Icon = icon;
   const restante = disponible - gastos;
   const restanteSiConfirma = disponible - gastos - sinConfirmar;
-  const [vencAbierto, setVencAbierto] = useState(false);
-  const totalVenc = (vencimientos || []).reduce((s, v) => s + (v.monto || 0), 0);
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2">
       <div className="flex items-center gap-2 mb-3">
@@ -968,31 +967,6 @@ function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 
           </div>
         )}
       </div>
-      {vencimientos?.length > 0 && (
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-          <button type="button" onClick={() => setVencAbierto(v => !v)}
-            className="w-full flex items-center justify-between gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-            <span className="flex items-center gap-1">
-              <Clock size={10} /> Próximos a vencer
-              <span className="text-slate-400 dark:text-slate-400">({vencimientos.length})</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              {!vencAbierto && <span className="text-amber-700 dark:text-amber-400">{fmt(totalVenc)}</span>}
-              <ChevronDown size={13} className={`transition-transform ${vencAbierto ? 'rotate-180' : ''}`} />
-            </span>
-          </button>
-          {vencAbierto && (
-            <div className="mt-1.5 space-y-0.5">
-              {vencimientos.map((v, i) => (
-                <div key={i} className="flex justify-between gap-2 text-xs text-amber-700 dark:text-amber-400">
-                  <span className="truncate min-w-0">{v.subrubro?.nombre}</span>
-                  <span className="shrink-0">{fmt(v.monto)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -1062,7 +1036,6 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [saldoCuentaAyer, setSaldoCuentaAyer]         = useState(null);
   const saldoCuentaEditRef = useRef(null);
 
-  const [vencimientos, setVencimientos] = useState([]);
   const [config, setConfig]             = useState({ empleados: [], proveedores: [], rubros_sync: [], dias_anticipacion_caja: 3 });
   const [showConfig, setShowConfig]     = useState(false);
   const [showExport, setShowExport]     = useState(false);
@@ -1150,27 +1123,20 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
   const cargarConfig = () => cajaApi.getConfig().then(setConfig);
 
-  const cargarVencimientos = () => movimientosApi.getVencimientos(7)
-    .then(data => setVencimientos(Array.isArray(data) ? data : (data?.vencimientos || [])))
-    .catch(() => { /* se conservan los vencimientos ya cargados */ });
-
   const cargarSubrubros = () => Promise.all(rubros.map(r => subrubrosApi.getByRubro(r.id)))
     .then(results => setAllSubrubros(results.flat()))
     .catch(() => { /* sin subrubros: las filas muestran solo el concepto */ });
 
   // Refresca todo lo que depende de datos del servidor (movimientos del día +
-  // reconciliación auto-sync, vencimientos, config y subrubros). Lo usa el botón
+  // reconciliación auto-sync, config y subrubros). Lo usa el botón
   // "Refrescar" y los disparos automáticos al volver el foco a la ventana.
   // `automatico` = disparado por el foco: la Caja se recarga igual, pero el auto-sync
-  // y los vencimientos (lo pesado) respetan el mínimo de un minuto entre corridas.
+  // (lo pesado) respeta el mínimo de un minuto entre corridas.
   const refrescarTodo = async ({ automatico = false } = {}) => {
-    const ult = ultimoSyncRef.current;
-    const pesado = !automatico || ult.fecha !== fecha || Date.now() - ult.at > SYNC_MIN_MS;
     setRefreshing(true);
     try {
       await Promise.all([
         cargar({ forzarSync: !automatico }),
-        pesado ? cargarVencimientos() : null,
         cargarConfig(),
         automatico ? null : cargarSubrubros(),
       ]);
@@ -1187,7 +1153,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
     setFechaSeleccion(fecha);
     setSelectedIds(new Set());
   }
-  useEffect(() => { cargarConfig(); cargarVencimientos(); cargarSubrubros(); }, []);
+  useEffect(() => { cargarConfig(); cargarSubrubros(); }, []);
 
   // Auto-refresh: al volver el foco a la ventana o reactivar la pestaña, recarga
   // datos frescos. Así un pago/baja hecho en otra vista (o pestaña) se refleja sin
@@ -1521,8 +1487,6 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // atajo de arriba muestra el resultado sin montar la card.
   const restaEfvo  = disponibleEfvo  - gastosEfvo;
   const restaTrans = disponibleTrans - gastosTrans;
-  const vencEfvo    = vencimientos.filter(v => v.metodo_pago !== 'transferencia');
-  const vencTrans   = vencimientos.filter(v => v.metodo_pago === 'transferencia');
 
   // Mirando un día futuro los pendientes no se confirman (el backend también lo
   // rechaza): se pagan desde hoy, en "Próximos vencimientos".
@@ -1552,7 +1516,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
     // Hasta xl: una columna, con el atajo "Queda" arriba. Desde xl: lista a la
     // izquierda y el cierre del día fijo a la derecha. Antes era una columna de
     // 672px siempre y el resumen quedaba al final, detrás de 70+ ítems.
-    <div className="max-w-2xl xl:max-w-6xl mx-auto xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6 xl:items-start">
+    <div className="max-w-2xl xl:max-w-5xl mx-auto xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6 xl:items-start">
     <div className="space-y-5 min-w-0">
       {/* Navegación de fecha. En mobile la fecha va sola en su fila y las acciones
           debajo: no entran los 6 botones más la fecha larga en 360px de ancho. */}
@@ -1948,10 +1912,11 @@ export default function CajaView({ rubros = [], onNavigate }) {
       )}
 
       {/* Próximos vencimientos — solo mirando hoy. Un botón compacto arriba de los
-          totales que abre la lista en una ventana, para no alargar la Caja del día. */}
+          totales que abre la lista en una ventana, para no alargar la Caja del día.
+          En xl ya está en la columna "Cierre del día": acá se oculta para no repetirlo. */}
       {proximos.length > 0 && (
         <button type="button" onClick={() => setShowProximos(true)}
-          className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
+          className="xl:hidden w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
           <Clock size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Próximos vencimientos</span>
           <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">· {proximos.length}</span>
@@ -1964,9 +1929,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
           está arriba (botón "Resta efectivo / Resta transferencia"). */}
       <div ref={resumenRef} className="xl:hidden grid grid-cols-1 sm:grid-cols-2 gap-3 scroll-mt-4">
         <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-700 dark:text-green-400"
-          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
+          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} />
         <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-700 dark:text-blue-400"
-          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
+          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
       </div>
     </div>
@@ -1976,9 +1941,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
       <aside aria-label="Cierre del día" className="hidden xl:block sticky top-0 space-y-3">
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 px-1">Cierre del día</h2>
         <ResumenMetodo label="Efectivo" icon={Banknote} color="text-green-700 dark:text-green-400"
-          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} vencimientos={vencEfvo} />
+          disponible={disponibleEfvo} gastos={gastosEfvo} sinConfirmar={sinConfirmarEfvo} />
         <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-700 dark:text-blue-400"
-          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans} vencimientos={vencTrans}
+          disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
         {proximos.length > 0 && (
           <button type="button" onClick={() => setShowProximos(true)}
@@ -2044,6 +2009,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                     bloqueoConfirmar={bloqueoSync(m)}
                     onPagoParcial={(mov) => setParcialDe({ item: mov, fechaPago: todayStr() })}
                     onEditarBoleta={setBoletaDe}
+                    compacto
                   />
                 )))}
               </div>
