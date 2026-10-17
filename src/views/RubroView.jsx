@@ -3,6 +3,7 @@ import { subrubrosApi, rubrosApi, dashboardApi, getErrorMsg } from '../api';
 import Modal from '../components/Modal';
 import CamposManager from '../components/CamposManager';
 import SubrubroView from './SubrubroView';
+import SumatoriaView from './SumatoriaView';
 import ImportModal from '../components/ImportModal';
 import ConfirmModal from '../components/ConfirmModal';
 import SubrubroMetadataModal from '../components/SubrubroMetadataModal';
@@ -136,6 +137,17 @@ export default function RubroView({ rubro, initialSubrubro, nonce = 0, role }) {
 
   if (selectedSubrubro) {
     const sub = subrubros.find(s => s.id === selectedSubrubro.id) || selectedSubrubro;
+    // Sumatoria: vista propia (conceptos y cargas), sin facturas ni saldos.
+    if (sub.tipo_subrubro === 'sumatoria') {
+      return (
+        <SumatoriaView
+          rubro={rubro}
+          subrubro={sub}
+          onBack={() => { setSelectedSubrubro(null); cargar(); }}
+          role={role}
+        />
+      );
+    }
     return (
       <SubrubroView
         rubro={rubro}
@@ -270,6 +282,11 @@ export default function RubroView({ rubro, initialSubrubro, nonce = 0, role }) {
                       <p className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 transition-colors truncate">
                         {sub.nombre}
                       </p>
+                      {sub.tipo_subrubro === 'sumatoria' && (
+                        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                          Sumatoria
+                        </span>
+                      )}
                       {sub.tipo_subrubro === 'deuda' && (
                         <span className="shrink-0 text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
                           Deuda
@@ -280,7 +297,20 @@ export default function RubroView({ rubro, initialSubrubro, nonce = 0, role }) {
                   </div>
 
                   {/* Indicadores: próximo vencimiento → importe a vencer → saldo pendiente → forma de pago */}
-                  {stats[sub.id] !== undefined && (
+                  {/* Sumatoria: no hay vencimientos ni saldo, solo lo acumulado del mes. */}
+                  {stats[sub.id] !== undefined && sub.tipo_subrubro === 'sumatoria' && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-x-2 gap-y-2 text-center">
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">Total del mes</p>
+                        <p className="text-sm font-bold text-violet-700 dark:text-violet-300 whitespace-nowrap tabular-nums">{fmt(stats[sub.id].total_mes)}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">Cargas del mes</p>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">{stats[sub.id].cantidad_mes ?? 0}</p>
+                      </div>
+                    </div>
+                  )}
+                  {stats[sub.id] !== undefined && sub.tipo_subrubro !== 'sumatoria' && (
                     <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-x-2 gap-y-2 text-center">
                       <div className="min-w-0">
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 truncate">Próx. vencimiento</p>

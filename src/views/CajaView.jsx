@@ -4,9 +4,10 @@ import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
   Link2, ChevronDown, RefreshCw, Loader2, Eye, EyeOff, FileSpreadsheet, ExternalLink, HandCoins,
-  HelpCircle, Percent, Coins, Receipt, RotateCcw
+  HelpCircle, Percent, Coins, Receipt, RotateCcw, Sigma
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SumatoriaMovForm from '../components/SumatoriaMovForm';
 import { EntityIcon } from '../icons';
 import ConfirmModal from '../components/ConfirmModal';
 import CajaExportModal from '../components/CajaExportModal';
@@ -15,6 +16,7 @@ import RowActions from '../components/RowActions';
 import Modal from '../components/Modal';
 import { hoyAR, sumarDias, fmtFechaCorta as fmtFechaCortaAR } from '../utils/fecha';
 import { confirmar } from '../utils/confirmar';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { fmtMoneda, fmtPct } from '../utils/formato';
 
 const fmt = fmtMoneda;
@@ -256,7 +258,7 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
 // En un <Modal> con los botones fijos al pie: antes se abría en línea en medio
 // de la lista y en mobile Guardar quedaba debajo de la bottom navigation.
 // Orden: tipo → concepto → monto → método → (opcional) vincular a subrubro.
-function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList, rubros, allSubrubros }) {
+function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList, rubros, allSubrubros, onElegirSumatoria }) {
   const uid = useId();
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
@@ -292,8 +294,15 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     ? allSubrubros.filter(s => String(s.rubro_id) === rubroSel)
     : [];
 
-  // Elegir subrubro carga sus boletas pendientes.
+  // Elegir subrubro carga sus boletas pendientes. Un subrubro Sumatoria no tiene
+  // boletas: la carga pasa a su propio formulario (concepto + método), conservando
+  // lo que ya se escribió.
   const elegirSubrubro = (id) => {
+    const subSel = id ? allSubrubros.find(s => String(s.id) === String(id)) : null;
+    if (subSel?.tipo_subrubro === 'sumatoria' && onElegirSumatoria) {
+      onElegirSumatoria(subSel, { monto, metodo });
+      return;
+    }
     setSubrubroSel(id);
     setFacturaSel('');
     setFacturasSub([]);
@@ -314,6 +323,15 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   };
 
   const lista = tipo === 'empleado' ? empleadosList : tipo === 'gasto' ? proveedoresList : [];
+  const isMobile = useIsMobile();
+  // Botones de la lista (mobile): filtrados por lo escrito. Elegido uno, queda
+  // marcado entre los demás para poder cambiarlo con un toque.
+  const filtroLista = concepto.trim().toLowerCase();
+  const elegidoDeLista = lista.some(i => i.nombre === concepto);
+  const sugerencias = (filtroLista && !elegidoDeLista
+    ? lista.filter(i => (i.nombre || '').toLowerCase().includes(filtroLista))
+    : lista
+  ).slice(0, 30);
 
   // El monto de un ítem vinculado vive en dos lugares (Caja y subrubro): no se edita
   // acá, que lo desincronizaba. El backend también lo rechaza.
@@ -422,16 +440,34 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
         <label htmlFor={`${uid}-concepto`} className={labelCls}>
           {tipo === 'empleado' ? 'Empleado' : tipo === 'ingreso_extra' ? 'Descripción' : 'Proveedor o concepto'}
         </label>
-        <input id={`${uid}-concepto`} ref={conceptoRef} type="text" list={lista.length ? `${uid}-lista` : undefined}
+        {/* En mobile: sin autoFocus (el teclado se abría solo y tapaba el formulario)
+            y sin <datalist>, que los navegadores de celular casi no muestran. La
+            lista va como botones tocables debajo del campo. */}
+        <input id={`${uid}-concepto`} ref={conceptoRef} type="text" list={lista.length && !isMobile ? `${uid}-lista` : undefined}
           className={`${inputCls} ${conError('concepto')}`}
-          placeholder={lista.length ? 'Escribí o elegí de la lista' : tipo === 'ingreso_extra' ? 'Ej: venta de cajas' : 'Nombre'}
+          placeholder={lista.length ? (isMobile ? 'Elegí abajo o escribí' : 'Escribí o elegí de la lista') : tipo === 'ingreso_extra' ? 'Ej: venta de cajas' : 'Nombre'}
           value={concepto} onChange={e => handleConcepto(e.target.value)}
           aria-invalid={!!errores.concepto} aria-describedby={errores.concepto ? `${uid}-concepto-err` : undefined}
-          autoComplete="off" autoFocus={!initial} />
-        {lista.length > 0 && (
+          autoComplete="off" autoFocus={!initial && !isMobile} />
+        {lista.length > 0 && !isMobile && (
           <datalist id={`${uid}-lista`}>
             {lista.map((item, i) => <option key={i} value={item.nombre} />)}
           </datalist>
+        )}
+        {isMobile && sugerencias.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={tipo === 'empleado' ? 'Empleados' : 'Proveedores'}>
+            {sugerencias.map(item => (
+              <button key={item.nombre} type="button"
+                onClick={() => { handleConcepto(item.nombre); conceptoRef.current?.blur(); }}
+                className={`min-h-11 px-3 rounded-full border text-sm font-medium transition-colors ${
+                  concepto === item.nombre
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 active:bg-slate-100 dark:active:bg-slate-600'
+                }`}>
+                {item.nombre}
+              </button>
+            ))}
+          </div>
         )}
         {errores.concepto && <p id={`${uid}-concepto-err`} className={errCls}>{errores.concepto}</p>}
       </div>
@@ -486,7 +522,7 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
                   }
                 }} disabled={!rubroSel}>
                   <option value="">— Subrubro —</option>
-                  {subrubrosDel.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                  {subrubrosDel.map(s => <option key={s.id} value={s.id}>{s.nombre}{s.tipo_subrubro === 'sumatoria' ? ' (sumatoria)' : ''}</option>)}
                 </select>
               </div>
               {subrubroSel && (
@@ -557,10 +593,15 @@ const GRUPOS_METODO = [
 // badge de comprobante a la vista el prefijo es redundante, y además mandaría al
 // remito a la "R" al ordenar, separándolo de la factura del mismo proveedor. Se
 // quita para mostrar y para ordenar; el dato en la base queda intacto.
-const conceptoLimpio = (m) =>
-  m.documento === 'remito'
-    ? (m.concepto || '').replace(/^Remito\s+—\s+/, '')
-    : (m.concepto || '');
+//
+// Lo mismo con las cargas de Sumatoria ("Retiro Antonela — Retiro efectivo"): la fila
+// muestra el subrubro y el concepto va en su badge.
+const conceptoLimpio = (m) => {
+  const c = m.concepto || '';
+  if (m.documento === 'remito') return c.replace(/^Remito\s+—\s+/, '');
+  const sufijo = m.origen === 'sumatoria' && m.sumatoria?.concepto_nombre ? ` — ${m.sumatoria.concepto_nombre}` : null;
+  return sufijo && c.endsWith(sufijo) ? c.slice(0, -sufijo.length) : c;
+};
 
 // sensitivity 'base' para que acentos y mayúsculas no rompan el orden
 // ("Álvarez" cae junto a "Alvarez").
@@ -625,7 +666,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   const esPendiente  = (m.tipo === 'gasto' || esCobro) && m.confirmado === false;
   const esConfirmado = (m.tipo === 'gasto' || esCobro) && m.confirmado === true;
   const esGasto      = m.tipo === 'gasto';
-  const confirmable  = esGasto || esCobro;
+  // Carga de un subrubro Sumatoria hecha desde la Caja: ya descontó del día, no tiene
+  // ciclo de confirmación (ni "Pagar" ni "Sin confirmar").
+  const esSumatoria  = m.origen === 'sumatoria';
+  const confirmable  = (esGasto || esCobro) && !esSumatoria;
   // Descuento por pago ya aplicado: el ítem vale el NETO y `descuento` guarda cuánto
   // se descontó. Es lo que pinta la fila de violeta.
   const conDescuento = Number(m.descuento) > 0;
@@ -670,7 +714,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-300 dark:border-purple-800'
           : esPendiente
             ? 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-900 border-dashed'
-            : esConfirmado
+            // Una carga de sumatoria ya salió de la caja: se ve como un pago hecho.
+            : esConfirmado || esSumatoria
               ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-900'
               : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
     }`}>
@@ -722,6 +767,16 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
               el encabezado: se omite y queda solo el tipo de comprobante y el estado. */}
           {!hideMetodo && <MetodoBadge metodo={m.metodo} />}
           <DocumentoBadge documento={m.documento} />
+          {/* Concepto de la sumatoria con el mismo estilo que Factura/Remito: es una
+              etiqueta, no un estado. */}
+          {esSumatoria && m.sumatoria && (
+            <span className="text-xs leading-[18px] px-1.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium truncate max-w-full">
+              {m.sumatoria.concepto_nombre}
+            </span>
+          )}
+          {esSumatoria && m.sumatoria?.descripcion && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-48" title={m.sumatoria.descripcion}>{m.sumatoria.descripcion}</span>
+          )}
           {/* Rojo, igual que el importe y el borde: un solo código de color por estado. */}
           {esPendiente && <span className="inline-flex items-center gap-1 text-xs leading-[18px] px-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium"><Clock size={11} /> {esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
           {conDescuento && (
@@ -744,6 +799,15 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
             gap-2 = los 8px mínimos de separación entre dos targets táctiles
             adyacentes (MOBILE.md): con gap-1 los bordes de 44px se solapaban. */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Sumatoria: mismo chip de solo lectura que un pago confirmado (no hay
+              nada que confirmar ni revertir). */}
+          {esSumatoria && (
+            <span title="Retirado de la caja"
+              className="inline-flex items-center gap-1 min-h-8 px-2 rounded-lg text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 shrink-0">
+              <Check size={13} />
+              {compacto ? <span className="sr-only">Retirado</span> : 'Retirado'}
+            </span>
+          )}
           {confirmable && onConfirmar && (esConfirmado ? (
             // Confirmado: badge de solo lectura. Antes era el mismo botón ✓ al 40% de
             // opacidad y un toque lo revertía sin preguntar (borraba el pago del
@@ -1040,6 +1104,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [showConfig, setShowConfig]     = useState(false);
   const [showExport, setShowExport]     = useState(false);
   const [allSubrubros, setAllSubrubros] = useState([]);
+  // Carga de un subrubro Sumatoria desde la Caja (alta o edición):
+  // null | { subrubro?, initial?, prefill? }.
+  const [sumatoriaForm, setSumatoriaForm] = useState(null);
+  const subsSumatoria = allSubrubros.filter(s => s.tipo_subrubro === 'sumatoria');
 
   // Selección múltiple de gastos (para sumar/agrupar por proveedor/subrubro).
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -1338,7 +1406,20 @@ export default function CajaView({ rubros = [], onNavigate }) {
     toast.success('Eliminado');
   };
 
-  const handleEdit = (m) => { setEditingMov(m); setShowForm(true); setTipoForm(null); };
+  const handleEdit = (m) => {
+    // Espejo de una carga de Sumatoria: se edita la carga (fuente de verdad), con su
+    // formulario; la Caja se reescribe desde ahí.
+    if (m.origen === 'sumatoria' && m.sumatoria) {
+      setSumatoriaForm({
+        initial: {
+          id: m.sumatoria.id, subrubro_id: m.subrubro_id, concepto_id: m.sumatoria.concepto_id,
+          fecha: m.fecha, monto: m.monto, metodo: m.metodo, descripcion: m.sumatoria.descripcion, origen: 'caja',
+        },
+      });
+      return;
+    }
+    setEditingMov(m); setShowForm(true); setTipoForm(null);
+  };
   const openForm  = (tipo) => { setTipoForm(tipo); setEditingMov(null); setShowForm(true); };
 
   const handleSaldoInicial = async () => {
@@ -1510,6 +1591,12 @@ export default function CajaView({ rubros = [], onNavigate }) {
     proveedoresList: config.proveedores || [],
     rubros,
     allSubrubros,
+    // Elegir un subrubro Sumatoria en "Registrar el pago en un subrubro" cambia al
+    // formulario de la sumatoria, con lo que ya se había cargado.
+    onElegirSumatoria: (sub, prefill) => {
+      setShowForm(false); setEditingMov(null); setTipoForm(null);
+      setSumatoriaForm({ subrubro: sub, prefill });
+    },
   };
 
   return (
@@ -1811,6 +1898,14 @@ export default function CajaView({ rubros = [], onNavigate }) {
                 {allGastosSelected ? 'Quitar selección' : 'Seleccionar pendientes'}
               </button>
             )}
+            {/* Atajo a las sumatorias (retiros de socios, etc.): solo si hay alguna. */}
+            {subsSumatoria.length > 0 && (
+              <button onClick={() => { setGastosOpen(true); setSumatoriaForm({}); }}
+                title="Cargar en un subrubro Sumatoria (descuenta de la caja)"
+                className="min-h-11 sm:min-h-0 px-1.5 text-xs text-violet-700 dark:text-violet-300 hover:underline flex items-center gap-1 shrink-0 sm:ml-2">
+                <Sigma size={13} /> Sumatoria
+              </button>
+            )}
             <button onClick={() => { setGastosOpen(true); openForm('gasto'); }} className="min-h-11 sm:min-h-0 px-1.5 -mr-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0 sm:ml-2"><Plus size={13} /> Agregar</button>
           </div>
         </div>
@@ -2020,6 +2115,19 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       {showExport && <CajaExportModal onClose={() => setShowExport(false)} />}
 
+      {sumatoriaForm && (
+        <SumatoriaMovForm
+          origen="caja"
+          subrubro={sumatoriaForm.subrubro || null}
+          subrubros={subsSumatoria}
+          initial={sumatoriaForm.initial || null}
+          prefill={sumatoriaForm.prefill || {}}
+          fechaDefault={fecha}
+          onClose={() => setSumatoriaForm(null)}
+          onSaved={() => { setSumatoriaForm(null); cargar(); }}
+        />
+      )}
+
       {showConfig && (
         <ConfigPanel config={config} rubros={allSubrubros} allRubros={rubros} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} />
       )}
@@ -2030,7 +2138,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
             const m = movs.find(x => x.id === deleteId) || proximos.find(x => x.id === deleteId);
             return m ? `¿Eliminar "${conceptoLimpio(m)}" por ${fmt(m.monto)}?` : '¿Eliminar este ítem de la caja?';
           })()}
-          detail="Si es un pago confirmado, también se borra el pago registrado en el subrubro. No se puede deshacer."
+          detail={(movs.find(x => x.id === deleteId)?.origen === 'sumatoria')
+            ? 'Es una carga de sumatoria: también se elimina del subrubro. No se puede deshacer.'
+            : 'Si es un pago confirmado, también se borra el pago registrado en el subrubro. No se puede deshacer.'}
           confirmLabel="Eliminar"
           onConfirm={confirmDelete}
           onCancel={() => setDeleteId(null)}

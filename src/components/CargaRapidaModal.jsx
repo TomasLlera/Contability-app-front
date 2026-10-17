@@ -5,6 +5,7 @@ import Modal from './Modal';
 import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg, newIdemKey } from '../api';
 import toast from 'react-hot-toast';
 import InfoTooltip from './InfoTooltip';
+import SumatoriaMovForm from './SumatoriaMovForm';
 import { fmtMoneda } from '../utils/formato';
 
 const today = () => hoyAR();
@@ -95,7 +96,9 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
     if (!id) return;
     setLoadingSubs(true);
     subrubrosApi.getByRubro(id)
-      .then(s => { setSubrubros(s); setSubrubroId(s[0]?.id || ''); })
+      // Se preselecciona el primero de facturas/deuda: uno Sumatoria abre su propio
+      // formulario, y no tiene que pasar solo por elegir el rubro.
+      .then(s => { setSubrubros(s); setSubrubroId(s.find(x => x.tipo_subrubro !== 'sumatoria')?.id || ''); })
       .finally(() => setLoadingSubs(false));
   };
 
@@ -242,6 +245,22 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   }`;
   const hayPercepciones = (tipo === 'factura' && !esRemito) || tipo === 'nota_credito';
 
+  // Subrubro Sumatoria: no tiene facturas ni pagos. Se carga por concepto y el método
+  // decide si impacta en la Caja del Día («No impacta en caja» = solo suma en el
+  // subrubro). Cerrar ese formulario vuelve a la Carga rápida.
+  const subSel = subrubros.find(s => String(s.id) === String(subrubroId));
+  if (subSel?.tipo_subrubro === 'sumatoria') {
+    return (
+      <SumatoriaMovForm
+        subrubro={subSel}
+        origen="subrubro"
+        elegirOrigen
+        onClose={() => setSubrubroId('')}
+        onSaved={() => { onSaved?.(); setSubrubroId(''); }}
+      />
+    );
+  }
+
   return (
     // <Modal> como el resto de la app: full-screen en mobile con Guardar fijo al pie
     // (antes era una tarjeta flotante propia, sin role="dialog" ni Escape).
@@ -295,7 +314,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
                 aria-invalid={!!errores.subrubro} aria-describedby={errores.subrubro ? `${uid}-sub-err` : undefined}>
                 <option value="">— {loadingSubs ? 'Cargando...' : 'Elegir'} —</option>
                 {subrubros.map(s => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                  <option key={s.id} value={s.id}>{s.nombre}{s.tipo_subrubro === 'sumatoria' ? ' (sumatoria)' : ''}</option>
                 ))}
               </select>
             </div>

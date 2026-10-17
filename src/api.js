@@ -179,6 +179,37 @@ export const subrubrosApi = {
   clearMovimientos: (id) => api.delete(`/movimientos/${id}/movimientos`).then(r => r.data),
 };
 
+// Subrubros de tipo Sumatoria: conceptos y cargas. `origen` de una carga:
+// 'caja' (descuenta del día, lleva método) | 'subrubro' (solo suma en el subrubro).
+// Filtros (params): { mes } | { desde, hasta }, conceptos (array de ids), origen.
+const paramsSumatoria = ({ conceptos, ...rest } = {}) => ({
+  ...rest,
+  conceptos: conceptos && conceptos.length ? conceptos.join(',') : undefined,
+});
+export const sumatoriasApi = {
+  getSubrubros: () => api.get('/sumatorias/subrubros').then(r => r.data),
+  getConceptos: (subrubroId) => api.get(`/sumatorias/${subrubroId}/conceptos`).then(r => r.data),
+  createConcepto: (subrubroId, data) => api.post(`/sumatorias/${subrubroId}/conceptos`, data).then(r => r.data),
+  updateConcepto: (id, data) => api.put(`/sumatorias/conceptos/${id}`, data).then(r => r.data),
+  reordenarConceptos: (subrubroId, ids) => api.put(`/sumatorias/${subrubroId}/conceptos-orden`, { ids }).then(r => r.data),
+  // Con cargas se desactiva en vez de borrarse: { eliminado, desactivado }.
+  deleteConcepto: (id) => api.delete(`/sumatorias/conceptos/${id}`).then(r => r.data),
+  getMovimientos: (subrubroId, filtros) => api.get(`/sumatorias/${subrubroId}/movimientos`, { params: paramsSumatoria(filtros) }).then(r => r.data),
+  getResumen: (subrubroId, filtros) => api.get(`/sumatorias/${subrubroId}/resumen`, { params: paramsSumatoria(filtros) }).then(r => r.data),
+  getMovimiento: (id) => api.get(`/sumatorias/movimientos/${id}`).then(r => r.data),
+  createMovimiento: (subrubroId, data) => api.post(`/sumatorias/${subrubroId}/movimientos`, data).then(r => r.data),
+  updateMovimiento: (id, data) => api.put(`/sumatorias/movimientos/${id}`, data).then(r => r.data),
+  deleteMovimiento: (id) => api.delete(`/sumatorias/movimientos/${id}`).then(r => r.data),
+  // conceptos = claves normalizadas; subrubros = ids.
+  getResumenGeneral: ({ subrubros, conceptos, ...rest } = {}) => api.get('/sumatorias/resumen-general', {
+    params: {
+      ...rest,
+      subrubros: subrubros && subrubros.length ? subrubros.join(',') : undefined,
+      conceptos: conceptos && conceptos.length ? conceptos.join(',') : undefined,
+    },
+  }).then(r => r.data),
+};
+
 export const dashboardApi = {
   getResumen: () => api.get('/dashboard/resumen').then(r => r.data),
   getTendencia: (rubroId, meses = 6) =>

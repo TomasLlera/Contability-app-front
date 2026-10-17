@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { hoyAR, sumarDias } from '../utils/fecha';
-import { dashboardApi, subrubrosApi, cajaApi, stockApi } from '../api';
-import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList, CalendarRange, CalendarClock, Wallet, Boxes } from 'lucide-react';
+import { dashboardApi, subrubrosApi, cajaApi, stockApi, sumatoriasApi } from '../api';
+import SumatoriasResumenView from './SumatoriasResumenView';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList, CalendarRange, CalendarClock, Wallet, Boxes, Sigma } from 'lucide-react';
 import { EntityIcon } from '../icons';
 import ComparativaCard from '../components/ComparativaCard';
 import { fmtMoneda, fmtNum, fmtPct } from '../utils/formato';
@@ -289,8 +290,15 @@ function DetalleEspeciales({ movs, open, onToggle }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Graficas({ rubros = [], initialRubroId = null, initialMetrica = null }) {
-  const [tab, setTab] = useState(() => sessionStorage.getItem('graficas_tab') || 'rubros');
+export default function Graficas({ rubros = [], initialRubroId = null, initialMetrica = null, onNavigate }) {
+  const [tabGuardada, setTab] = useState(() => sessionStorage.getItem('graficas_tab') || 'rubros');
+  // La pestaña Sumatorias aparece solo si existe algún subrubro de ese tipo.
+  const [haySumatorias, setHaySumatorias] = useState(false);
+  useEffect(() => {
+    sumatoriasApi.getSubrubros().then(s => setHaySumatorias(s.length > 0)).catch(() => {});
+  }, []);
+  // Recordada 'sumatorias' pero ya no hay ninguna (o todavía no cargó): Rubros.
+  const tab = tabGuardada === 'sumatorias' && !haySumatorias ? 'rubros' : tabGuardada;
   const [showResumen, setShowResumen] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [resumen, setResumen] = useState(null);
@@ -347,7 +355,8 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   useEffect(() => {
     if (!selectedRubroId) return;
     subrubrosApi.getByRubro(selectedRubroId).then(setSubrubros);
-    dashboardApi.getComparacion(selectedRubroId).then(d => setComparacion(d.comparacion ?? [])).catch(() => {});
+    // Las sumatorias no tienen facturado/pagado/saldo: no entran al ranking.
+    dashboardApi.getComparacion(selectedRubroId).then(d => setComparacion((d.comparacion ?? []).filter(s => s.tipo_subrubro !== 'sumatoria'))).catch(() => {});
   }, [selectedRubroId]);
 
   const claveTendencia = selectedRubroId ? `${selectedRubroId}|${selectedSubrubroId ?? ''}` : null;
@@ -446,7 +455,11 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
 
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-        {[['rubros', 'Rubros', BarChart3], ['caja', 'Caja', Wallet], ['stock', 'Stock', Boxes]].map(([key, label, icono]) => {
+        {[
+          ['rubros', 'Rubros', BarChart3], ['caja', 'Caja', Wallet], ['stock', 'Stock', Boxes],
+          // Solo si existe algún subrubro Sumatoria.
+          ...(haySumatorias ? [['sumatorias', 'Sumatorias', Sigma]] : []),
+        ].map(([key, label, icono]) => {
           // Variable con mayúscula para usarla como componente: así ESLint no la
           // marca como "sin usar" (no cuenta el uso en JSX).
           const Icon = icono;
@@ -454,7 +467,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
           <button
             key={key}
             onClick={() => { setTab(key); sessionStorage.setItem('graficas_tab', key); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+            className={`flex-1 min-w-0 py-2 min-h-11 sm:min-h-0 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-1 sm:gap-1.5 ${
               tab === key
                 ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
@@ -466,6 +479,11 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
           );
         })}
       </div>
+
+      {/* Tab: Sumatorias — resumen de todos los subrubros sumatoria por concepto. */}
+      {tab === 'sumatorias' && haySumatorias && (
+        <SumatoriasResumenView rubros={rubros} onNavigate={onNavigate} />
+      )}
 
       {/* Tab: Rubros */}
       {tab === 'rubros' && (
@@ -556,7 +574,7 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
                     <select value={selectedSubrubroId ?? ''} onChange={e => setSelectedSubrubroId(e.target.value ? Number(e.target.value) : null)}
                       className="min-w-0 flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
                       <option value="">Todos los subrubros</option>
-                      {subrubros.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                      {subrubros.filter(s => s.tipo_subrubro !== 'sumatoria').map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                     </select>
                   </>
                 )}

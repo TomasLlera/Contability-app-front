@@ -748,7 +748,7 @@ export default function App() {
               role={role}
             />
           ) : activeView === 'graficas' ? (
-            <Graficas rubros={rubros} initialRubroId={graficaRubroId} initialMetrica={graficaMetrica} />
+            <Graficas rubros={rubros} initialRubroId={graficaRubroId} initialMetrica={graficaMetrica} onNavigate={handleNavigateFromVenc} />
           ) : activeView === 'caja' ? (
             <CajaView rubros={rubros} onNavigate={handleNavigateFromVenc} />
           ) : activeView === 'stock' ? (

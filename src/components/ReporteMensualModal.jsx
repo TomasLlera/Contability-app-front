@@ -65,7 +65,7 @@ export default function ReporteMensualModal({ rubro, subrubros = [], onClose }) 
               className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos los subrubros</option>
-              {subrubros.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              {subrubros.filter(s => s.tipo_subrubro !== 'sumatoria').map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
             </select>
           </div>
 

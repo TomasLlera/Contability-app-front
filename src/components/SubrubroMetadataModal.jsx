@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
-import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet, HandCoins, Receipt, Percent, ChevronDown, Landmark } from 'lucide-react';
+import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wallet, HandCoins, Receipt, Percent, ChevronDown, Landmark, Sigma, Plus, X } from 'lucide-react';
 import { EntityIcon } from '../icons';
 import { ICON_LIST } from '../iconos';
 import InfoTooltip from './InfoTooltip';
@@ -15,6 +15,26 @@ const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-300 m
 // El botón de guardar vive en el footer fijo del Modal, fuera del <form>. El atributo
 // `form` los vuelve a unir, así el submit sigue siendo el mismo de siempre.
 const FORM_ID = 'subrubro-metadata-form';
+
+// Conceptos sugeridos al crear un subrubro Sumatoria (editables y ampliables).
+// "Retiro mercadería" no se ofrece en la Caja del Día: es un retiro sin plata.
+const CONCEPTOS_SUGERIDOS = [
+  { nombre: 'Retiro mercadería', mostrar_en_caja: false },
+  { nombre: 'Retiro efectivo', mostrar_en_caja: true },
+  { nombre: 'Retiro transferencia', mostrar_en_caja: true },
+];
+
+const TIPOS_SUBRUBRO = [
+  { value: 'factura',   label: 'Facturas / Gastos', corto: 'Facturas', Icon: Receipt,   activeCls: 'bg-blue-600 text-white' },
+  { value: 'deuda',     label: 'Deuda a cobrar',    corto: 'Deuda',    Icon: HandCoins, activeCls: 'bg-orange-500 text-white' },
+  { value: 'sumatoria', label: 'Sumatoria',         corto: 'Sumatoria', Icon: Sigma,    activeCls: 'bg-violet-600 text-white' },
+];
+
+const AYUDA_TIPO = {
+  factura: 'Registra facturas de proveedores a pagar y sus pagos (comportamiento clásico).',
+  deuda: 'Registra plata que te DEBEN (préstamos a otros locales/personas). Cargás deudas y abonos; los abonos entran como ingresos en la Caja del Día.',
+  sumatoria: 'Suma cargas por concepto (ej. retiros de un socio), sin estados ni vencimientos. Lo cargado desde la Caja del Día descuenta del día; lo cargado desde el subrubro solo suma acá.',
+};
 
 /**
  * Sección plegable del formulario. Cerrada muestra un resumen de lo que contiene, para
@@ -73,6 +93,16 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
   const [aplicaDescuento, setAplicaDescuento] = useState(!!subrubro?.aplica_descuento);
   const [saving, setSaving] = useState(false);
   const esDeuda = tipoSubrubro === 'deuda';
+  const esSumatoria = tipoSubrubro === 'sumatoria';
+  // Conceptos iniciales: solo al CREAR. Los de un subrubro existente se gestionan
+  // desde su vista (con el conteo de cargas, desactivar, reordenar).
+  const esNuevo = !subrubro;
+  const [conceptos, setConceptos] = useState(CONCEPTOS_SUGERIDOS);
+  const [errorConceptos, setErrorConceptos] = useState(null);
+  const setConcepto = (i, cambios) => {
+    setErrorConceptos(null);
+    setConceptos(cs => cs.map((c, j) => (j === i ? { ...c, ...cambios } : c)));
+  };
 
   // Qué secciones arrancan abiertas: las que ya tienen algo cargado. Un subrubro nuevo
   // abre compacto (solo lo básico) y uno existente muestra de entrada lo que tiene.
@@ -134,9 +164,19 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         dia = n;
       }
     }
+    let conceptosPayload;
+    if (esSumatoria && esNuevo) {
+      conceptosPayload = conceptos
+        .map(c => ({ ...c, nombre: c.nombre.replace(/\s+/g, ' ').trim() }))
+        .filter(c => c.nombre);
+      const claves = conceptosPayload.map(c => c.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase());
+      if (conceptosPayload.length === 0) { setErrorConceptos('Agregá al menos un concepto'); return; }
+      if (new Set(claves).size !== claves.length) { setErrorConceptos('Hay conceptos repetidos'); return; }
+    }
     setSaving(true);
     try {
       await onSave({
+        ...(conceptosPayload ? { conceptos: conceptosPayload } : {}),
         nombre: nombre.trim(),
         icon,
         razon_social: razonSocial.trim(),
@@ -149,8 +189,8 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         dia_mes_vencimiento: diaMes,
         metodo_pago_default: metodoPagoDefault,
         tipo_subrubro: tipoSubrubro,
-        // Una deuda a cobrar nunca lleva descuento por pago (el backend lo revalida).
-        aplica_descuento: tipoSubrubro === 'deuda' ? false : aplicaDescuento,
+        // Una deuda a cobrar o una sumatoria nunca llevan descuento por pago (el backend lo revalida).
+        aplica_descuento: tipoSubrubro === 'factura' ? aplicaDescuento : false,
         notas: notas.trim(),
       });
     } finally {
@@ -248,39 +288,79 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
             )}
           </div>
 
-          {/* Tipo de subrubro: proveedor (facturas a pagar) o deuda (dinero a cobrar) */}
+          {/* Tipo de subrubro: proveedor (facturas a pagar), deuda (dinero a cobrar) o
+              sumatoria (acumulador por conceptos). */}
           <div>
             <label className={labelCls}>Tipo de subrubro</label>
-            <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
-              {[
-                { value: 'factura', label: 'Facturas / Gastos', Icon: Receipt, activeCls: 'bg-blue-600 text-white' },
-                { value: 'deuda',   label: 'Deuda a cobrar',    Icon: HandCoins, activeCls: 'bg-orange-500 text-white' },
-              ].map(t => (
+            <div role="radiogroup" aria-label="Tipo de subrubro" className="flex rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-medium">
+              {TIPOS_SUBRUBRO.map(t => (
                 <button
                   key={t.value}
                   type="button"
+                  role="radio"
+                  aria-checked={tipoSubrubro === t.value}
                   onClick={() => setTipoSubrubro(t.value)}
-                  className={`flex-1 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`flex-1 min-h-11 sm:min-h-0 py-2 px-1 flex items-center justify-center gap-1.5 transition-colors ${
                     tipoSubrubro === t.value
                       ? t.activeCls
                       : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600'
                   }`}
                 >
-                  <t.Icon size={14} />
-                  {t.label}
+                  <t.Icon size={14} className="shrink-0" />
+                  <span className="sm:hidden">{t.corto}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {esDeuda
-                ? 'Registra plata que te DEBEN (préstamos a otros locales/personas). Cargás deudas y abonos; los abonos entran como ingresos en la Caja del Día.'
-                : 'Registra facturas de proveedores a pagar y sus pagos (comportamiento clásico).'}
-            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{AYUDA_TIPO[tipoSubrubro] || AYUDA_TIPO.factura}</p>
           </div>
 
+          {/* Conceptos de la sumatoria: al crear se ofrecen los sugeridos, editables. */}
+          {esSumatoria && esNuevo && (
+            <div className="rounded-xl border border-violet-200 dark:border-violet-900 bg-violet-50/60 dark:bg-violet-950/20 p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Conceptos</p>
+                <InfoTooltip text="Cada carga se suma en un concepto. «En Caja» define si el concepto aparece al cargar desde la Caja del Día; desde el subrubro siempre están todos." />
+              </div>
+              {conceptos.map((c, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    className={`${inputCls} flex-1 min-w-0`}
+                    placeholder="Nombre del concepto"
+                    value={c.nombre}
+                    maxLength={60}
+                    aria-label={`Concepto ${i + 1}`}
+                    onChange={e => setConcepto(i, { nombre: e.target.value })}
+                  />
+                  <label className="flex items-center gap-1.5 shrink-0 min-h-11 sm:min-h-0 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-violet-600" checked={c.mostrar_en_caja}
+                      onChange={e => setConcepto(i, { mostrar_en_caja: e.target.checked })} />
+                    En Caja
+                  </label>
+                  <button type="button" onClick={() => setConceptos(cs => cs.filter((_, j) => j !== i))}
+                    aria-label={`Quitar ${c.nombre || 'concepto'}`}
+                    className="shrink-0 w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-red-600 hover:bg-white dark:hover:bg-slate-700">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setConceptos(cs => [...cs, { nombre: '', mostrar_en_caja: true }])}
+                className="min-h-11 sm:min-h-0 inline-flex items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300 hover:underline">
+                <Plus size={12} /> Agregar concepto
+              </button>
+              {errorConceptos && <p className="text-xs text-red-600 dark:text-red-400">{errorConceptos}</p>}
+            </div>
+          )}
+          {esSumatoria && !esNuevo && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Los conceptos se crean, renombran y ordenan desde la vista del subrubro (botón «Conceptos»).
+            </p>
+          )}
+
           {/* Descuento por pago — solo para subrubros de facturas/gastos: una deuda a
-              cobrar no lleva descuento (el backend además fuerza el flag en false). */}
-          {!esDeuda && (
+              cobrar o una sumatoria no llevan descuento (el backend además fuerza el flag en false). */}
+          {!esDeuda && !esSumatoria && (
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-purple-200 dark:border-purple-900 bg-purple-50 dark:bg-purple-950/30 px-3 py-2.5">
               <input
                 type="checkbox"
@@ -299,6 +379,8 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
           )}
         </div>
 
+        {/* Una sumatoria no tiene facturas: sin datos fiscales ni vencimientos. */}
+        {!esSumatoria && <>
         {/* --- Datos fiscales y bancarios --- */}
         <Seccion
           icon={Landmark}
@@ -468,6 +550,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
             </p>
           </div>
         </Seccion>
+        </>}
 
         {/* --- Notas --- */}
         <Seccion
