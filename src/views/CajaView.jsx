@@ -851,8 +851,10 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           {esPendiente && <span className="inline-flex items-center gap-1 text-xs leading-[18px] px-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium"><Clock size={11} /> {esCobro ? 'Sin cobrar' : 'Sin confirmar'}</span>}
           {conDescuento && (
             <span title={`Descuento de ${fmt(m.descuento)}${m.descuento_pct ? ` (${m.descuento_pct}%)` : ''} aplicado sobre ${fmt(bruto)}`}
-              className="text-xs leading-[18px] px-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium inline-flex items-center gap-0.5">
-              <Percent size={9} /> <span className="hidden sm:inline">Con </span>descuento
+              className="text-xs leading-4.5 px-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium inline-flex items-center">
+              {/* Solo el ícono: la fila violeta y el botón % ya lo dicen; con el badge
+                  del banco el texto mandaba los badges a una segunda línea. */}
+              <Percent size={11} aria-hidden /><span className="sr-only">Con descuento</span>
             </span>
           )}
         </div>
@@ -1228,6 +1230,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [movBancoForm, setMovBancoForm] = useState(null);
   // Banco elegido para confirmar en lote las transferencias seleccionadas.
   const [bancoLote, setBancoLote] = useState(null);
+  // Desglose de bancos en la card de Saldo en cuenta: plegado por defecto, con memoria.
+  const [bancosOpen, setBancosOpen] = useState(() => { try { return localStorage.getItem('cajaBancosOpen') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('cajaBancosOpen', bancosOpen ? '1' : '0'); } catch { /* sin storage */ } }, [bancosOpen]);
   const saldoCuentaEditRef = useRef(null);
 
   const [config, setConfig]             = useState({ empleados: [], proveedores: [], rubros_sync: [], dias_anticipacion_caja: 3 });
@@ -1926,13 +1931,6 @@ export default function CajaView({ rubros = [], onNavigate }) {
             </div>
             {!editandoSaldoCuenta && (
               <div className="shrink-0 flex items-center gap-2 -my-2 sm:my-0">
-                {/* Movimiento entre bancos: acceso discreto, solo con 2+ bancos activos. */}
-                {bancosCtx.multi && (
-                  <button onClick={() => setMovBancoForm({ initial: null })} title="Movimiento entre bancos"
-                    className="min-h-11 sm:min-h-0 px-1 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:underline flex items-center gap-1">
-                    <ArrowLeftRight size={11} /> <span className="hidden sm:inline">Entre bancos</span><span className="sm:hidden">Mover</span>
-                  </button>
-                )}
                 <button onClick={() => {
                   // Varios bancos: un campo por banco en un modal. Uno solo: como siempre.
                   if (mostrarBancos) { setShowSaldosBancos(true); return; }
@@ -1957,8 +1955,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
               <p className={`text-2xl font-bold ${saldoCuentaHoy !== null ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`}>
                 {ocultarSaldos ? '••••••' : (saldoCuentaHoy !== null ? fmt(saldoCuentaHoy) : '—')}
               </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>
+              <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">🏦 Transferencia</span>
                 {ingresoTransDia !== null ? (
                   <span className={`text-xs font-medium ${ingresoTransDia >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
                     {ingresoTransDia >= 0 ? '↑' : '↓'} {ocultarSaldos ? '••••' : (pctTransDia !== null ? `${fmtPct(pctTransDia, { signo: false })}` : fmt(Math.abs(ingresoTransDia)))} vs. día anterior
@@ -1968,9 +1966,18 @@ export default function CajaView({ rubros = [], onNavigate }) {
                     {saldoCuentaAyer !== null ? 'Ingresá el saldo de hoy.' : 'Sin datos de cuenta'}
                   </span>
                 )}
+                {/* Bancos plegados: la card queda del alto de la de efectivo. */}
+                {(mostrarBancos || bancosDia.movimientos.length > 0) && (
+                  <button type="button" onClick={() => setBancosOpen(v => !v)} aria-expanded={bancosOpen}
+                    className="ml-auto shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 flex items-center gap-0.5">
+                    {porBanco.filter(b => b.bid !== null).length} bancos
+                    {bancosDia.movimientos.length > 0 && <span className="hidden sm:inline"> · {bancosDia.movimientos.length} mov.</span>}
+                    <ChevronDown size={12} className={`transition-transform ${bancosOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
               </div>
               {/* Desglose por banco (2+ bancos) y movimientos entre bancos del día. */}
-              {mostrarBancos && (
+              {bancosOpen && mostrarBancos && (
                 <ul className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700 space-y-1.5">
                   {porBanco.filter(b => b.bid !== null || b.saldo !== null).map(b => (
                     <li key={b.bid ?? 'sin'} className="flex items-center gap-2 text-xs">
@@ -1987,7 +1994,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
                   ))}
                 </ul>
               )}
-              {bancosDia.movimientos.length > 0 && (
+              {bancosOpen && bancosDia.movimientos.length > 0 && (
                 <ul className="mt-2 pt-2 border-t border-dashed border-slate-200 dark:border-slate-700 space-y-1" aria-label="Movimientos entre bancos del día">
                   {bancosDia.movimientos.map(mb => {
                     const o = bancosCtx.bancoDe(mb.banco_origen_id), d = bancosCtx.bancoDe(mb.banco_destino_id);
@@ -2010,6 +2017,13 @@ export default function CajaView({ rubros = [], onNavigate }) {
                     );
                   })}
                 </ul>
+              )}
+              {/* Movimiento entre bancos: acceso discreto, solo con 2+ bancos activos. */}
+              {bancosOpen && bancosCtx.multi && (
+                <button type="button" onClick={() => setMovBancoForm({ initial: null })}
+                  className="mt-2 min-h-11 sm:min-h-0 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                  <ArrowLeftRight size={11} /> Movimiento entre bancos
+                </button>
               )}
             </div>
           )}
