@@ -3,6 +3,8 @@ import { hoyAR, fmtFecha } from '../utils/fecha';
 import { FileText, CreditCard, FileMinus, Check, Banknote, ArrowLeftRight, Loader2, HandCoins, ChevronDown } from 'lucide-react';
 import { newIdemKey } from '../api';
 import { fmtMoneda } from '../utils/formato';
+import useBancos from '../hooks/useBancos';
+import { BancoSelect } from './BancoBadge';
 
 const fmt = fmtMoneda;
 
@@ -19,7 +21,7 @@ const TIPOS_DEUDA = [
   { value: 'pago',    label: 'Abono',  Icon: CreditCard, hint: 'Pago recibido de la deuda' },
 ];
 
-export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel, metodoDefault = 'ambas', tipoSubrubro = 'factura' }) {
+export default function MovimientoForm({ campos = [], movimiento, todasFacturasPendientes = [], onSave, onCancel, metodoDefault = 'ambas', bancoDefault = null, tipoSubrubro = 'factura' }) {
   // Modo DEUDA: cambia etiquetas, colores y oculta remito/percepciones/NC.
   const esDeudaSub = tipoSubrubro === 'deuda';
   const palabraDoc = esDeudaSub ? 'deuda' : 'factura';
@@ -49,6 +51,10 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
   const [metodoPago, setMetodoPago] = useState(
     movimiento?.metodo_pago ?? (metodoFijo ? metodoDefault : null)
   );
+  // Multi-banco: banco de un pago por transferencia (el suyo o el predeterminado).
+  const { activos: bancosActivos, multi: multiBanco, bancoDe, bancoPara } = useBancos();
+  const [bancoElegido, setBancoElegido] = useState(movimiento?.banco_id ?? null);
+  const bancoId = bancoElegido ?? bancoPara(bancoDefault);
   // Tipo de documento: solo aplica a facturas. Default 'factura'.
   const [documento, setDocumento] = useState(movimiento?.documento || 'factura');
 
@@ -217,6 +223,7 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
         facturas_vinculadas_ids: [...facturasSeleccionadas],
         concepto_diferencia: conceptoDiferencia,
         metodo_pago: tipo === 'pago' ? metodoPago : null,
+        ...(tipo === 'pago' && metodoPago === 'transferencia' && multiBanco && bancoId != null ? { banco_id: bancoId } : {}),
         // Percepciones: solo aplican a la NC (no al pago). No suman al monto.
         percepcion_iva: tipo === 'nota_credito' ? (Number(percepcionIva) || 0) : 0,
         ingresos_brutos: tipo === 'nota_credito' ? (Number(ingresosBrutos) || 0) : 0,
@@ -447,6 +454,12 @@ export default function MovimientoForm({ campos = [], movimiento, todasFacturasP
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Predeterminado del subrubro, no editable.</p>
           ) : !metodoPago && (
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Sin definir: el pago queda registrado sin método.</p>
+          )}
+          {metodoPago === 'transferencia' && multiBanco && (
+            <div className="mt-3">
+              <BancoSelect id={`${uid}-banco`} opciones={bancosActivos} value={bancoId} onChange={setBancoElegido}
+                bancoActual={movimiento?.banco_id != null ? bancoDe(movimiento.banco_id) : null} />
+            </div>
           )}
         </div>
       )}

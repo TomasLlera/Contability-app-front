@@ -330,7 +330,7 @@ export default function App() {
     'iva-compras':       ['IVA', 'Compras, ventas y diferencia mensual'],
     'iva-ventas':        ['IVA', 'Compras, ventas y diferencia mensual'],
     'registro-ventas':   ['Venta Sistema', 'Registro diario y evolución mensual de ventas'],
-    'registro-tarjetas': ['Tarjetas', 'QR, débito, crédito y prepagas'],
+    'registro-tarjetas': ['Tarjetas', 'QR, débito, crédito, prepagas y Mercado Pago'],
     config:              ['Configuración', 'Alertas y preferencias del sistema'],
   };
   const [titulo, subtitulo] = TITULOS[activeView] || TITULOS.inicio;

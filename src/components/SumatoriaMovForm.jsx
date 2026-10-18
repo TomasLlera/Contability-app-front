@@ -5,6 +5,8 @@ import Modal from './Modal';
 import { sumatoriasApi, getErrorMsg, newIdemKey } from '../api';
 import { hoyAR, fmtFecha } from '../utils/fecha';
 import { METODO_LABEL } from '../utils/sumatoria';
+import useBancos from '../hooks/useBancos';
+import { BancoSelect } from './BancoBadge';
 
 const inputCls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 const labelCls = 'block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1';
@@ -40,6 +42,10 @@ export default function SumatoriaMovForm({
   const [monto, setMonto] = useState(initial?.monto ?? prefill.monto ?? '');
   const [fecha, setFecha] = useState(initial?.fecha || fechaDefault || hoyAR());
   const [metodo, setMetodo] = useState(initial?.metodo ?? prefill.metodo ?? (esCaja ? 'efectivo' : null));  const [descripcion, setDescripcion] = useState(initial?.descripcion || '');
+  // Multi-banco: banco de una carga de Caja por transferencia.
+  const { activos: bancosActivos, multi: multiBanco, bancoDe, bancoPara } = useBancos();
+  const [bancoElegido, setBancoElegido] = useState(initial?.banco_id ?? null);
+  const bancoId = bancoElegido ?? bancoPara(sub?.banco_default_id);
   const [errores, setErrores] = useState({});
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -114,6 +120,7 @@ export default function SumatoriaMovForm({
       monto: n,
       descripcion: descripcion.trim(),
       ...(esCaja ? { metodo } : {}),
+      ...(esCaja && metodo === 'transferencia' && multiBanco && bancoId != null ? { banco_id: bancoId } : {}),
     };
     savingRef.current = true;
     setSaving(true);
@@ -271,6 +278,12 @@ export default function SumatoriaMovForm({
               })}
             </div>
             {errores.metodo && <p className={errCls}>{errores.metodo}</p>}
+            {esCaja && metodo === 'transferencia' && multiBanco && (
+              <div className="mt-3">
+                <BancoSelect id={`${uid}-banco`} opciones={bancosActivos} value={bancoId} onChange={setBancoElegido}
+                  bancoActual={initial?.banco_id != null ? bancoDe(initial.banco_id) : null} />
+              </div>
+            )}
           </div>
         )}
 

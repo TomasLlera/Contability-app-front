@@ -4,6 +4,7 @@ import { Building2, Hash, CreditCard, AtSign, FileText, CalendarClock, Ban, Wall
 import { EntityIcon } from '../icons';
 import { ICON_LIST } from '../iconos';
 import InfoTooltip from './InfoTooltip';
+import useBancos from '../hooks/useBancos';
 
 
 // Índice = Date.getDay() → 0=domingo … 6=sábado (debe coincidir con el backend).
@@ -91,6 +92,14 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
   const [metodoPagoDefault, setMetodoPagoDefault] = useState(subrubro?.metodo_pago_default || 'ambas');
   const [tipoSubrubro, setTipoSubrubro] = useState(subrubro?.tipo_subrubro || 'factura');
   const [aplicaDescuento, setAplicaDescuento] = useState(!!subrubro?.aplica_descuento);
+  // Multi-banco: banco con el que se le paga por defecto ('' = el predeterminado general).
+  const { bancos, activos: bancosActivos, predeterminado } = useBancos();
+  const [bancoDefault, setBancoDefault] = useState(subrubro?.banco_default_id != null ? String(subrubro.banco_default_id) : '');
+  // Activos + el actual aunque esté desactivado (para no perderlo al guardar).
+  const opcionesBanco = [
+    ...bancosActivos,
+    ...bancos.filter(b => !b.activo && String(b.id) === bancoDefault),
+  ];
   const [saving, setSaving] = useState(false);
   const esDeuda = tipoSubrubro === 'deuda';
   const esSumatoria = tipoSubrubro === 'sumatoria';
@@ -188,6 +197,7 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
         dia_semana_vencimiento: diaSemana,
         dia_mes_vencimiento: diaMes,
         metodo_pago_default: metodoPagoDefault,
+        banco_default_id: bancoDefault === '' ? null : Number(bancoDefault),
         tipo_subrubro: tipoSubrubro,
         // Una deuda a cobrar o una sumatoria nunca llevan descuento por pago (el backend lo revalida).
         aplica_descuento: tipoSubrubro === 'factura' ? aplicaDescuento : false,
@@ -549,6 +559,26 @@ export default function SubrubroMetadataModal({ subrubro, onSave, onClose, title
                 : 'Si elegís un método fijo, los pagos de este subrubro lo toman automáticamente y aparecen en esa sección de Caja del día. Con "Ambas" se elige al momento de cargar.'}
             </p>
           </div>
+
+          {/* Banco por defecto: con 2+ bancos y si se le puede pagar por transferencia. */}
+          {opcionesBanco.length > 1 && metodoPagoDefault !== 'efectivo' && (
+            <div>
+              <label className={labelCls}>
+                <Landmark size={11} className="inline mr-1" /> Banco para transferencias
+              </label>
+              <select className={inputCls} value={bancoDefault} onChange={e => setBancoDefault(e.target.value)}>
+                <option value="">El predeterminado{predeterminado ? ` (${predeterminado.nombre})` : ''}</option>
+                {opcionesBanco.map(b => (
+                  <option key={b.id} value={b.id}>{b.nombre}{!b.activo ? ' (desactivado)' : ''}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {esDeuda
+                  ? 'Los abonos por transferencia entran por este banco. Al cargarlos se puede elegir otro.'
+                  : 'Los pagos por transferencia salen de este banco: viene preseleccionado al pagar y se puede cambiar en la Caja del Día. No cambia pagos ya cargados.'}
+              </p>
+            </div>
+          )}
         </Seccion>
         </>}
 

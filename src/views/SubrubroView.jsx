@@ -448,6 +448,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
           concepto_diferencia,
           campos_extra: rest.campos_extra,
           metodo_pago: rest.metodo_pago,
+          banco_id: rest.banco_id,
           // Percepciones de la NC (el backend las ignora si el tipo es 'pago').
           percepcion_iva: rest.percepcion_iva,
           ingresos_brutos: rest.ingresos_brutos,
@@ -1071,6 +1072,7 @@ export default function SubrubroView({ rubro, subrubro, onBack, role }) {
             campos={campos}
             movimiento={editingMov}
             metodoDefault={subrubro.metodo_pago_default || 'ambas'}
+            bancoDefault={subrubro.banco_default_id ?? null}
             tipoSubrubro={subrubro.tipo_subrubro || 'factura'}
             todasFacturasPendientes={(() => {
               // Al editar un pago vinculado, incluir también las facturas ya pagadas

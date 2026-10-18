@@ -6,6 +6,9 @@ import { subrubrosApi, movimientosApi, cajaApi, getErrorMsg, newIdemKey } from '
 import toast from 'react-hot-toast';
 import InfoTooltip from './InfoTooltip';
 import SumatoriaMovForm from './SumatoriaMovForm';
+import MovimientoBancoModal from './MovimientoBancoModal';
+import { BancoSelect } from './BancoBadge';
+import useBancos from '../hooks/useBancos';
 import { fmtMoneda } from '../utils/formato';
 
 const today = () => hoyAR();
@@ -74,6 +77,13 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   const [fechaVenc, setFechaVenc] = useState('');
   const vencManualRef = useRef(false);
   const [metodoPago, setMetodoPago] = useState('efectivo');
+  // Multi-banco: banco del pago por transferencia y acceso a "Movimiento entre bancos".
+  const { activos: bancosActivos, multi: multiBanco, bancoDe, bancoPara } = useBancos();
+  const [bancoElegido, setBancoElegido] = useState(null);
+  // Preseleccionado: el banco por defecto del subrubro elegido, o el predeterminado.
+  const bancoId = bancoElegido ?? bancoPara(subrubros.find(s => String(s.id) === String(subrubroId))?.banco_default_id);
+  const bancoPago = tipo === 'pago' && metodoPago === 'transferencia' && multiBanco && bancoId != null ? { banco_id: bancoId } : {};
+  const [movBanco, setMovBanco] = useState(false);
   const [documento, setDocumento] = useState('factura');
   // Método de pago de la factura (opcional): viaja a la Caja del Día al vencer.
   // Independiente de metodoPago (que es para el tipo 'pago'). Remito = efectivo.
@@ -185,6 +195,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           fecha,
           facturas_vinculadas_ids: [Number(facturaSel)],
           metodo_pago: tipo === 'pago' ? metodoPago : null,
+          ...bancoPago,
           // Percepciones solo para NC (backend las ignora si es 'pago').
           percepcion_iva: tipo === 'nota_credito' ? (Number(percepcionIva) || 0) : 0,
           ingresos_brutos: tipo === 'nota_credito' ? (Number(ingresosBrutos) || 0) : 0,
@@ -203,6 +214,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
           // metodo_pago: en 'pago' es el método del pago; en 'factura' es el método que
           // viajará a la Caja del Día al vencer (remito = efectivo). En NC no aplica.
           metodo_pago: tipo === 'pago' ? metodoPago : (esRemito ? 'efectivo' : (tipo === 'factura' ? metodoFactura : null)),
+          ...bancoPago,
           // documento solo aplica al tipo 'factura'
           documento: tipo === 'factura' ? documento : null,
           // Percepciones para factura / NC (el backend guarda 0 en pago y en remito).
@@ -248,6 +260,19 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
   // Subrubro Sumatoria: no tiene facturas ni pagos. Se carga por concepto y el método
   // decide si impacta en la Caja del Día («No impacta en caja» = solo suma en el
   // subrubro). Cerrar ese formulario vuelve a la Carga rápida.
+  // Movimiento entre bancos (solo con 2+ bancos activos): su propio formulario.
+  if (movBanco) {
+    return (
+      <MovimientoBancoModal
+        activos={bancosActivos}
+        bancoDe={bancoDe}
+        fechaDefault={today()}
+        onClose={() => setMovBanco(false)}
+        onSaved={() => { setMovBanco(false); onSaved?.(); }}
+      />
+    );
+  }
+
   const subSel = subrubros.find(s => String(s.id) === String(subrubroId));
   if (subSel?.tipo_subrubro === 'sumatoria') {
     return (
@@ -294,6 +319,12 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
               </button>
             ))}
           </div>
+          {multiBanco && (
+            <button type="button" onClick={() => setMovBanco(true)}
+              className="-mt-2 min-h-11 sm:min-h-0 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline">
+              ↔ Movimiento entre bancos
+            </button>
+          )}
 
           {/* Proveedor: rubro + subrubro */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -309,7 +340,7 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
             <div>
               <label htmlFor={`${uid}-sub`} className={labelCls}>Subrubro</label>
               <select id={`${uid}-sub`} ref={subRef} className={`${selectCls} ${conError('subrubro')}`} value={subrubroId}
-                onChange={e => { setSubrubroId(e.target.value); limpiarError('subrubro'); }}
+                onChange={e => { setSubrubroId(e.target.value); setBancoElegido(null); limpiarError('subrubro'); }}
                 disabled={!rubroId || loadingSubs}
                 aria-invalid={!!errores.subrubro} aria-describedby={errores.subrubro ? `${uid}-sub-err` : undefined}>
                 <option value="">— {loadingSubs ? 'Cargando...' : 'Elegir'} —</option>
@@ -418,6 +449,11 @@ export default function CargaRapidaModal({ rubros, onClose, onSaved }) {
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {esRemito ? 'Remito: siempre efectivo.' : 'Opcional.'}
                 </p>
+              )}
+              {tipo === 'pago' && metodoPago === 'transferencia' && multiBanco && (
+                <div className="mt-3">
+                  <BancoSelect id={`${uid}-banco`} opciones={bancosActivos} value={bancoId} onChange={setBancoElegido} />
+                </div>
               )}
             </div>
           )}

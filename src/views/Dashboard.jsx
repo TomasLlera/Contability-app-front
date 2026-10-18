@@ -342,7 +342,9 @@ export default function Dashboard({ locales = [], rubros = [], rubroStats = {}, 
   const gastosConfirmados  = gastosHoy.filter(m => m.confirmado !== false);
   const gastosPendientes   = gastosHoy.filter(m => m.confirmado === false);
   const saldoMov           = cajaHoy.find(m => m.tipo === 'saldo_inicial');
-  const saldoCuentaMov     = cajaHoy.find(m => m.tipo === 'saldo_cuenta');
+  // Multi-banco: un 'saldo_cuenta' por banco; se muestra la suma.
+  const saldosCuenta       = cajaHoy.filter(m => m.tipo === 'saldo_cuenta');
+  const saldoCuentaMov     = saldosCuenta.length ? { monto: saldosCuenta.reduce((s, m) => s + (m.monto || 0), 0) } : null;
   // confirmado === false = deuda por cobrar todavía sin cobrar: no es un ingreso del día.
   const ingresosExtra      = cajaHoy.filter(m => m.tipo === 'ingreso_extra' && m.confirmado !== false);
   // Deudas por cobrar del día: ingresos espejados desde un subrubro DEUDA, pendientes de cobro.

@@ -4,10 +4,11 @@ import { confirmar } from '../utils/confirmar';
 import RowActions from '../components/RowActions';
 import TableScroll from '../components/TableScroll';
 import toast from 'react-hot-toast';
-import { PauseCircle, PlayCircle, Mail, Bell, BellRing, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
+import { PauseCircle, PlayCircle, Mail, Bell, BellRing, Send, CheckCircle, Clock, Globe, DollarSign, Building2, Users, Plus, Trash2, KeyRound, Eye, EyeOff, ShieldCheck, ShieldAlert, History, LayoutDashboard, Crown, Database, Download, Upload, AlertTriangle, RefreshCw, ChevronRight, Landmark } from 'lucide-react';
 import AuditDetailModal from '../components/AuditDetailModal';
 import InfoTooltip from '../components/InfoTooltip';
 import RecordatoriosManager from '../components/RecordatoriosManager';
+import BancosManager from '../components/BancosManager';
 import Skeleton from '../components/Skeleton';
 
 // Metadatos visuales por rol (jerarquía: superadmin > admin > viewer).
@@ -22,6 +23,7 @@ const SECCIONES = [
   { key: 'alertas',   label: 'Alertas',    icon: Bell,           ready: true },
   { key: 'recordatorios', label: 'Recordatorios', icon: BellRing, ready: true },
   { key: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard, ready: true },
+  { key: 'bancos',    label: 'Bancos',     icon: Landmark,       ready: true },
   { key: 'usuarios',  label: 'Usuarios',   icon: Users,          ready: true, ancha: true },
   { key: 'auditoria', label: 'Auditoría',  icon: History,        ready: true, ancha: true },
   { key: 'backup',    label: 'Backup',     icon: Database,       ready: true },
@@ -1055,6 +1057,7 @@ export default function SettingsView() {
             : activa?.key === 'auditoria' ? <AuditoriaSection />
             : activa?.key === 'backup' ? <BackupSection />
             : activa?.key === 'moneda' ? <MonedaSection />
+            : activa?.key === 'bancos' ? <BancosManager isAdmin={authApi.getRole() !== 'viewer'} />
             : <Proximamente label={activa?.label} />
           }
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useId } from 'react';
-import { cajaApi, subrubrosApi, newIdemKey } from '../api';
+import { cajaApi, subrubrosApi, bancosApi, newIdemKey } from '../api';
 import {
   Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
   Users, ShoppingCart, Banknote, ArrowLeftRight, Star, Clock, Wallet, Settings, X, Check,
@@ -8,6 +8,10 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SumatoriaMovForm from '../components/SumatoriaMovForm';
+import SaldosCuentaModal from '../components/SaldosCuentaModal';
+import MovimientoBancoModal from '../components/MovimientoBancoModal';
+import { BancoBadge, BancoSelect } from '../components/BancoBadge';
+import useBancos from '../hooks/useBancos';
 import { EntityIcon } from '../icons';
 import ConfirmModal from '../components/ConfirmModal';
 import CajaExportModal from '../components/CajaExportModal';
@@ -258,7 +262,7 @@ function ConfigPanel({ config, rubros, allRubros, onSave, onClose }) {
 // En un <Modal> con los botones fijos al pie: antes se abría en línea en medio
 // de la lista y en mobile Guardar quedaba debajo de la bottom navigation.
 // Orden: tipo → concepto → monto → método → (opcional) vincular a subrubro.
-function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList, rubros, allSubrubros, onElegirSumatoria }) {
+function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosList, proveedoresList, rubros, allSubrubros, onElegirSumatoria, cargadosHoy = [] }) {
   const uid = useId();
   const [tipo, setTipo]         = useState(tipoForzado || initial?.tipo || 'gasto');
   const [concepto, setConcepto] = useState(initial?.concepto || '');
@@ -269,6 +273,10 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     initial && 'metodo' in initial ? initial.metodo : 'efectivo'
   );
   const [esEspecial, setEsEspecial] = useState(initial?.es_especial || false);
+  // Multi-banco: banco de la transferencia (el del ítem o el predeterminado). Solo se
+  // muestra con 2 o más bancos activos; con uno, el backend asigna el único.
+  const { activos: bancosActivos, multi: multiBanco, bancoDe, bancoPara } = useBancos();
+  const [bancoElegido, setBancoElegido] = useState(initial?.banco_id ?? null);
   // Errores visibles tras intentar guardar (antes el botón quedaba deshabilitado
   // sin decir qué faltaba).
   const [errores, setErrores] = useState({});
@@ -286,6 +294,10 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
   const [vincularOpen, setVincularOpen] = useState(false);
   const [rubroSel, setRubroSel]       = useState('');
   const [subrubroSel, setSubrubroSel] = useState('');
+  // Banco preseleccionado: el del ítem; si no, el por defecto del subrubro vinculado
+  // (si sigue activo); si no, el predeterminado.
+  const subParaBanco = allSubrubros.find(s => String(s.id) === String(subrubroSel || initial?.subrubro_id || ''));
+  const bancoId = bancoElegido ?? bancoPara(subParaBanco?.banco_default_id);
   const [facturasSub, setFacturasSub] = useState([]);
   const [facturaSel, setFacturaSel]   = useState('');
   const [loadingFacturas, setLoadingFacturas] = useState(false);
@@ -324,6 +336,10 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
 
   const lista = tipo === 'empleado' ? empleadosList : tipo === 'gasto' ? proveedoresList : [];
   const isMobile = useIsMobile();
+  // Alta de cajas de empleados: se cargan varias seguidas, así que el formulario queda
+  // abierto después de guardar. Los ya cargados hoy se marcan para no repetirlos.
+  const sigueAbierto = tipo === 'empleado' && !initial;
+  const yaCargado = (nombre) => sigueAbierto && cargadosHoy.includes(nombre);
   // Botones de la lista (mobile): filtrados por lo escrito. Elegido uno, queda
   // marcado entre los demás para poder cambiarlo con un toque.
   const filtroLista = concepto.trim().toLowerCase();
@@ -374,6 +390,8 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
       // a ese día (un pendiente arrastrado, por ejemplo, saltaba a la fecha vista).
       fecha: initial?.fecha ?? fecha,
       tipo, concepto: concepto.trim(), monto: Number(monto), metodo, es_especial: esEspecial,
+      // Solo se manda si se eligió (multi-banco): si no, el backend conserva / asigna.
+      ...(metodo === 'transferencia' && multiBanco && bancoId != null ? { banco_id: bancoId } : {}),
       idempotency_key: idemKeyRef.current,
     };
     if (subrubroSel) {
@@ -384,7 +402,18 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
     setSaving(true);
     try {
       await onSave(data);
-      // Éxito: el padre cierra el formulario (se desmonta).
+      // Cajas de empleados (alta): se cargan varias seguidas y cada una es de otro
+      // empleado. El formulario queda abierto y limpio (método y banco se conservan);
+      // el resto de las altas las cierra el padre.
+      if (sigueAbierto) {
+        setConcepto('');
+        setMonto('');
+        setErrores({});
+        idemKeyRef.current = newIdemKey();
+        savingRef.current = false;
+        setSaving(false);
+        if (!isMobile) conceptoRef.current?.focus();
+      }
     } catch {
       savingRef.current = false;
       setSaving(false);
@@ -413,12 +442,12 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
         <div className="flex gap-2">
           <button type="button" onClick={onCancel} disabled={saving}
             className="flex-1 min-h-11 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 py-2 rounded-lg text-sm font-medium disabled:opacity-40">
-            Cancelar
+            {sigueAbierto ? 'Listo' : 'Cancelar'}
           </button>
           <button type="submit" form={`${uid}-form`} disabled={saving}
             className="flex-1 min-h-11 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-1.5">
             {saving && <Loader2 size={14} className="animate-spin" />}
-            {saving ? 'Guardando...' : 'Guardar'}
+            {saving ? 'Guardando...' : sigueAbierto ? 'Guardar y seguir' : 'Guardar'}
           </button>
         </div>
       }
@@ -462,12 +491,20 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
                 className={`min-h-11 px-3 rounded-full border text-sm font-medium transition-colors ${
                   concepto === item.nombre
                     ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 active:bg-slate-100 dark:active:bg-slate-600'
+                    : yaCargado(item.nombre)
+                      ? 'bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-800 text-green-700 dark:text-green-400'
+                      : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 active:bg-slate-100 dark:active:bg-slate-600'
                 }`}>
+                {yaCargado(item.nombre) && <Check size={13} className="inline -mt-0.5 mr-1" aria-label="ya cargado hoy" />}
                 {item.nombre}
               </button>
             ))}
           </div>
+        )}
+        {sigueAbierto && !isMobile && cargadosHoy.length > 0 && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <Check size={11} className="inline -mt-0.5 text-green-600" /> Ya cargados hoy: {cargadosHoy.join(', ')}
+          </p>
         )}
         {errores.concepto && <p id={`${uid}-concepto-err`} className={errCls}>{errores.concepto}</p>}
       </div>
@@ -495,6 +532,12 @@ function EntryForm({ fecha, onSave, onCancel, initial, tipoForzado, empleadosLis
           ))}
         </div>
         {metodo == null && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Sin método definido: elegí uno para poder confirmar el pago.</p>}
+        {metodo === 'transferencia' && multiBanco && (
+          <div className="mt-3">
+            <BancoSelect id={`${uid}-banco`} opciones={bancosActivos} value={bancoId} onChange={setBancoElegido}
+              bancoActual={initial?.banco_id != null ? bancoDe(initial.banco_id) : null} />
+          </div>
+        )}
       </div>
 
       {/* Vincular a subrubro: opcional, plegado para no alargar la carga común. */}
@@ -635,12 +678,36 @@ function agruparPorMetodo(items, nombreDe) {
 function GrupoHeader({ grupo }) {
   const Icon = grupo.icon;
   const total = grupo.items.reduce((s, m) => s + (m.monto || 0), 0);
+  // Transferencias con varios bancos: subtotales por banco, desplegables.
+  const { multi, bancoDe } = useBancos();
+  const [verBancos, setVerBancos] = useState(false);
+  const porBanco = multi && grupo.key === 'transferencia'
+    ? [...grupo.items.reduce((acc, m) => acc.set(m.banco_id ?? null, (acc.get(m.banco_id ?? null) || 0) + (m.monto || 0)), new Map())]
+    : [];
   return (
-    <div className={`sticky top-0 z-10 flex items-center gap-2 px-2.5 py-2 mb-2 rounded-lg border backdrop-blur-sm ${grupo.bg} ${grupo.border}`}>
-      <Icon size={14} className={`${grupo.color} shrink-0`} />
-      <span className={`text-xs font-semibold uppercase tracking-wide ${grupo.color}`}>{grupo.label}</span>
-      <span className="text-xs text-slate-500 dark:text-slate-400">({grupo.items.length})</span>
-      <span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{fmt(total)}</span>
+    <div className={`sticky top-0 z-10 mb-2 rounded-lg border backdrop-blur-sm ${grupo.bg} ${grupo.border}`}>
+      <div className="flex items-center gap-2 px-2.5 py-2">
+        <Icon size={14} className={`${grupo.color} shrink-0`} />
+        <span className={`text-xs font-semibold uppercase tracking-wide ${grupo.color}`}>{grupo.label}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">({grupo.items.length})</span>
+        {porBanco.length > 0 && (
+          <button type="button" onClick={() => setVerBancos(v => !v)} aria-expanded={verBancos}
+            className="min-h-11 sm:min-h-0 px-1 text-xs text-blue-700 dark:text-blue-300 hover:underline inline-flex items-center gap-0.5">
+            por banco <ChevronDown size={12} className={`transition-transform ${verBancos ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+        <span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{fmt(total)}</span>
+      </div>
+      {verBancos && porBanco.length > 0 && (
+        <div className="px-2.5 pb-2 space-y-1">
+          {porBanco.map(([bid, sub]) => (
+            <div key={bid ?? 'sin'} className="flex items-center justify-between text-xs">
+              <BancoBadge banco={bancoDe(bid)} />
+              <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">{fmt(sub)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -659,6 +726,7 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
   // bruto. El mismo "7" significa $7 o 7% según este toggle, así que la unidad tiene
   // que estar siempre visible al lado del input.
   const [descModo, setDescModo] = useState('monto');
+  const { multi: multiBanco, bancoDe } = useBancos();
   // Cobro de deuda: ingreso auto-sincronizado con ciclo de confirmación (una deuda
   // por cobrar apunta a su movimiento de origen). Los ingresos manuales/espejo de
   // abono no llevan confirmación (confirmado null).
@@ -766,6 +834,8 @@ function MovRow({ m, onEdit, onDelete, onConfirmar, colorMonto, confirming = fal
           {/* Dentro de una sección agrupada por método el badge repite lo que ya dice
               el encabezado: se omite y queda solo el tipo de comprobante y el estado. */}
           {!hideMetodo && <MetodoBadge metodo={m.metodo} />}
+          {/* Multi-banco: el banco de cada transferencia. */}
+          {multiBanco && m.metodo === 'transferencia' && <BancoBadge banco={bancoDe(m.banco_id)} />}
           <DocumentoBadge documento={m.documento} />
           {/* Concepto de la sumatoria con el mismo estilo que Factura/Remito: es una
               etiqueta, no un estado. */}
@@ -1035,6 +1105,58 @@ function ResumenMetodo({ label, icon, color, disponible, gastos, sinConfirmar = 
   );
 }
 
+// Desglose por banco del cierre de Transferencia (colapsable). Mismas cuentas que la
+// card de totales, banco por banco, más el neto de los movimientos entre bancos del
+// día (solo si hubo). Resta negativa = advertencia en rojo, no bloquea nada.
+function DesgloseBancos({ porBanco, ocultar = false }) {
+  const [abierto, setAbierto] = useState(false);
+  const filas = porBanco.filter(b => b.bid !== null || b.disponible || b.gastos || b.sinConfirmar);
+  if (filas.length === 0) return null;
+  const v = (n) => (ocultar ? '••••' : fmt(n));
+  const negativos = filas.filter(b => b.resta < -0.005).length;
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+      <button type="button" onClick={() => setAbierto(a => !a)} aria-expanded={abierto}
+        className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-slate-700 dark:text-slate-300">
+        <ArrowLeftRight size={14} className="text-blue-700 dark:text-blue-400 shrink-0" />
+        Transferencia por banco
+        {negativos > 0 && <span className="text-xs text-red-600 dark:text-red-400">· {negativos} en negativo</span>}
+        <ChevronDown size={14} className={`ml-auto shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+      </button>
+      {abierto && (
+        <div className="px-4 pb-3 space-y-3">
+          {filas.map(b => (
+            <div key={b.bid ?? 'sin'} className="space-y-1 text-sm border-t border-slate-100 dark:border-slate-700 pt-2">
+              <BancoBadge banco={b.banco} />
+              <div className="flex justify-between text-slate-600 dark:text-slate-300"><span>{b.saldo !== null ? 'Saldo en cuenta' : 'Ingresos'}</span><span className="tabular-nums">{v(b.disponible)}</span></div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300"><span>Gastos</span><span className="tabular-nums">− {v(b.gastos)}</span></div>
+              {Math.abs(b.neto) > 0.005 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>Movimientos entre bancos</span>
+                  <span className="tabular-nums">{b.neto > 0 ? '+ ' : '− '}{v(Math.abs(b.neto))}</span>
+                </div>
+              )}
+              {b.sinConfirmar > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300"><span>Sin confirmar</span><span className="tabular-nums text-amber-700 dark:text-amber-400">{v(b.sinConfirmar)}</span></div>
+              )}
+              <div className="flex justify-between font-semibold">
+                <span className="text-slate-700 dark:text-slate-200">Resta</span>
+                <span className={`tabular-nums ${b.resta >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-red-600 dark:text-red-400'}`}>{v(b.resta)}</span>
+              </div>
+              {b.sinConfirmar > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Si confirmás todo</span>
+                  <span className={`tabular-nums ${b.siConfirma >= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-red-600 dark:text-red-400'}`}>{v(b.siConfirma)}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Última respuesta de /caja/dia por fecha. Vive fuera del componente para sobrevivir
 // al cambio de vista: volver a la Caja la muestra al instante mientras se refresca.
 const cacheDia = new Map();
@@ -1098,6 +1220,14 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const [saldoCuentaInput, setSaldoCuentaInput]       = useState('');
   const [editandoSaldoCuenta, setEditandoSaldoCuenta] = useState(false);
   const [saldoCuentaAyer, setSaldoCuentaAyer]         = useState(null);
+  // Multi-banco del día: { saldos_ayer, cierre_ayer, movimientos } (GET /caja/dia).
+  const [bancosDia, setBancosDia] = useState({ saldos_ayer: {}, cierre_ayer: {}, movimientos: [] });
+  const bancosCtx = useBancos();
+  // Modales de multi-banco: saldos por banco y movimiento entre bancos ({ initial }).
+  const [showSaldosBancos, setShowSaldosBancos] = useState(false);
+  const [movBancoForm, setMovBancoForm] = useState(null);
+  // Banco elegido para confirmar en lote las transferencias seleccionadas.
+  const [bancoLote, setBancoLote] = useState(null);
   const saldoCuentaEditRef = useRef(null);
 
   const [config, setConfig]             = useState({ empleados: [], proveedores: [], rubros_sync: [], dias_anticipacion_caja: 3 });
@@ -1148,6 +1278,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
     setMovs(dia.movs);
     setProximos(dia.proximos || []);
     setSaldoCuentaAyer(dia.saldo_cuenta_ayer ?? null);
+    setBancosDia(dia.bancos || { saldos_ayer: {}, cierre_ayer: {}, movimientos: [] });
     // Con saldo_inicial manual cargado hoy, ese manda. saldo === null = nunca se
     // cargó un saldo inicial → la Caja muestra "—" en vez de un cero engañoso.
     const tieneSaldoManual = dia.movs.some(m => m.tipo === 'saldo_inicial');
@@ -1285,9 +1416,13 @@ export default function CajaView({ rubros = [], onNavigate }) {
           empleado: 'Caja ingresada ✓',
           gasto: 'Pago ingresado ✓',
         }[data.tipo] || 'Guardado — confirmá el pago para que descuente de la caja';
-        toast.success(msgCreado);
+        toast.success(data.tipo === 'empleado' ? `${data.concepto}: caja ingresada ✓` : msgCreado);
       }
-      setShowForm(false); setEditingMov(null); setTipoForm(null);
+      // Alta de caja de empleado: el formulario sigue abierto para el próximo (lo
+      // limpia el propio formulario). El resto se cierra.
+      if (editingMov || data.tipo !== 'empleado') {
+        setShowForm(false); setEditingMov(null); setTipoForm(null);
+      }
       cargar();
     } catch (err) { toast.error('Error al guardar'); throw err; }
   };
@@ -1345,6 +1480,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
         //
         // El backend hace el pago (por el neto) y la NC del descuento juntos: si algo
         // falla, no queda un pago huérfano sin su nota de crédito.
+        if (m.metodo === 'transferencia') avisarSiNegativo(opts.banco_id ?? m.banco_id, Number(opts.monto ?? m.monto) || 0);
         const r = await cajaApi.confirmar(m.id, { ...opts, fecha: fechaPago });
         cargar();
         toast.success(
@@ -1413,7 +1549,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
       setSumatoriaForm({
         initial: {
           id: m.sumatoria.id, subrubro_id: m.subrubro_id, concepto_id: m.sumatoria.concepto_id,
-          fecha: m.fecha, monto: m.monto, metodo: m.metodo, descripcion: m.sumatoria.descripcion, origen: 'caja',
+          fecha: m.fecha, monto: m.monto, metodo: m.metodo, banco_id: m.banco_id, descripcion: m.sumatoria.descripcion, origen: 'caja',
         },
       });
       return;
@@ -1435,9 +1571,17 @@ export default function CajaView({ rubros = [], onNavigate }) {
   const handleSaldoCuenta = async () => {
     const n = Number(saldoCuentaInput);
     if (isNaN(n) || saldoCuentaInput === '') return;
-    const existing = movs.find(m => m.tipo === 'saldo_cuenta');
-    if (existing) await cajaApi.update(existing.id, { monto: n, concepto: 'Saldo en cuenta', metodo: 'transferencia' });
-    else await cajaApi.create({ fecha, tipo: 'saldo_cuenta', concepto: 'Saldo en cuenta', monto: n, metodo: 'transferencia', es_especial: false });
+    // Con un banco cargado, el saldo es el de ese banco (multi-banco con uno solo).
+    // Sin bancos (antes de migrar), el saldo único de siempre.
+    const unico = bancosCtx.predeterminado;
+    if (unico) {
+      try { await cajaApi.saveSaldosCuenta(fecha, [{ banco_id: unico.id, monto: n }]); }
+      catch (err) { toast.error(err?.response?.data?.error || 'No se pudo guardar el saldo'); return; }
+    } else {
+      const existing = movs.find(m => m.tipo === 'saldo_cuenta');
+      if (existing) await cajaApi.update(existing.id, { monto: n, concepto: 'Saldo en cuenta', metodo: 'transferencia' });
+      else await cajaApi.create({ fecha, tipo: 'saldo_cuenta', concepto: 'Saldo en cuenta', monto: n, metodo: 'transferencia', es_especial: false });
+    }
     setSaldoCuentaInput(''); setEditandoSaldoCuenta(false);
     cargar(); toast.success('Saldo cargado con éxito ✓');
   };
@@ -1456,8 +1600,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
   // ── Cálculos ────────────────────────────────────────────────────────────────
   const saldoMov      = movs.find(m => m.tipo === 'saldo_inicial');
   const saldoInicial  = saldoMov?.monto ?? saldoAutoCalculado ?? 0;
-  const saldoCuentaMov = movs.find(m => m.tipo === 'saldo_cuenta');
-  const saldoCuentaHoy = saldoCuentaMov?.monto ?? null;
+  // Multi-banco: un 'saldo_cuenta' por banco; el saldo en cuenta es la suma.
+  const saldosCuentaHoy = movs.filter(m => m.tipo === 'saldo_cuenta');
+  const saldoCuentaMov = saldosCuentaHoy[0] || null;
+  const saldoCuentaHoy = saldosCuentaHoy.length ? saldosCuentaHoy.reduce((s, m) => s + (m.monto || 0), 0) : null;
 
   const ingresoTransDia = (saldoCuentaHoy !== null && saldoCuentaAyer !== null)
     ? saldoCuentaHoy - saldoCuentaAyer
@@ -1533,8 +1679,13 @@ export default function CajaView({ rubros = [], onNavigate }) {
       if (!ok) return;
     }
     // Un solo aviso de fecha para toda la selección, no uno por ítem.
-    if (!validarFechaPago(aConfirmar, {}, fecha)) return;
-    await confirmarVarios(aConfirmar, {}, fecha);
+    // Multi-banco: si se eligió un banco en el panel, va para todas las transferencias;
+    // si no, cada una sale por el suyo (el del subrubro o el predeterminado).
+    const optsLote = bancosCtx.multi && aConfirmar.some(m => m.metodo === 'transferencia')
+      && bancoLote != null ? { banco_id: bancoLote }
+      : {};
+    if (!validarFechaPago(aConfirmar, optsLote, fecha)) return;
+    await confirmarVarios(aConfirmar, optsLote, fecha);
     if (sinMetodo) toast('Se saltearon ' + sinMetodo + ' sin método definido', { icon: '⚠️' });
   };
 
@@ -1554,16 +1705,66 @@ export default function CajaView({ rubros = [], onNavigate }) {
     + empleados.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0)
     + ingresosDia.filter(m => m.metodo === 'efectivo').reduce((s,m) => s+m.monto,0);
 
-  const disponibleTrans = saldoCuentaHoy !== null
-  ? saldoCuentaHoy
-  : empleados.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0)
-    + ingresosDia.filter(m => m.metodo === 'transferencia').reduce((s,m) => s+m.monto,0);
+  // ── Transferencia, por banco ──
+  // Cada banco (y "sin banco": datos anteriores a la migración o pendientes que se
+  // asignan al confirmar) tiene el mismo cálculo que antes tenía la cuenta única:
+  //   disponible = su saldo en cuenta cargado hoy, o (sin saldo) sus ingresos por
+  //   transferencia; gastos / sin confirmar = sus transferencias; neto = movimientos
+  //   entre bancos (no son gasto ni ingreso: entre todos suman cero).
+  // Los totales del panel son la suma de los bancos: con un solo banco (o sin bancos)
+  // dan exactamente lo mismo que antes.
+  const sumaDe = (lista) => lista.reduce((s, m) => s + (m.monto || 0), 0);
+  const netoBancos = bancosDia.movimientos.reduce((acc, mb) => {
+    acc[mb.banco_origen_id] = (acc[mb.banco_origen_id] || 0) - mb.monto;
+    acc[mb.banco_destino_id] = (acc[mb.banco_destino_id] || 0) + mb.monto;
+    return acc;
+  }, {});
+  const transDe = (lista, bid) => lista.filter(m => m.metodo === 'transferencia' && (m.banco_id ?? null) === bid);
+  const clavesBanco = [...new Set([
+    ...bancosCtx.activos.map(b => b.id),
+    ...saldosCuentaHoy.map(m => m.banco_id ?? null),
+    ...[...empleados, ...ingresosDia, ...gastos].filter(m => m.metodo === 'transferencia').map(m => m.banco_id ?? null),
+    ...Object.keys(netoBancos).map(Number),
+  ])];
+  const porBanco = clavesBanco.map(bid => {
+    const saldos = saldosCuentaHoy.filter(m => (m.banco_id ?? null) === bid);
+    const saldo = saldos.length ? sumaDe(saldos) : null;
+    const ingresos = sumaDe(transDe(empleados, bid)) + sumaDe(transDe(ingresosDia, bid));
+    const g = transDe(gastos, bid);
+    const gastosB = sumaDe(g.filter(m => m.confirmado !== false));
+    const sinConfB = sumaDe(g.filter(m => m.confirmado === false));
+    const neto = netoBancos[bid] || 0;
+    const disponible = saldo !== null ? saldo : ingresos;
+    const resta = disponible - gastosB + neto;
+    const ayer = bancosDia.saldos_ayer?.[bid ?? 'sin_banco'] ?? null;
+    return {
+      bid, banco: bancosCtx.bancoDe(bid), saldo, disponible, gastos: gastosB, sinConfirmar: sinConfB, neto, resta,
+      siConfirma: resta - sinConfB,
+      pctAyer: saldo !== null && ayer ? ((saldo - ayer) / Math.abs(ayer)) * 100 : null,
+    };
+  // "Sin banco" solo si tiene algo; un banco activo sin nada igual se lista.
+  }).filter(b => b.bid !== null || b.saldo !== null || b.disponible || b.gastos || b.sinConfirmar);
+  const restaDeBanco = (bid) => porBanco.find(b => b.bid === (bid ?? null))?.resta ?? null;
+  // Desglose visible con 2+ bancos activos, o si el día ya tiene más de un banco en juego.
+  const mostrarBancos = bancosCtx.multi || porBanco.filter(b => b.bid !== null).length > 1;
+
+  const disponibleTrans = porBanco.reduce((s, b) => s + b.disponible, 0);
 
   // Solo los gastos confirmados (confirmado !== false) descuentan de la caja
   const gastosEfvo  = gastos.filter(m => m.metodo === 'efectivo'       && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
   const gastosTrans = gastos.filter(m => m.metodo === 'transferencia'  && m.confirmado !== false).reduce((s,m) => s+m.monto,0);
   const sinConfirmarEfvo  = gastos.filter(m => m.metodo === 'efectivo'      && m.confirmado === false).reduce((s,m) => s+m.monto,0);
   const sinConfirmarTrans = gastos.filter(m => m.metodo === 'transferencia' && m.confirmado === false).reduce((s,m) => s+m.monto,0);
+
+  // Aviso (no bloquea) si una transferencia deja a su banco en negativo.
+  const avisarSiNegativo = (bid, monto) => {
+    if (!mostrarBancos) return;
+    const r = restaDeBanco(bid ?? bancosCtx.predeterminado?.id ?? null);
+    if (r !== null && r - monto < -0.005) {
+      const nombre = bancosCtx.bancoDe(bid ?? bancosCtx.predeterminado?.id)?.nombre || 'el banco';
+      toast(`Ojo: ${nombre} queda en negativo (${fmt(r - monto)})`, { icon: '⚠️' });
+    }
+  };
   // Misma cuenta que hace ResumenMetodo (`restante`). Se calcula acá porque el
   // atajo de arriba muestra el resultado sin montar la card.
   const restaEfvo  = disponibleEfvo  - gastosEfvo;
@@ -1724,10 +1925,23 @@ export default function CajaView({ rubros = [], onNavigate }) {
               <InfoTooltip text="Total en la cuenta bancaria hoy. El sistema calcula el ingreso por transferencia restando el saldo de ayer al de hoy." />
             </div>
             {!editandoSaldoCuenta && (
-              <button onClick={() => { setSaldoCuentaInput(saldoCuentaHoy ?? ''); setEditandoSaldoCuenta(true); }}
-                className="shrink-0 min-h-11 sm:min-h-0 -my-2 sm:my-0 px-1 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                <Pencil size={11} /> {saldoCuentaMov ? 'Editar' : 'Ingresar'}
-              </button>
+              <div className="shrink-0 flex items-center gap-2 -my-2 sm:my-0">
+                {/* Movimiento entre bancos: acceso discreto, solo con 2+ bancos activos. */}
+                {bancosCtx.multi && (
+                  <button onClick={() => setMovBancoForm({ initial: null })} title="Movimiento entre bancos"
+                    className="min-h-11 sm:min-h-0 px-1 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:underline flex items-center gap-1">
+                    <ArrowLeftRight size={11} /> <span className="hidden sm:inline">Entre bancos</span><span className="sm:hidden">Mover</span>
+                  </button>
+                )}
+                <button onClick={() => {
+                  // Varios bancos: un campo por banco en un modal. Uno solo: como siempre.
+                  if (mostrarBancos) { setShowSaldosBancos(true); return; }
+                  setSaldoCuentaInput(saldoCuentaHoy ?? ''); setEditandoSaldoCuenta(true);
+                }}
+                  className="min-h-11 sm:min-h-0 px-1 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                  <Pencil size={11} /> {saldoCuentaMov ? 'Editar' : 'Ingresar'}
+                </button>
+              </div>
             )}
           </div>
           {editandoSaldoCuenta ? (
@@ -1755,6 +1969,48 @@ export default function CajaView({ rubros = [], onNavigate }) {
                   </span>
                 )}
               </div>
+              {/* Desglose por banco (2+ bancos) y movimientos entre bancos del día. */}
+              {mostrarBancos && (
+                <ul className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700 space-y-1.5">
+                  {porBanco.filter(b => b.bid !== null || b.saldo !== null).map(b => (
+                    <li key={b.bid ?? 'sin'} className="flex items-center gap-2 text-xs">
+                      <BancoBadge banco={b.banco} />
+                      {b.pctAyer !== null && !ocultarSaldos && (
+                        <span className={b.pctAyer >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}>
+                          {b.pctAyer >= 0 ? '↑' : '↓'} {fmtPct(b.pctAyer, { signo: false })}
+                        </span>
+                      )}
+                      <span className="ml-auto font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                        {ocultarSaldos ? '••••' : b.saldo !== null ? fmt(b.saldo) : <span className="font-normal text-slate-400">sin cargar</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {bancosDia.movimientos.length > 0 && (
+                <ul className="mt-2 pt-2 border-t border-dashed border-slate-200 dark:border-slate-700 space-y-1" aria-label="Movimientos entre bancos del día">
+                  {bancosDia.movimientos.map(mb => {
+                    const o = bancosCtx.bancoDe(mb.banco_origen_id), d = bancosCtx.bancoDe(mb.banco_destino_id);
+                    return (
+                      <li key={mb.id} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                        <span className="truncate min-w-0" title={mb.descripcion || undefined}>
+                          {o?.alias || o?.nombre || '?'} → {d?.alias || d?.nombre || '?'}
+                        </span>
+                        <span className="ml-auto font-semibold tabular-nums shrink-0">{ocultarSaldos ? '••••' : fmt(mb.monto)}</span>
+                        <button type="button" onClick={() => setMovBancoForm({ initial: mb })} aria-label="Editar movimiento entre bancos"
+                          className="shrink-0 w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center rounded text-slate-500 hover:text-blue-600"><Pencil size={12} /></button>
+                        <button type="button" aria-label="Eliminar movimiento entre bancos"
+                          onClick={async () => {
+                            if (!(await confirmar({ message: `¿Eliminar el movimiento de ${fmt(mb.monto)}?`, detail: 'Se revierte en los dos bancos.', confirmLabel: 'Eliminar' }))) return;
+                            try { await bancosApi.deleteMovimiento(mb.id); toast.success('Movimiento eliminado'); cargar(); }
+                            catch (err) { toast.error(err?.response?.data?.error || 'No se pudo eliminar'); }
+                          }}
+                          className="shrink-0 w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center rounded text-slate-500 hover:text-red-600"><Trash2 size={12} /></button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           )}
         </div>
@@ -1841,7 +2097,8 @@ export default function CajaView({ rubros = [], onNavigate }) {
         {empleadosOpen && (
           <>
             {showForm && (tipoForm === 'empleado' || editingMov?.tipo === 'empleado') && (
-              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'} /></div>
+              <div className="mb-2"><EntryForm {...formProps} initial={editingMov} tipoForzado={editingMov ? null : 'empleado'}
+                cargadosHoy={[...new Set(empleados.map(m => m.concepto))]} /></div>
             )}
             {empleados.length === 0 && !(showForm && tipoForm === 'empleado') && (
               <p className="text-xs text-slate-500 dark:text-slate-400 py-2 text-center">Sin empleados cargados</p>
@@ -2028,6 +2285,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-700 dark:text-blue-400"
           disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
+        {mostrarBancos && <div className="sm:col-span-2"><DesgloseBancos porBanco={porBanco} ocultar={ocultarSaldos} /></div>}
       </div>
     </div>
 
@@ -2040,6 +2298,7 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <ResumenMetodo label="Transferencia" icon={ArrowLeftRight} color="text-blue-700 dark:text-blue-400"
           disponible={disponibleTrans} gastos={gastosTrans} sinConfirmar={sinConfirmarTrans}
           labelDisponible={ingresoTransDia !== null ? 'Ingreso del día' : 'Disponible'} />
+        {mostrarBancos && <DesgloseBancos porBanco={porBanco} ocultar={ocultarSaldos} />}
         {proximos.length > 0 && (
           <button type="button" onClick={() => setShowProximos(true)}
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-left transition-colors">
@@ -2115,6 +2374,33 @@ export default function CajaView({ rubros = [], onNavigate }) {
 
       {showExport && <CajaExportModal onClose={() => setShowExport(false)} />}
 
+      {showSaldosBancos && (
+        <SaldosCuentaModal
+          fecha={fecha}
+          // Activos + los desactivados que ya tengan saldo este día (para no perderlo).
+          bancos={[
+            ...bancosCtx.activos,
+            ...bancosCtx.bancos.filter(b => !b.activo && saldosCuentaHoy.some(m => m.banco_id === b.id)),
+          ]}
+          saldosHoy={Object.fromEntries(saldosCuentaHoy.filter(m => m.banco_id != null).map(m => [m.banco_id, m.monto]))}
+          cierreAyer={bancosDia.cierre_ayer || {}}
+          onClose={() => setShowSaldosBancos(false)}
+          onSaved={() => { setShowSaldosBancos(false); cargar(); }}
+        />
+      )}
+
+      {movBancoForm && (
+        <MovimientoBancoModal
+          initial={movBancoForm.initial}
+          fechaDefault={fecha}
+          activos={bancosCtx.activos}
+          bancoDe={bancosCtx.bancoDe}
+          disponibleDe={(bid) => restaDeBanco(bid)}
+          onClose={() => setMovBancoForm(null)}
+          onSaved={() => { setMovBancoForm(null); cargar(); }}
+        />
+      )}
+
       {sumatoriaForm && (
         <SumatoriaMovForm
           origen="caja"
@@ -2151,10 +2437,10 @@ export default function CajaView({ rubros = [], onNavigate }) {
         <PagoParcialModal
           item={parcialDe.item}
           onClose={() => setParcialDe(null)}
-          onConfirm={async (monto) => {
+          onConfirm={async (monto, bancoId) => {
             const { item, fechaPago } = parcialDe;
             setParcialDe(null);
-            await handleConfirmarGasto(item, { monto }, { fechaPago });
+            await handleConfirmarGasto(item, { monto, ...(bancoId != null ? { banco_id: bancoId } : {}) }, { fechaPago });
           }}
         />
       )}
@@ -2189,6 +2475,9 @@ export default function CajaView({ rubros = [], onNavigate }) {
           subNames={selSubNames}
           onClear={clearSelection}
           onConfirmar={bulkConfirmSeleccionados}
+          bancos={bancosCtx.multi && selAConfirmar.some(m => m.metodo === 'transferencia') ? bancosCtx.activos : []}
+          banco={bancoLote}
+          onBanco={setBancoLote}
         />
       )}
     </div>
@@ -2205,12 +2494,17 @@ function PagoParcialModal({ item, onConfirm, onClose }) {
   const n = Number(monto) || 0;
   const valido = n > 0 && n < saldo - 0.005;
   const esCobro = item.tipo === 'ingreso_extra';
+  // Multi-banco: banco del pago parcial por transferencia.
+  const { activos, predeterminado, multi, bancoDe } = useBancos();
+  const [banco, setBanco] = useState(item.banco_id ?? null);
+  const bancoId = banco ?? predeterminado?.id ?? null;
+  const conBanco = multi && item.metodo === 'transferencia';
 
   const enviar = async (e) => {
     e.preventDefault();
     if (!valido || enviando) return;
     setEnviando(true);
-    try { await onConfirm(Math.round(n * 100) / 100); }
+    try { await onConfirm(Math.round(n * 100) / 100, conBanco ? bancoId : undefined); }
     finally { setEnviando(false); }
   };
 
@@ -2226,6 +2520,10 @@ function PagoParcialModal({ item, onConfirm, onClose }) {
           <input type="number" inputMode="decimal" min="0" step="any" autoFocus className={inputCls}
             value={monto} onChange={e => setMonto(e.target.value)} placeholder="0,00" />
         </label>
+        {conBanco && (
+          <BancoSelect id="parcial-banco" opciones={activos} value={bancoId} onChange={setBanco}
+            bancoActual={item.banco_id != null ? bancoDe(item.banco_id) : null} />
+        )}
         {n > 0 && (
           <p className={`text-xs ${valido ? 'text-slate-500 dark:text-slate-400' : 'text-red-600 dark:text-red-400'}`}>
             {valido
@@ -2334,7 +2632,7 @@ function EditarBoletaModal({ item, onSaved, onClose }) {
 
 // Panel flotante de resumen de la selección múltiple de gastos: total acumulado,
 // cantidad y subrubro(s) involucrado(s). Acciones: marcar como pagados / limpiar.
-function SeleccionPanel({ total, count, sinMetodo = 0, subNames, onClear, onConfirmar }) {
+function SeleccionPanel({ total, count, sinMetodo = 0, subNames, onClear, onConfirmar, bancos = [], banco = null, onBanco }) {
   const subLabel = subNames.length === 0
     ? 'Sin subrubro'
     : subNames.length === 1
@@ -2355,6 +2653,17 @@ function SeleccionPanel({ total, count, sinMetodo = 0, subNames, onClear, onConf
             {count} {count === 1 ? 'pago' : 'pagos'} · <span className="text-slate-100">{subLabel}</span>
             {sinMetodo > 0 && <> · <span className="text-amber-300">{sinMetodo} sin método</span></>}
           </div>
+          {/* Multi-banco: banco para todas las transferencias seleccionadas. */}
+          {bancos.length > 1 && (
+            <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-300">
+              Transferencias desde
+              <select value={banco ?? ''} onChange={e => onBanco(e.target.value === '' ? null : Number(e.target.value))}
+                className="min-h-9 bg-slate-800 dark:bg-slate-700 border border-slate-600 rounded-md px-1.5 text-xs text-white">
+                <option value="">El de cada pago</option>
+                {bancos.map(b => <option key={b.id} value={b.id}>{b.alias || b.nombre}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <button onClick={onConfirmar} disabled={count === 0}
           className="text-sm font-semibold px-3 min-h-11 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-40 transition-colors shrink-0 flex items-center gap-1.5">

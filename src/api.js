@@ -179,6 +179,20 @@ export const subrubrosApi = {
   clearMovimientos: (id) => api.delete(`/movimientos/${id}/movimientos`).then(r => r.data),
 };
 
+// Bancos de la Caja del Día (multi-banco) y movimientos entre bancos propios.
+export const bancosApi = {
+  getAll: () => api.get('/bancos').then(r => r.data),
+  create: (data) => api.post('/bancos', data).then(r => r.data),
+  update: (id, data) => api.put(`/bancos/${id}`, data).then(r => r.data),
+  reordenar: (ids) => api.put('/bancos/orden', { ids }).then(r => r.data),
+  // Con movimientos responde 409: solo se puede desactivar.
+  delete: (id) => api.delete(`/bancos/${id}`).then(r => r.data),
+  getMovimientos: (params = {}) => api.get('/bancos/movimientos', { params }).then(r => r.data),
+  createMovimiento: (data) => api.post('/bancos/movimientos', data).then(r => r.data),
+  updateMovimiento: (id, data) => api.put(`/bancos/movimientos/${id}`, data).then(r => r.data),
+  deleteMovimiento: (id) => api.delete(`/bancos/movimientos/${id}`).then(r => r.data),
+};
+
 // Subrubros de tipo Sumatoria: conceptos y cargas. `origen` de una carga:
 // 'caja' (descuenta del día, lleva método) | 'subrubro' (solo suma en el subrubro).
 // Filtros (params): { mes } | { desde, hasta }, conceptos (array de ids), origen.
@@ -414,7 +428,7 @@ export const ivaApi = {
   },
 };
 
-// Registro → Venta Sistema (ventas propias) y Tarjetas (QR/débito/crédito/prepaga)
+// Registro → Venta Sistema (ventas propias) y Tarjetas (QR/débito/crédito/prepaga/Mercado Pago)
 export const registroApi = {
   ventas: {
     getMes: (mes) => api.get(`/registro/ventas-sistema/mes/${mes}`).then(r => r.data),
@@ -500,8 +514,16 @@ export const cajaApi = {
   // el pago en el subrubro y, si hubo descuento, su Nota de Crédito automática.
   // descuento = monto fijo · descuento_pct = porcentaje (el backend lo resuelve a pesos).
   // monto = pago parcial (menor al saldo): el resto queda como un pendiente nuevo.
-  confirmar: (id, { descuento = 0, descuento_pct = null, fecha, monto = null } = {}) =>
-    api.post(`/caja/${id}/confirmar`, { descuento, descuento_pct, fecha, monto }).then(r => r.data),
+  // banco_id = banco del pago por transferencia (pago en lote / parcial); sin él, el
+  // del ítem o el predeterminado.
+  confirmar: (id, { descuento = 0, descuento_pct = null, fecha, monto = null, banco_id } = {}) =>
+    api.post(`/caja/${id}/confirmar`, { descuento, descuento_pct, fecha, monto, banco_id }).then(r => r.data),
+  // Saldo en cuenta del día, uno por banco: saldos = [{ banco_id, monto }] (monto '' = borrar).
+  saveSaldosCuenta: (fecha, saldos) => api.put('/caja/saldos-cuenta', { fecha, saldos }).then(r => r.data),
+  // Gráficas agregadas en el backend: { periodos: [...] }. bancos = ids (vacío = todos).
+  getGraficas: ({ desde, hasta, vista, bancos }) => api.get('/caja/graficas', {
+    params: { desde, hasta, vista, bancos: bancos && bancos.length ? bancos.join(',') : undefined },
+  }).then(r => r.data),
   revertir: (id) => api.post(`/caja/${id}/revertir`).then(r => r.data),
   // Factura/remito detrás de un ítem pendiente, para corregirla desde la Caja. El
   // cambio se guarda en la factura y el ítem pasa a valer el saldo nuevo.

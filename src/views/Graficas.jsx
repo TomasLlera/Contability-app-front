@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { hoyAR, sumarDias } from '../utils/fecha';
 import { dashboardApi, subrubrosApi, cajaApi, stockApi, sumatoriasApi } from '../api';
 import SumatoriasResumenView from './SumatoriasResumenView';
+import CajaBancosGraficos from '../components/CajaBancosGraficos';
+import useBancos from '../hooks/useBancos';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, RotateCcw, BarChart3, ClipboardList, CalendarRange, CalendarClock, Wallet, Boxes, Sigma } from 'lucide-react';
 import { EntityIcon } from '../icons';
 import ComparativaCard from '../components/ComparativaCard';
@@ -319,6 +321,10 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
   const [cajaMetrica, setCajaMetrica] = useState('ingresosEfvo');
   const [respCaja, setRespCaja]       = useState({ clave: null, datos: [] });
   const [showEspeciales, setShowEspeciales] = useState(() => sessionStorage.getItem('graficas_especiales') !== '0');
+  // Multi-banco: filtro de bancos (vacío = todos). Se ofrece con 2+ bancos con historial.
+  const { bancos: listaBancos, bancoDe } = useBancos();
+  const [bancosFiltro, setBancosFiltro] = useState([]);
+  const toggleBancoFiltro = (id) => setBancosFiltro(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]));
 
   // Stock
   const [stockVista, setStockVista]   = useState('mes');
@@ -402,39 +408,27 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
       .catch(() => setRespStock(r => ({ clave: claveStock, datos: r.datos })));
   }, [claveStock]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Series de caja agregadas en Mongo (GET /caja/graficas), por período y banco. El
+  // filtro de bancos afecta lo que es transferencia; con todos, los totales son los
+  // mismos que calculaba antes el front sobre los ítems crudos.
+  const claveGraf = tab === 'caja' ? `${rangoCaja.desde}|${rangoCaja.hasta}|${cajaVista}|${bancosFiltro.join(',')}` : null;
+  const [respGraf, setRespGraf] = useState({ clave: null, periodos: [] });
+  const grafLoading = !!claveGraf && respGraf.clave !== claveGraf;
+  useEffect(() => {
+    if (!claveGraf) return;
+    cajaApi.getGraficas({ desde: rangoCaja.desde, hasta: rangoCaja.hasta, vista: cajaVista, bancos: bancosFiltro })
+      .then(d => setRespGraf({ clave: claveGraf, periodos: d.periodos || [] }))
+      .catch(() => setRespGraf(r => ({ clave: claveGraf, periodos: r.periodos })));
+  }, [claveGraf]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cajaAggregated = useMemo(() => {
-    const getKey = (fecha) => {
-      if (cajaVista === 'dia') return fecha;
-      if (cajaVista === 'mes') return fecha.slice(0, 7);
-      return fecha.slice(0, 4);
-    };
     const getLabel = (key) => {
       if (cajaVista === 'dia') return key.split('-')[2];
       if (cajaVista === 'mes') { const [a, m] = key.split('-'); return `${MESES[m]}'${a.slice(2)}`; }
       return key;
     };
-
-    const map = {};
-    cajaMovs.forEach(m => {
-      const key = getKey(m.fecha);
-      if (!map[key]) map[key] = { ingresosEfvo: 0, gastosEfvo: 0, gastosTrans: 0, gastosEspeciales: 0, saldoCuentaLast: null };
-      if ((m.tipo === 'empleado' || m.tipo === 'ingreso_extra') && m.metodo === 'efectivo') map[key].ingresosEfvo += m.monto;
-      if (m.tipo === 'gasto') {
-        if (m.metodo === 'efectivo') map[key].gastosEfvo += m.monto;
-        else map[key].gastosTrans += m.monto;
-        if (m.es_especial) map[key].gastosEspeciales += m.monto;
-      }
-      if (m.tipo === 'saldo_cuenta') map[key].saldoCuentaLast = m.monto;
-    });
-
-    const sorted = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([key, v]) => ({ key, label: getLabel(key), ...v }));
-    return sorted.map((d, i) => {
-      const prev = sorted[i - 1];
-      const transDelta = (d.saldoCuentaLast !== null && prev?.saldoCuentaLast != null)
-        ? Math.max(d.saldoCuentaLast - prev.saldoCuentaLast, 0) : 0;
-      return { ...d, transDelta, totalGastos: d.gastosEfvo + d.gastosTrans };
-    });
-  }, [cajaMovs, cajaVista]);
+    return respGraf.periodos.map(p => ({ ...p, label: getLabel(p.key) }));
+  }, [respGraf, cajaVista]);
 
   const activeCajaCfg = CAJA_CHARTS.find(c => c.key === cajaMetrica) || CAJA_CHARTS[0];
 
@@ -697,7 +691,27 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
             ))}
           </div>
 
-          {cajaLoading ? (
+          {/* Filtro de bancos: solo con 2+ bancos (incluidos los desactivados con historial). */}
+          {listaBancos.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1 mb-4" role="group" aria-label="Bancos">
+              <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">Transferencias de:</span>
+              <button type="button" aria-pressed={bancosFiltro.length === 0} onClick={() => setBancosFiltro([])}
+                className={`min-h-11 sm:min-h-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${bancosFiltro.length === 0 ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}>
+                Todos los bancos
+              </button>
+              {listaBancos.map(b => {
+                const activo = bancosFiltro.includes(b.id);
+                return (
+                  <button key={b.id} type="button" aria-pressed={activo} onClick={() => toggleBancoFiltro(b.id)}
+                    className={`min-h-11 sm:min-h-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors inline-flex items-center gap-1 ${activo ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300'} ${b.activo ? '' : 'opacity-70'}`}>
+                    <span aria-hidden className="w-2 h-2 rounded-full" style={{ background: b.color }} /> {b.alias || b.nombre}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {cajaLoading || grafLoading ? (
             <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Cargando...</div>
           ) : cajaAggregated.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">Sin datos de caja para este período</div>
@@ -709,6 +723,11 @@ export default function Graficas({ rubros = [], initialRubroId = null, initialMe
             <DetalleEspeciales movs={movsEspeciales} open={showEspeciales} onToggle={toggleEspeciales} />
           )}
         </div>
+
+        {/* Por banco: solo con 2+ bancos; con uno, Gráficas queda como antes. */}
+        {listaBancos.length > 1 && !grafLoading && cajaAggregated.length > 0 && (
+          <CajaBancosGraficos periodos={cajaAggregated} bancoDe={bancoDe} />
+        )}
         </div>
       )}
 
