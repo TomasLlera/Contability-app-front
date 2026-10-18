@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { hoyAR, fmtFecha } from '../utils/fecha';
 import { registroApi, cajaApi, reportesApi, getErrorMsg } from '../api';
 import ConfirmModal from '../components/ConfirmModal';
@@ -10,7 +10,7 @@ import RegistroExportModal from '../components/RegistroExportModal';
 import ComparativaVentasModal from '../components/ComparativaVentasModal';
 import {
   QrCode, CreditCard, Landmark, Ticket, Plus, Pencil, Trash2, Check, X, Users, BarChart3, FileSpreadsheet,
-  ChevronLeft, ChevronRight, ChevronDown, Scale,
+  ChevronLeft, ChevronRight, ChevronDown, Scale, Wallet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { fmtMoneda } from '../utils/formato';
@@ -29,18 +29,19 @@ const shiftMes = (mes, d) => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
 };
 
-// Las 4 columnas fijas. `color` se usa en el gráfico apilado y en los acentos de las cards.
+// Las 5 columnas fijas (también el orden de la rotación de carga). `color` se usa en el gráfico apilado y en los acentos de las cards.
 const TIPOS = [
   { key: 'qr',      label: 'Pagos QR',        Icon: QrCode,     color: '#8b5cf6', text: 'text-violet-600 dark:text-violet-400',   bg: 'bg-violet-50 dark:bg-violet-900/20',   border: 'border-violet-200 dark:border-violet-800' },
   { key: 'debito',  label: 'Tarjeta Débito',  Icon: CreditCard, color: '#3b82f6', text: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-200 dark:border-blue-800' },
   { key: 'credito', label: 'Tarjeta Crédito', Icon: Landmark,   color: '#f59e0b', text: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-900/20',     border: 'border-amber-200 dark:border-amber-800' },
   { key: 'prepaga', label: 'Tarjeta Prepaga', Icon: Ticket,     color: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-800' },
+  { key: 'mercado_pago', label: 'Mercado Pago', Icon: Wallet, color: '#0ea5e9', text: 'text-sky-600 dark:text-sky-400',         bg: 'bg-sky-50 dark:bg-sky-900/20',         border: 'border-sky-200 dark:border-sky-800' },
 ];
 const tipoDef = (key) => TIPOS.find(t => t.key === key) || TIPOS[0];
 
 // Rotación de carga: la primera vuelta arranca en el ancla (el tipo elegido a mano)
 // y sigue con el resto en orden. Al cerrar el ciclo vuelve al primero (orden natural),
-// no al ancla. Ej: ancla 'debito' → debito, qr, credito, prepaga; luego qr, debito, credito, prepaga…
+// no al ancla. Ej: ancla 'debito' → debito, qr, credito, prepaga, mercado_pago; luego qr, debito, …
 const rotarTipo = (anchor, current) => {
   const seq = [anchor, ...TIPOS.map(t => t.key).filter(k => k !== anchor)];
   const i = seq.indexOf(current);
@@ -66,8 +67,19 @@ export default function TarjetasView({ role }) {
   const [showExport, setShowExport] = useState(false);
   const [showComparativa, setShowComparativa] = useState(false);
 
+  // Alta: formulario y tipo donde arrancó la rotación de carga.
+  const [form, setForm] = useState({ tipo: 'qr', monto: '', empleado: '' });
+  const [anchorTipo, setAnchorTipo] = useState('qr');
+
   // Elegir un día lleva el resumen mensual a ese mes (evita tener dos navegadores desfasados).
-  const setFecha = (f) => { setFechaState(f); setMes(f.slice(0, 7)); };
+  // Cambiar de día reinicia la rotación de carga (vuelve a QR) pero conserva el
+  // empleado: así se cargan los días de un mismo empleado de corrido.
+  const setFecha = (f) => {
+    setFechaState(f);
+    setMes(f.slice(0, 7));
+    setForm(fm => ({ ...fm, tipo: TIPOS[0].key, monto: '' }));
+    setAnchorTipo(TIPOS[0].key);
+  };
 
   // La vista NO abre en hoy sino en el día donde quedó la carga: el siguiente al
   // último que ya tiene datos (tope hoy). Si hoy es 3 y lo último cargado es el 31,
@@ -85,10 +97,21 @@ export default function TarjetasView({ role }) {
   }, []);
 
   // Alta
-  const [form, setForm] = useState({ tipo: 'qr', monto: '', empleado: '' });
-  const [anchorTipo, setAnchorTipo] = useState('qr'); // tipo donde arrancó la rotación de carga
   const [empleadoOtro, setEmpleadoOtro] = useState(false); // true = escribir a mano
   const [saving, setSaving] = useState(false);
+  const montoRef = useRef(null);
+
+  // Otro empleado = otra vuelta de carga: la rotación arranca de nuevo en QR.
+  const cambiarEmpleado = (v) => {
+    setForm(f => (f.empleado === v ? f : { ...f, empleado: v, tipo: TIPOS[0].key }));
+    if (form.empleado !== v) setAnchorTipo(TIPOS[0].key);
+  };
+  // Elegir el tipo a mano lo vuelve el ancla de la rotación.
+  const elegirTipo = (key) => {
+    setForm(f => ({ ...f, tipo: key }));
+    setAnchorTipo(key);
+    montoRef.current?.focus();
+  };
 
   // Edición inline
   const [editId, setEditId] = useState(null);
@@ -139,8 +162,11 @@ export default function TarjetasView({ role }) {
       const { next, cerroCiclo } = rotarTipo(anchorTipo, form.tipo);
       setForm(f => ({ ...f, monto: '', tipo: next }));
       if (cerroCiclo) setAnchorTipo(TIPOS[0].key); // cerrado el ciclo → orden natural desde el primero
+      // El foco vuelve al monto (en el celular el teclado queda abierto) para cargar
+      // el siguiente tipo sin tocar nada más.
+      montoRef.current?.focus();
       await recargarTodo();
-      toast.success('Ingreso registrado');
+      toast.success(`${tipoDef(form.tipo).label} registrado · sigue ${tipoDef(next).label}`);
     } catch (err) {
       toast.error(getErrorMsg(err));
     } finally {
@@ -210,7 +236,7 @@ export default function TarjetasView({ role }) {
       {showExport && (
         <RegistroExportModal
           titulo="Exportar tarjetas"
-          ayuda="Genera un Excel con el resumen mes a mes por tipo (QR, débito, crédito, prepaga), el acumulado por empleado y el detalle de cada ingreso."
+          ayuda="Genera un Excel con el resumen mes a mes por tipo (QR, débito, crédito, prepaga, Mercado Pago), el acumulado por empleado y el detalle de cada ingreso."
           mesInicial={mes}
           onExport={reportesApi.tarjetas}
           onClose={() => setShowExport(false)}
@@ -261,8 +287,8 @@ export default function TarjetasView({ role }) {
         </div>
       </div>
 
-      {/* 4 columnas del día */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 5 columnas del día */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {TIPOS.map((def) => {
           const { key, label, text, bg, border } = def;
           const g = porTipoDia[key] || { total: 0, transacciones: 0 };
@@ -306,7 +332,7 @@ export default function TarjetasView({ role }) {
       <div className="flex items-center justify-between bg-slate-900 dark:bg-slate-800 border border-slate-700 rounded-xl px-5 py-4">
         <div className="text-sm font-medium text-slate-300 flex items-center gap-1.5">
           Total consolidado del día
-          <InfoTooltip text="Suma bruta de QR, débito, crédito y prepaga. Todavía no descuenta retenciones bancarias." />
+          <InfoTooltip text="Suma bruta de QR, débito, crédito, prepaga y Mercado Pago. Todavía no descuenta retenciones bancarias." />
         </div>
         <span className="text-2xl font-bold text-white">{fmt(totalDia)}</span>
       </div>
@@ -317,16 +343,28 @@ export default function TarjetasView({ role }) {
           <div className="flex justify-end -mt-1 -mr-1">
             <InfoTooltip text={`El ingreso se carga en el día seleccionado arriba (${fecha}). Cambiá el día con el navegador de fechas.`} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
-            <div>
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Tipo</label>
-              <select value={form.tipo} onChange={e => { setForm(f => ({ ...f, tipo: e.target.value })); setAnchorTipo(e.target.value); }} className={inputCls}>
-                {TIPOS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-              </select>
+          {/* Tipo: botones a la vista (no un select) para ver siempre a qué tipo saltó la
+              rotación después de cada carga, también en el celular. */}
+          <div className="mb-3">
+            <span id="tarjeta-tipo" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Tipo</span>
+            <div role="radiogroup" aria-labelledby="tarjeta-tipo" className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+              {TIPOS.map(t => {
+                const activo = form.tipo === t.key;
+                return (
+                  <button key={t.key} type="button" role="radio" aria-checked={activo} onClick={() => elegirTipo(t.key)}
+                    className={`min-h-11 sm:min-h-9 px-2 rounded-lg border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors ${
+                      activo ? `${t.bg} ${t.border} ${t.text} ring-2 ring-offset-1 ring-current dark:ring-offset-slate-800` : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40'
+                    }`}>
+                    <t.Icon size={14} className="shrink-0" /> <span className="truncate">{t.label.replace('Tarjeta ', '')}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
             <div>
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Monto</label>
-              <input type="number" inputMode="decimal" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0" className={inputCls} />
+              <label htmlFor="tarjeta-monto" className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Monto · {tipoDef(form.tipo).label}</label>
+              <input id="tarjeta-monto" ref={montoRef} type="number" inputMode="decimal" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0" className={`${inputCls} min-h-11 sm:min-h-0 text-base sm:text-sm`} />
             </div>
             <div>
               <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mb-1">
@@ -338,8 +376,8 @@ export default function TarjetasView({ role }) {
                 value={form.empleado}
                 otro={empleadoOtro}
                 setOtro={setEmpleadoOtro}
-                onChange={(v) => setForm(f => ({ ...f, empleado: v }))}
-                cls={inputCls}
+                onChange={cambiarEmpleado}
+                cls={`${inputCls} min-h-11 sm:min-h-0`}
               />
             </div>
             <button type="submit" disabled={saving}

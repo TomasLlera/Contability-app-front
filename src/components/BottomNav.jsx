@@ -36,7 +36,7 @@ const SUBMENUS = {
     label: 'Registro',
     items: [
       { view: 'registro-ventas',   label: 'Venta Sistema', hint: 'Registro diario de ventas' },
-      { view: 'registro-tarjetas', label: 'Tarjetas',      hint: 'QR, débito, crédito y prepagas' },
+      { view: 'registro-tarjetas', label: 'Tarjetas',      hint: 'QR, débito, crédito, prepagas y Mercado Pago' },
     ],
   },
 };
