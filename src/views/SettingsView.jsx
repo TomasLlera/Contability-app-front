@@ -530,6 +530,59 @@ function AlertasSection() {
   );
 }
 
+// Cambio de la PROPIA contraseña (admin y superadmin). Pide la actual. El backend
+// cierra las demás sesiones y devuelve un token nuevo: este dispositivo sigue adentro.
+function MiContrasena() {
+  const [actual, setActual] = useState('');
+  const [nueva, setNueva] = useState('');
+  const [repetir, setRepetir] = useState('');
+  const [ver, setVer] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const cls = 'w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 min-h-11 sm:min-h-0 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    if (!actual) { toast.error('Ingresá tu contraseña actual'); return; }
+    if (nueva.length < 6) { toast.error('La nueva debe tener al menos 6 caracteres'); return; }
+    if (nueva !== repetir) { toast.error('Las contraseñas nuevas no coinciden'); return; }
+    setGuardando(true);
+    try {
+      const r = await usersApi.changeOwnPassword(actual, nueva);
+      if (r?.token) localStorage.setItem('token', r.token);
+      setActual(''); setNueva(''); setRepetir('');
+      toast.success('Contraseña actualizada. Se cerraron tus sesiones en otros dispositivos.');
+    } catch (err) { toast.error(getErrorMsg(err)); }
+    finally { setGuardando(false); }
+  };
+
+  return (
+    <form onSubmit={guardar} className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <KeyRound size={15} className="text-blue-600 dark:text-blue-400" />
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Mi contraseña</h3>
+        <span className="text-xs text-slate-500 dark:text-slate-400">· {authApi.getUsuario()}</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input type={ver ? 'text' : 'password'} className={cls} placeholder="Contraseña actual" autoComplete="current-password"
+          aria-label="Contraseña actual" value={actual} onChange={e => setActual(e.target.value)} />
+        <input type={ver ? 'text' : 'password'} className={cls} placeholder="Nueva (mín. 6)" autoComplete="new-password"
+          aria-label="Contraseña nueva" value={nueva} onChange={e => setNueva(e.target.value)} />
+        <input type={ver ? 'text' : 'password'} className={cls} placeholder="Repetir la nueva" autoComplete="new-password"
+          aria-label="Repetir la contraseña nueva" value={repetir} onChange={e => setRepetir(e.target.value)} />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={() => setVer(v => !v)} className="min-h-11 sm:min-h-0 text-xs text-slate-500 dark:text-slate-400 hover:underline inline-flex items-center gap-1">
+          {ver ? <EyeOff size={12} /> : <Eye size={12} />} {ver ? 'Ocultar' : 'Mostrar'}
+        </button>
+        <button type="submit" disabled={guardando}
+          className="min-h-11 sm:min-h-9 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          {guardando ? 'Guardando…' : 'Cambiar contraseña'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function UsuariosSection() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -640,9 +693,12 @@ function UsuariosSection() {
         </p>
       </div>
 
+      {/* Admin y superadmin cambian su propia contraseña; la de los demás, solo el superadmin. */}
+      {['admin', 'superadmin'].includes(authApi.getRole()) && <MiContrasena />}
+
       {!isSuper && (
         <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-          <Crown size={14} /> Solo un Super Administrador puede crear, editar o eliminar usuarios.
+          <Crown size={14} /> Solo un Super Administrador puede crear usuarios, editarlos y cambiar contraseñas ajenas.
         </div>
       )}
 

@@ -357,6 +357,9 @@ export const usersApi = {
   update: (id, data) => api.put(`/users/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/users/${id}`).then(r => r.data),
   changePassword: (id, password) => api.put(`/users/${id}/password`, { password }).then(r => r.data),
+  // La propia (admin / superadmin): devuelve { token } nuevo, porque el cambio cierra las sesiones.
+  changeOwnPassword: (password_actual, password_nueva) =>
+    api.put('/users/me/password', { password_actual, password_nueva }).then(r => r.data),
 };
 
 export const stockApi = {
